@@ -98,8 +98,7 @@ export async function POST(request: NextRequest) {
             participants: game.participants,
             teams: game.teams,
             result: game.result,
-            reservationInfo: game.reservationInfo,
-            customTime: game.customTime
+            reservationInfo: game.reservationInfo
           });
         } else {
           // Create new game
@@ -110,8 +109,7 @@ export async function POST(request: NextRequest) {
             status: game.status || 'scheduled',
             teams: game.teams,
             result: game.result,
-            reservationInfo: game.reservationInfo,
-            customTime: game.customTime
+            reservationInfo: game.reservationInfo
           });
         }
       }

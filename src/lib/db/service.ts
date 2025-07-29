@@ -409,9 +409,9 @@ export class DatabaseService {
     try {
       const allGames = await this.getAllGames();
       return allGames.filter(game => game.participants.length >= 10);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If the table doesn't exist, return empty array
-      if (error.message && (
+      if (error instanceof Error && error.message && (
         error.message.includes('relation "games" does not exist') ||
         error.message.includes('column "admin_notification_sent" does not exist')
       )) {
@@ -422,70 +422,11 @@ export class DatabaseService {
     }
   }
 
-  static async checkAndNotifyAdminsForFullGames(): Promise<void> {
-    const fullGames = await this.getGamesWithFullParticipants();
-    
-    for (const game of fullGames) {
-      // Check if notification already sent and timeout hasn't expired
-      if (game.adminNotificationSent && game.adminNotificationTimeout) {
-        const now = new Date();
-        if (now < game.adminNotificationTimeout) {
-          continue; // Still in timeout period
-        }
-      }
 
-      // Create admin notification
-      await this.createAdminNotification({
-        type: 'match_ready',
-        gameId: game.id,
-        message: `Match on ${new Date(game.date).toLocaleDateString()} has reached 10 players and needs confirmation`,
-        actionRequired: true,
-        isRead: false
-      });
-
-      // Update game with notification sent and set timeout (5 minutes)
-      const timeoutDate = new Date();
-      timeoutDate.setMinutes(timeoutDate.getMinutes() + 5);
-      
-      await this.updateGame(game.id, {
-        adminNotificationSent: true,
-        adminNotificationTimeout: timeoutDate
-      });
-    }
-  }
 
   // Admin notifications management
-  static async createAdminNotification(notification: Omit<NewAdminNotification, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    const result = await db.insert(adminNotifications).values({
-      ...notification,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning({ id: adminNotifications.id });
-    
-    return result[0].id;
-  }
 
-  static async getUnreadAdminNotifications(): Promise<AdminNotification[]> {
-    try {
-      return await db.select()
-        .from(adminNotifications)
-        .where(eq(adminNotifications.isRead, false))
-        .orderBy(desc(adminNotifications.createdAt));
-    } catch (error: any) {
-      // If the table doesn't exist, return empty array
-      if (error.message && error.message.includes('relation "admin_notifications" does not exist')) {
-        console.log('Admin notifications table does not exist yet');
-        return [];
-      }
-      throw error;
-    }
-  }
 
-  static async markAdminNotificationAsRead(notificationId: string): Promise<void> {
-    await db.update(adminNotifications)
-      .set({ isRead: true, updatedAt: new Date() })
-      .where(eq(adminNotifications.id, notificationId));
-  }
 
   static async createVotingReminderNotification(month: number, year: number): Promise<void> {
     const usersNeedingReminders = await this.getUsersNeedingReminders(month, year);
@@ -591,10 +532,10 @@ export class DatabaseService {
       console.log(`✅ Admin notification created with ID: ${notificationId}`);
       
       return notificationId;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error creating admin notification:', error);
       // If it's a table issue, handle gracefully but still log
-      if (error.message && error.message.includes('does not exist')) {
+      if (error instanceof Error && error.message && error.message.includes('does not exist')) {
         console.log('⚠️ Admin notifications table does not exist - notification not saved to DB');
         return 'mock-notification-id';
       }
@@ -611,9 +552,9 @@ export class DatabaseService {
         
       console.log(`📨 Found ${notifications.length} unread admin notifications`);
       return notifications;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If the table doesn't exist, return empty array
-      if (error.message && error.message.includes('relation "admin_notifications" does not exist')) {
+      if (error instanceof Error && error.message && error.message.includes('relation "admin_notifications" does not exist')) {
         console.log('Admin notifications table does not exist yet');
         return [];
       }
@@ -628,9 +569,9 @@ export class DatabaseService {
         .where(eq(adminNotifications.id, notificationId));
         
       console.log(`✅ Marked notification ${notificationId} as read`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error marking notification as read:', error);
-      if (error.message && error.message.includes('does not exist')) {
+      if (error instanceof Error && error.message && error.message.includes('does not exist')) {
         console.log('⚠️ Admin notifications table does not exist - cannot mark as read');
       }
     }

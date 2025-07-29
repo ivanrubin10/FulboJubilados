@@ -132,11 +132,12 @@ export async function POST(request: NextRequest) {
       try {
         await DatabaseService.addUser({
           ...player,
+          imageUrl: player.imageUrl || undefined,
           createdAt: new Date()
         });
 
         // Make ALL mock players available on the FIRST Sunday for easy testing
-        let availableSundays;
+        let availableSundays: number[];
         if (allSundays.length > 0) {
           // All players available on the first Sunday of the month
           const firstSunday = allSundays[0];
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
         console.log(`Player ${player.name} might already exist, trying to set availability...`);
         try {
           // Use the same availability logic as above
-          let availableSundays;
+          let availableSundays: number[];
           if (allSundays.length > 0) {
             const firstSunday = allSundays[0];
             availableSundays = [firstSunday];
