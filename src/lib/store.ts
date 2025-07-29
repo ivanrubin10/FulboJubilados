@@ -164,7 +164,7 @@ export class LocalStorage {
   }
 
   static getUsersNeedingReminders(month: number, year: number): User[] {
-    const users = this.getUsers().filter(u => !u.isAdmin); // Don't remind admins
+    const users = this.getUsers().filter(u => !u.isAdmin && u.isWhitelisted); // Only whitelisted, non-admin users
     const availability = this.getMonthlyAvailability();
     const reminderStatuses = this.getReminderStatuses();
 
@@ -185,6 +185,24 @@ export class LocalStorage {
 
       return reminderStatus?.isActive !== false; // Send if no status or still active
     });
+  }
+
+  static toggleUserWhitelist(userId: string): void {
+    const users = this.getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    
+    if (userIndex !== -1) {
+      users[userIndex].isWhitelisted = !users[userIndex].isWhitelisted;
+      this.saveUsers(users);
+    }
+  }
+
+  static getWhitelistedUsers(): User[] {
+    return this.getUsers().filter(u => u.isWhitelisted && !u.isAdmin);
+  }
+
+  static getWhitelistedUserCount(): number {
+    return this.getWhitelistedUsers().length;
   }
 
   static getSettings(): { currentMonth?: number; currentYear?: number } {

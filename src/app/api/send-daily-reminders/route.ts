@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { emailService } from '@/lib/email';
-import { LocalStorage } from '@/lib/store';
+import { HybridStore } from '@/lib/hybrid-store';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current active month
-    const activeMonth = LocalStorage.getCurrentActiveMonth();
+    const activeMonth = await HybridStore.getCurrentActiveMonth();
     const { month, year } = activeMonth;
 
     // Get users who need reminders
-    const usersNeedingReminders = LocalStorage.getUsersNeedingReminders(month, year);
+    const usersNeedingReminders = await HybridStore.getUsersNeedingReminders(month, year);
     
     if (usersNeedingReminders.length === 0) {
       return NextResponse.json({
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
 
     if (success) {
       // Update reminder status for each user
-      usersNeedingReminders.forEach(user => {
-        LocalStorage.updateReminderStatus(user.id, month, year);
-      });
+      for (const user of usersNeedingReminders) {
+        await HybridStore.updateReminderStatus(user.id, month, year);
+      }
 
       return NextResponse.json({
         success: true,
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
 // Also support GET for testing purposes
 export async function GET() {
   try {
-    const activeMonth = LocalStorage.getCurrentActiveMonth();
+    const activeMonth = await HybridStore.getCurrentActiveMonth();
     const { month, year } = activeMonth;
-    const usersNeedingReminders = LocalStorage.getUsersNeedingReminders(month, year);
+    const usersNeedingReminders = await HybridStore.getUsersNeedingReminders(month, year);
 
     return NextResponse.json({
       success: true,

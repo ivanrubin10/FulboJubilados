@@ -87,22 +87,6 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-24 text-center">
-          <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-12 shadow-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-sky-500/10"></div>
-            <div className="relative z-10">
-              <h3 className="text-3xl font-black text-white mb-4 text-shadow-strong">¿Listo para empezar?</h3>
-              <p className="text-slate-300 mb-6 max-w-2xl mx-auto text-lg font-medium leading-relaxed">
-                Únete a la comunidad y disfruta de partidos organizados cada domingo
-              </p>
-              <SignUpButton mode="modal">
-                <button className="button-glow nested-border bg-white text-slate-900 px-10 py-3 rounded-2xl font-bold hover:bg-slate-50 transition-all duration-300 shadow-2xl hover:shadow-white/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                  ⚽ Crear Cuenta Gratis
-                </button>
-              </SignUpButton>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

@@ -48,6 +48,12 @@ export default function AdminPage() {
     }
   };
 
+  const toggleUserWhitelist = (userId: string) => {
+    LocalStorage.toggleUserWhitelist(userId);
+    const updatedUsers = LocalStorage.getUsers();
+    setUsers(updatedUsers);
+  };
+
   const advanceToNextMonth = () => {
     const nextMonth = getNextAvailableMonth();
     LocalStorage.setCurrentActiveMonth(nextMonth.month, nextMonth.year);
@@ -165,6 +171,36 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error checking reminder status:', error);
       alert('❌ Error al verificar estado');
+    }
+  };
+
+  const migrateToDatabase = async () => {
+    if (!confirm('¿Migrar todos los datos de LocalStorage a la base de datos Neon? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setIsLoadingEmail(true);
+    try {
+      const response = await fetch('/api/migrate-to-db', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || 'admin-secret'}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert('✅ Migración completada exitosamente. Los datos ahora están en la base de datos Neon.');
+      } else {
+        alert(`❌ Error en migración: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error in migration:', error);
+      alert('❌ Error al ejecutar migración');
+    } finally {
+      setIsLoadingEmail(false);
     }
   };
 
@@ -314,7 +350,7 @@ export default function AdminPage() {
               </button>
             </div>
             
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-purple-600">🤖</span>
                 <h4 className="font-bold text-purple-800 text-sm">Automatización con GitHub Actions</h4>
@@ -323,6 +359,25 @@ export default function AdminPage() {
                 Los recordatorios se envían automáticamente todos los días a las 10:00 AM UTC usando GitHub Actions.
                 Solo se envían a usuarios que no han marcado su disponibilidad para el mes activo.
               </p>
+            </div>
+
+            <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-600">🗄️</span>
+                  <div>
+                    <h4 className="font-bold text-cyan-800 text-sm">Base de Datos Neon</h4>
+                    <p className="text-cyan-700 text-xs">Migra datos de LocalStorage a PostgreSQL</p>
+                  </div>
+                </div>
+                <button
+                  onClick={migrateToDatabase}
+                  disabled={isLoadingEmail}
+                  className="bg-gradient-to-r from-cyan-600 to-cyan-700 text-white px-4 py-2 rounded-xl font-semibold hover:from-cyan-700 hover:to-cyan-800 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                >
+                  {isLoadingEmail ? '⏳ Migrando...' : '📦 Migrar a DB'}
+                </button>
+              </div>
             </div>
           </div>
           
@@ -344,12 +399,33 @@ export default function AdminPage() {
             <div className="w-14 h-14 bg-gradient-to-r from-sky-100 to-sky-200 rounded-2xl flex items-center justify-center">
               <span className="text-2xl">👥</span>
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-900">
                 Usuarios Registrados ({users.length})
               </h2>
               <p className="text-slate-600 text-sm">Gestiona permisos y usuarios del sistema</p>
             </div>
+            <div className="flex gap-4">
+              <div className="text-center">
+                <div className="text-lg font-bold text-green-700">{LocalStorage.getWhitelistedUserCount()}</div>
+                <div className="text-xs text-green-600">Habilitados</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-red-700">{users.filter(u => !u.isWhitelisted && !u.isAdmin).length}</div>
+                <div className="text-xs text-red-600">Deshabilitados</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-blue-600">ℹ️</span>
+              <h3 className="font-bold text-blue-800 text-sm">Control de Usuarios para Partidos</h3>
+            </div>
+            <p className="text-blue-700 text-xs leading-relaxed">
+              Solo los usuarios <strong>habilitados</strong> serán contados para la organización de partidos y recibirán recordatorios.
+              Usa esto para excluir usuarios de prueba o cuentas temporales.
+            </p>
           </div>
         
           {users.length > 0 ? (
@@ -361,8 +437,9 @@ export default function AdminPage() {
                       <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Foto</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Nombre</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Email</th>
-                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Administrador</th>
-                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Fecha de Registro</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Admin</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Habilitado</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Registro</th>
                       <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Acciones</th>
                     </tr>
                   </thead>
@@ -402,7 +479,16 @@ export default function AdminPage() {
                           }`}>
                             {userData.isAdmin ? '✓ Admin' : 'Usuario'}
                           </span>
-                    </td>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            userData.isWhitelisted 
+                              ? 'bg-green-100 text-green-800 border border-green-200' 
+                              : 'bg-red-100 text-red-800 border border-red-200'
+                          }`}>
+                            {userData.isWhitelisted ? '✓ Habilitado' : '❌ Deshabilitado'}
+                          </span>
+                        </td>
                         <td className="py-3 px-4 text-center text-slate-600 font-medium text-sm">
                           {new Date(userData.createdAt).toLocaleDateString('es-ES')}
                         </td>
@@ -417,6 +503,17 @@ export default function AdminPage() {
                               }`}
                             >
                               {userData.isAdmin ? '🔒 Quitar Admin' : '🔑 Hacer Admin'}
+                            </button>
+                            
+                            <button
+                              onClick={() => toggleUserWhitelist(userData.id)}
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                userData.isWhitelisted
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+                              }`}
+                            >
+                              {userData.isWhitelisted ? '❌ Deshabilitar' : '✅ Habilitar'}
                             </button>
                             
                             {userData.id !== currentUser.id && (

@@ -5,7 +5,9 @@ export interface User {
   nickname?: string;
   imageUrl?: string;
   isAdmin: boolean;
+  isWhitelisted: boolean; // For counting towards matches (excludes test users)
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 export interface Game {

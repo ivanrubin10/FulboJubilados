@@ -22,6 +22,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (isLoaded && user) {
       const existingUser = LocalStorage.getUserById(user.id);
+      let currentUserData = existingUser;
       
       if (!existingUser) {
         const userEmail = user.emailAddresses[0]?.emailAddress || '';
@@ -31,15 +32,19 @@ export default function Dashboard() {
           name: user.fullName || user.firstName || 'Usuario',
           imageUrl: user.imageUrl,
           isAdmin: userEmail === 'ivanrubin10@gmail.com',
+          isWhitelisted: true, // Auto-whitelist new users (admins can remove later)
           createdAt: new Date(),
         };
         LocalStorage.addUser(newUser);
         setCurrentUser(newUser);
+        currentUserData = newUser;
       } else {
         setCurrentUser(existingUser);
+        currentUserData = existingUser;
       }
 
-      if (!existingUser?.nickname) {
+      // Check if current user (new or existing) needs nickname setup
+      if (!currentUserData?.nickname) {
         router.push('/setup-nickname');
         return;
       }

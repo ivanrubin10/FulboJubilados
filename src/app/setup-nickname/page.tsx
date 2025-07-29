@@ -109,7 +109,7 @@ export default function SetupNickname() {
               id="nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="Ej: Ronaldinho, El Crack, Messi..."
+              placeholder="Ej: neox, dami, lazurro..."
               className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
               maxLength={20}
               disabled={isSubmitting}
