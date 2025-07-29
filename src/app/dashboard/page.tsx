@@ -3,93 +3,210 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LocalStorage } from '@/lib/store';
 import { getSundaysInMonth, formatDate } from '@/lib/utils';
 import { User } from '@/types';
+
+// API helper functions
+const apiClient = {
+  async getCurrentActiveMonth() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    return res.json();
+  },
+  
+  async getUserById(id: string) {
+    const res = await fetch(`/api/users/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch user');
+    const user = await res.json();
+    return user === null ? undefined : user;
+  },
+  
+  async addUser(user: User) {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error('Failed to add user');
+    return res.json();
+  },
+  
+  async getUserMonthlyAvailability(userId: string, month: number, year: number) {
+    const res = await fetch(`/api/availability?type=user&userId=${userId}&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch user availability');
+    return res.json();
+  },
+  
+  async getUserVotingStatus(userId: string, month: number, year: number) {
+    const res = await fetch(`/api/availability?type=voting&userId=${userId}&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch voting status');
+    return res.json();
+  },
+  
+  async getBlockedSundays(month: number, year: number) {
+    const res = await fetch(`/api/availability?type=blocked&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch blocked sundays');
+    return res.json();
+  },
+  
+  async updateMonthlyAvailability(userId: string, month: number, year: number, availableSundays: number[], cannotPlayAnyDay: boolean) {
+    const res = await fetch('/api/availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, month, year, availableSundays, cannotPlayAnyDay })
+    });
+    if (!res.ok) throw new Error('Failed to update availability');
+    return res.json();
+  }
+};
 
 export default function Dashboard() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
-  const activeMonth = LocalStorage.getCurrentActiveMonth();
-  const [selectedMonth, setSelectedMonth] = useState(activeMonth.month);
-  const [selectedYear, setSelectedYear] = useState(activeMonth.year);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [availableSundays, setAvailableSundays] = useState<number[]>([]);
   const [sundaysInMonth, setSundaysInMonth] = useState<number[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [cannotPlayAnyDay, setCannotPlayAnyDay] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
+  const [blockedSundays, setBlockedSundays] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load initial data
   useEffect(() => {
-    if (isLoaded && user) {
-      const existingUser = LocalStorage.getUserById(user.id);
-      let currentUserData = existingUser;
+    const loadInitialData = async () => {
+      if (!isLoaded || !user) return;
       
-      if (!existingUser) {
-        const userEmail = user.emailAddresses[0]?.emailAddress || '';
-        const newUser: User = {
-          id: user.id,
-          email: userEmail,
-          name: user.fullName || user.firstName || 'Usuario',
-          imageUrl: user.imageUrl,
-          isAdmin: userEmail === 'ivanrubin10@gmail.com',
-          isWhitelisted: true, // Auto-whitelist new users (admins can remove later)
-          createdAt: new Date(),
-        };
-        LocalStorage.addUser(newUser);
-        setCurrentUser(newUser);
-        currentUserData = newUser;
-      } else {
-        setCurrentUser(existingUser);
-        currentUserData = existingUser;
-      }
+      setIsLoading(true);
+      try {
+        // Get active month from database
+        const activeMonth = await apiClient.getCurrentActiveMonth();
+        setSelectedMonth(activeMonth.month);
+        setSelectedYear(activeMonth.year);
 
-      // Check if current user (new or existing) needs nickname setup
-      if (!currentUserData?.nickname) {
-        router.push('/setup-nickname');
-        return;
-      }
+        // Check if user exists, create if not
+        const existingUser = await apiClient.getUserById(user.id);
+        let currentUserData = existingUser;
+        
+        if (!existingUser) {
+          const userEmail = user.emailAddresses[0]?.emailAddress || '';
+          const newUser: User = {
+            id: user.id,
+            email: userEmail,
+            name: user.fullName || user.firstName || 'Usuario',
+            imageUrl: user.imageUrl,
+            isAdmin: userEmail === 'ivanrubin10@gmail.com',
+            isWhitelisted: true, // Auto-whitelist new users (admins can remove later)
+            createdAt: new Date(),
+          };
+          await apiClient.addUser(newUser);
+          setCurrentUser(newUser);
+          currentUserData = newUser;
+        } else {
+          setCurrentUser(existingUser);
+          currentUserData = existingUser;
+        }
 
-      const userAvailability = LocalStorage.getUserMonthlyAvailability(
-        user.id,
-        selectedMonth,
-        selectedYear
-      );
-      const votingStatus = LocalStorage.getUserVotingStatus(user.id, selectedMonth, selectedYear);
+        // Check if current user (new or existing) needs nickname setup
+        if (!currentUserData?.nickname) {
+          router.push('/setup-nickname');
+          return;
+        }
+
+        // Load user's availability for the active month
+        await loadUserAvailability(user.id, activeMonth.month, activeMonth.year);
+        
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [isLoaded, user, router]);
+
+  // Load user availability when month changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user || !currentUser) return;
       
-      setAvailableSundays(userAvailability);
-      setCannotPlayAnyDay(votingStatus.cannotPlayAnyDay);
-      setHasVoted(votingStatus.hasVoted);
-    }
-  }, [isLoaded, user, selectedMonth, selectedYear, router]);
+      await loadUserAvailability(user.id, selectedMonth, selectedYear);
+    };
+    
+    loadData();
+  }, [user, currentUser, selectedMonth, selectedYear]);
 
+  // Update Sundays when month changes
   useEffect(() => {
     setSundaysInMonth(getSundaysInMonth(selectedYear, selectedMonth));
   }, [selectedMonth, selectedYear]);
 
-  const toggleSundayAvailability = (sunday: number) => {
+  const loadUserAvailability = async (userId: string, month: number, year: number) => {
+    try {
+      const [userAvailability, votingStatus, blocked] = await Promise.all([
+        apiClient.getUserMonthlyAvailability(userId, month, year),
+        apiClient.getUserVotingStatus(userId, month, year),
+        apiClient.getBlockedSundays(month, year)
+      ]);
+      
+      setAvailableSundays(userAvailability);
+      setCannotPlayAnyDay(votingStatus.cannotPlayAnyDay);
+      setHasVoted(votingStatus.hasVoted);
+      setBlockedSundays(blocked);
+    } catch (error) {
+      console.error('Error loading user availability:', error);
+    }
+  };
+
+  const toggleSundayAvailability = async (sunday: number) => {
     if (!user || cannotPlayAnyDay) return;
+
+    // Check if this day is blocked (has confirmed game with 10 players)
+    const isBlocked = blockedSundays.includes(sunday);
+    
+    // If trying to add a blocked day, show warning and prevent selection
+    if (!availableSundays.includes(sunday) && isBlocked) {
+      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+      alert(
+        `⚠️ No puedes seleccionar este domingo\n\n` +
+        `🚫 ${monthName} ${sunday}: Ya hay un partido confirmado con 10 jugadores\n\n` +
+        `Este día está completo y no acepta más jugadores.`
+      );
+      return;
+    }
 
     const newAvailability = availableSundays.includes(sunday)
       ? availableSundays.filter(s => s !== sunday)
       : [...availableSundays, sunday];
 
+    // Update UI immediately for better UX
     setAvailableSundays(newAvailability);
     setHasVoted(true);
     setCannotPlayAnyDay(false);
     
-    LocalStorage.updateMonthlyAvailability(
-      user.id,
-      selectedMonth,
-      selectedYear,
-      newAvailability,
-      false
-    );
+    try {
+      await apiClient.updateMonthlyAvailability(
+        user.id,
+        selectedMonth,
+        selectedYear,
+        newAvailability,
+        false
+      );
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      // Revert UI changes on error
+      setAvailableSundays(availableSundays);
+    }
   };
 
-  const toggleCannotPlayAnyDay = () => {
+  const toggleCannotPlayAnyDay = async () => {
     if (!user) return;
 
     const newCannotPlayAnyDay = !cannotPlayAnyDay;
+    
+    // Update UI immediately
     setCannotPlayAnyDay(newCannotPlayAnyDay);
     setHasVoted(true);
     
@@ -97,197 +214,214 @@ export default function Dashboard() {
       setAvailableSundays([]);
     }
     
-    LocalStorage.updateMonthlyAvailability(
-      user.id,
-      selectedMonth,
-      selectedYear,
-      newCannotPlayAnyDay ? [] : availableSundays,
-      newCannotPlayAnyDay
-    );
+    try {
+      await apiClient.updateMonthlyAvailability(
+        user.id,
+        selectedMonth,
+        selectedYear,
+        newCannotPlayAnyDay ? [] : availableSundays,
+        newCannotPlayAnyDay
+      );
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      // Revert UI changes on error
+      setCannotPlayAnyDay(!newCannotPlayAnyDay);
+    }
   };
 
-  if (!isLoaded) {
-    return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (!user) {
-    return <div className="flex justify-center items-center min-h-screen">No autenticado</div>;
+  if (!user || !currentUser) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-gray-600">No se pudo cargar el usuario</p>
+      </div>
+    );
   }
+
+  const nextMonth = () => {
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const prevMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-        <div className="glass-morphism rounded-3xl border border-white/30 p-6 md:p-10 mb-8 md:mb-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mb-6">
-            <div className="w-20 h-20 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-3xl flex items-center justify-center shadow-2xl">
-              <span className="text-3xl">👋</span>
-            </div>
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 text-shadow-soft tracking-tight">
-                ¡Hola, {currentUser?.nickname || user.firstName}!
-              </h1>
-              <p className="text-base sm:text-lg text-slate-600 font-medium mt-2 mb-3">
-                Marca los domingos en los que puedes jugar este mes
-              </p>
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-sky-100 px-4 py-2 rounded-xl border border-emerald-200">
-                <span className="text-lg">🕙</span>
-                <p className="text-emerald-800 font-bold text-xs sm:text-sm">
-                  Partidos: Domingos 10:00 AM
-                </p>
-              </div>
-            </div>
-          </div>
-
-
-          {currentUser?.isAdmin && (
-            <div className="mt-8 p-6 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-emerald-800 text-base">Panel de Administración</h3>
-                  <p className="text-emerald-700 font-medium text-sm">Gestionar usuarios y configuración del sistema</p>
-                </div>
-                <a
-                  href="/dashboard/admin"
-                  className="button-glow px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-bold shadow-lg hover:shadow-emerald-500/25 transform hover:-translate-y-0.5"
-                >
-                  ⚙️ Ir al Admin Panel
-                </a>
-              </div>
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+            ¡Hola, {currentUser.nickname || currentUser.name}! ⚽
+          </h1>
+          <p className="text-base sm:text-lg text-slate-600">
+            Marca los domingos que puedes jugar
+          </p>
         </div>
 
-        <div className="glass-morphism rounded-3xl border border-white/30 p-6 md:p-10">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 md:mb-10 gap-6">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 text-shadow-soft tracking-tight">Tu disponibilidad</h2>
-              <p className="text-slate-600 text-sm sm:text-base font-medium">Selecciona los domingos que puedes jugar</p>
+        {/* Blocked Days Info */}
+        {blockedSundays.length > 0 && (
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-orange-600">🚫</span>
+              <p className="text-orange-800 font-bold text-sm">
+                Días completos en {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' })}
+              </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                className="nested-border rounded-2xl pl-3 sm:pl-4 pr-8 sm:pr-10 py-2 sm:py-3 bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent shadow-lg text-sm sm:text-base"
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {new Date(selectedYear, i, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(selectedYear, i, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="nested-border rounded-2xl pl-3 sm:pl-4 pr-8 sm:pr-10 py-2 sm:py-3 bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent shadow-lg text-sm sm:text-base"
-              >
-                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
-                <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
-              </select>
-            </div>
+            <p className="text-orange-700 text-xs">
+              Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.join(', ')}
+            </p>
+          </div>
+        )}
+
+        {/* Month Navigation */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={prevMonth}
+              className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-2"
+            >
+              <span className="text-lg">←</span>
+              <span className="hidden sm:inline text-sm font-medium text-slate-700">Anterior</span>
+            </button>
+            
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 text-center">
+              {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
+                month: 'long', 
+                year: 'numeric' 
+              }).replace(/^\w/, c => c.toUpperCase())}
+            </h2>
+            
+            <button
+              onClick={nextMonth}
+              className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-2"
+            >
+              <span className="hidden sm:inline text-sm font-medium text-slate-700">Siguiente</span>
+              <span className="text-lg">→</span>
+            </button>
           </div>
 
-          {/* Voting Status Indicator */}
-          {hasVoted && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-              <div className="flex items-center gap-2">
-                <span className="text-green-600">✅</span>
-                <p className="text-green-800 font-bold text-sm">
-                  {cannotPlayAnyDay 
-                    ? 'Has indicado que no puedes jugar ningún día este mes' 
-                    : `Has seleccionado ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
-                  }
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Cannot Play Any Day Option */}
-          <div className="mb-6">
-            <div
+          {/* Cannot Play Toggle */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-slate-50 rounded-xl">
+            <span className="text-sm font-medium text-slate-700">
+              ¿No puedes jugar ningún domingo este mes?
+            </span>
+            <button
               onClick={toggleCannotPlayAnyDay}
-              className={`p-4 sm:p-6 rounded-2xl cursor-pointer transition-colors duration-200 ${
+              className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
                 cannotPlayAnyDay
-                  ? 'bg-red-50 border-2 border-red-200'
-                  : 'bg-white border-2 border-slate-200 hover:border-slate-300'
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 mr-4">
-                  <h3 className={`text-base sm:text-lg md:text-xl font-bold mb-1 ${cannotPlayAnyDay ? 'text-red-900' : 'text-slate-900'}`}>
-                    No puedo ningún día este mes
-                  </h3>
-                  <p className={`text-sm sm:text-base font-medium ${cannotPlayAnyDay ? 'text-red-700' : 'text-slate-600'}`}>
-                    Marcar si no estarás disponible en ningún domingo
-                  </p>
-                </div>
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 flex items-center justify-center flex-shrink-0 ${
-                  cannotPlayAnyDay 
-                    ? 'border-red-500 bg-red-500' 
-                    : 'border-slate-300 bg-white'
-                }`}>
-                  {cannotPlayAnyDay && <span className="text-white font-bold text-sm sm:text-base">✓</span>}
-                </div>
-              </div>
-            </div>
+              {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
+            </button>
           </div>
 
-          <div className="grid gap-6">
+          {/* Sundays Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {sundaysInMonth.map((sunday) => {
-              const isSelected = availableSundays.includes(sunday);
               const date = new Date(selectedYear, selectedMonth - 1, sunday);
+              const isSelected = availableSundays.includes(sunday);
               const isDisabled = cannotPlayAnyDay;
-              
+              const isBlocked = blockedSundays.includes(sunday);
+              const shouldDisableClick = isDisabled || (!isSelected && isBlocked);
+
               return (
                 <div
                   key={sunday}
-                  onClick={() => !isDisabled && toggleSundayAvailability(sunday)}
+                  onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
                   className={`p-4 sm:p-6 rounded-2xl transition-colors duration-200 ${
-                    isDisabled 
+                    isDisabled
                       ? 'opacity-50 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
-                      : `cursor-pointer ${isSelected
-                          ? 'bg-emerald-50 border-2 border-emerald-200'
-                          : 'bg-white border-2 border-slate-200 hover:border-slate-300'
-                        }`
+                      : isBlocked && !isSelected
+                        ? 'opacity-75 cursor-not-allowed bg-orange-50 border-2 border-orange-200'
+                        : `cursor-pointer ${isSelected
+                            ? 'bg-emerald-50 border-2 border-emerald-200'
+                            : 'bg-white border-2 border-slate-200 hover:border-slate-300'
+                          }`
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 mr-4">
-                      <h3 className={`text-base sm:text-lg md:text-xl font-bold mb-1 ${isSelected ? 'text-emerald-900' : 'text-slate-900'}`}>
-                        Domingo {sunday} de {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
-                      </h3>
-                      <p className={`text-sm sm:text-base font-medium mb-1 ${isSelected ? 'text-emerald-700' : 'text-slate-600'}`}>
-                        {formatDate(date)}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm sm:text-base">🕙</span>
-                        <p className={`text-xs font-bold ${isSelected ? 'text-emerald-600' : 'text-slate-500'}`}>
-                          10:00 AM - Hora del partido
-                        </p>
-                      </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">
+                        {isSelected ? '✅' : isBlocked && !isSelected ? '🚫' : '⚽'}
+                      </span>
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                        Dom
+                      </span>
                     </div>
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 flex items-center justify-center flex-shrink-0 ${
-                      isSelected 
-                        ? 'border-emerald-500 bg-emerald-500' 
-                        : 'border-slate-300 bg-white'
-                    }`}>
-                      {isSelected && <span className="text-white font-bold text-sm sm:text-base">✓</span>}
-                    </div>
+                    {isSelected && (
+                      <span className="text-emerald-600 font-bold text-sm">DISPONIBLE</span>
+                    )}
                   </div>
+                  
+                  <h3 className={`text-base sm:text-lg md:text-xl font-bold mb-1 ${
+                    isSelected ? 'text-emerald-900' :
+                    isBlocked ? 'text-orange-900' : 'text-slate-900'
+                  }`}>
+                    Domingo {sunday} de {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
+                    {isBlocked && !isSelected && <span className="ml-2 text-orange-600">🚫</span>}
+                  </h3>
+                  <p className={`text-sm sm:text-base font-medium mb-1 ${
+                    isSelected ? 'text-emerald-700' :
+                    isBlocked ? 'text-orange-700' : 'text-slate-600'
+                  }`}>
+                    {isBlocked && !isSelected ? 'Día completo - 10 jugadores confirmados' : formatDate(date)}
+                  </p>
+                  <p className={`text-xs ${
+                    isSelected ? 'text-emerald-600' :
+                    isBlocked ? 'text-orange-600' : 'text-slate-500'
+                  }`}>
+                    {isSelected ? 'Toca para desmarcar' : 
+                     isBlocked && !isSelected ? 'Partido confirmado' : 'Toca para marcar como disponible'}
+                  </p>
                 </div>
               );
             })}
           </div>
 
-          {sundaysInMonth.length === 0 && (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">📅</span>
+          {/* Status Message */}
+          <div className="text-center">
+            {hasVoted ? (
+              <div className="flex items-center justify-center gap-2 text-emerald-600">
+                <span>✅</span>
+                <span className="font-semibold">
+                  {cannotPlayAnyDay 
+                    ? 'Marcado como no disponible para este mes'
+                    : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
+                  }
+                </span>
               </div>
-              <p className="text-slate-500 text-base font-medium">
-                No hay domingos en este mes
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center justify-center gap-2 text-amber-600">
+                <span>⏳</span>
+                <span className="font-semibold">Aún no has votado para este mes</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+    </div>
   );
 }

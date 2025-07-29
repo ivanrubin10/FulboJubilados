@@ -2,9 +2,39 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { LocalStorage } from '@/lib/store';
-import { getSundaysInMonth, formatDate, generateTeams, createMockUsers } from '@/lib/utils';
-import { Game, User } from '@/types';
+import { getSundaysInMonth, formatDate, generateTeams } from '@/lib/utils';
+import { Game, User, MonthlyAvailability } from '@/types';
+
+// API helper functions
+const apiClient = {
+  async getUsers() {
+    const res = await fetch('/api/users');
+    if (!res.ok) throw new Error('Failed to fetch users');
+    return res.json();
+  },
+  
+  async getGames() {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('Failed to fetch games');
+    return res.json();
+  },
+  
+  async getMonthlyAvailability() {
+    const res = await fetch('/api/availability?type=monthly');
+    if (!res.ok) throw new Error('Failed to fetch availability');
+    return res.json();
+  },
+  
+  async saveGames(games: Game[]) {
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(games)
+    });
+    if (!res.ok) throw new Error('Failed to save games');
+    return res.json();
+  }
+};
 
 interface EditGameModal {
   game: Game;
@@ -15,7 +45,6 @@ interface EditGameModal {
 
 function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
   const [editedGame, setEditedGame] = useState<Game>({ ...game });
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(game.participants);
   const [reservationInfo, setReservationInfo] = useState({
     location: game.reservationInfo?.location || '',
     time: game.reservationInfo?.time || '10:00',
@@ -26,7 +55,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
   const handleSave = () => {
     const updatedGame: Game = {
       ...editedGame,
-      participants: selectedParticipants,
+      participants: game.participants, // Keep original participants - no selection needed
       reservationInfo: reservationInfo.location ? {
         location: reservationInfo.location,
         time: reservationInfo.time,
@@ -38,19 +67,9 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
     onSave(updatedGame);
   };
 
-  const toggleParticipant = (userId: string) => {
-    setSelectedParticipants(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId].slice(0, 10) // Max 10 players
-    );
-  };
-
   const regenerateTeams = () => {
-    if (selectedParticipants.length === 10) {
-      const newTeams = generateTeams(selectedParticipants);
-      setEditedGame(prev => ({ ...prev, teams: newTeams }));
-    }
+    const newTeams = generateTeams(game.participants);
+    setEditedGame(prev => ({ ...prev, teams: newTeams }));
   };
 
   const swapPlayerBetweenTeams = (playerId: string) => {
@@ -143,46 +162,41 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             </div>
           </div>
 
-          {/* Participants Selection */}
+          {/* Participants Display - No selection needed, all available players assumed */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-semibold text-gray-900">
-                Participantes ({selectedParticipants.length}/10)
+                Participantes Confirmados ({game.participants.length})
               </h3>
-              {selectedParticipants.length === 10 && (
-                <button
-                  onClick={regenerateTeams}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Regenerar Equipos
-                </button>
-              )}
+              <button
+                onClick={regenerateTeams}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Regenerar Equipos
+              </button>
             </div>
-            <div className="grid md:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-              {users.filter(u => u.isWhitelisted && !u.isAdmin).map(user => (
-                <label
-                  key={user.id}
-                  className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${
-                    selectedParticipants.includes(user.id)
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedParticipants.includes(user.id)}
-                    onChange={() => toggleParticipant(user.id)}
-                    disabled={!selectedParticipants.includes(user.id) && selectedParticipants.length >= 10}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">{user.nickname || user.name}</span>
-                </label>
-              ))}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid md:grid-cols-3 gap-2">
+                {game.participants.map(participantId => {
+                  const player = users.find(u => u.id === participantId);
+                  return (
+                    <div
+                      key={participantId}
+                      className="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-medium"
+                    >
+                      {player?.nickname || player?.name || 'Jugador desconocido'}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-sm text-gray-600 mt-3">
+                💡 Los participantes se confirman automáticamente según disponibilidad. No es necesario seleccionar manualmente.
+              </p>
             </div>
           </div>
 
           {/* Teams Display and Edit */}
-          {editedGame.teams && selectedParticipants.length === 10 && (
+          {editedGame.teams && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Equipos</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -248,114 +262,50 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
 export default function GamesPage() {
   const { user, isLoaded } = useUser();
-  const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
-  const [showMockUsersButton, setShowMockUsersButton] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+  const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      const allUsers = LocalStorage.getUsers();
-      const allGames = LocalStorage.getGames();
-      const userData = allUsers.find(u => u.id === user.id);
+    const loadData = async () => {
+      if (!isLoaded || !user) return;
+      
+      setIsLoading(true);
+      try {
+        const [allUsers, allGames, monthlyAvailability] = await Promise.all([
+          apiClient.getUsers(),
+          apiClient.getGames(),
+          apiClient.getMonthlyAvailability()
+        ]);
+        
+        const userData = allUsers.find((u: User) => u.id === user.id);
+        
+        // Fix dates that might be serialized as strings
+        const gamesWithFixedDates = allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt),
+        }));
       
       setUsers(allUsers);
-      setGames(allGames);
+        setGames(gamesWithFixedDates);
       setCurrentUser(userData || null);
-      
-      // Show mock users button if there are less than 10 users
-      setShowMockUsersButton(allUsers.filter(u => u.isWhitelisted && !u.isAdmin).length < 10);
+        setAvailability(monthlyAvailability);
+      } catch (error) {
+        console.error('Error loading games data:', error);
+      } finally {
+        setIsLoading(false);
     }
-  }, [isLoaded, user]);
-
-  const handleCreateMockUsers = () => {
-    createMockUsers();
-    // Refresh users list
-    const allUsers = LocalStorage.getUsers();
-    setUsers(allUsers);
-    setShowMockUsersButton(allUsers.filter(u => u.isWhitelisted && !u.isAdmin).length < 10);
-  };
-
-  const createTestMatch = () => {
-    const now = new Date();
-    const nextSunday = new Date(now);
-    nextSunday.setDate(now.getDate() + (7 - now.getDay()));
-    
-    const availableUsers = users.filter(u => u.isWhitelisted && !u.isAdmin);
-    const selectedPlayers = availableUsers.slice(0, 10);
-    
-    if (selectedPlayers.length < 10) {
-      alert(`Solo hay ${selectedPlayers.length} usuarios disponibles. Crea usuarios de prueba primero.`);
-      return;
-    }
-
-    const testGame: Game = {
-      id: `test-game-${Date.now()}`,
-      date: nextSunday,
-      status: 'confirmed',
-      participants: selectedPlayers.map(p => p.id),
-      reservationInfo: {
-        location: 'Cancha de Prueba',
-        time: '10:00',
-        cost: 20,
-        reservedBy: 'Administrador'
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
     };
 
-    const updatedGames = [...games, testGame];
-    setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
-    
-    alert('✅ Partido de prueba creado! Ahora puedes editarlo.');
-  };
-
-  const showDebugInfo = () => {
-    const availability = LocalStorage.getMonthlyAvailability();
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
-    const upcomingSundays = getCurrentMonthSundays();
-    const mockUsers = users.filter(u => u.id.startsWith('mock-user-'));
-    
-    // Check August availability
-    const augustAvailability = availability.filter(a => a.month === 8 && a.year === currentYear);
-    const mockUsersWithAugust = augustAvailability.filter(a => a.userId.startsWith('mock-user-'));
-    
-    const debugInfo = `
-🔍 Información de Debug:
-
-👥 Usuarios:
-• Total: ${users.length}
-• Mock users: ${mockUsers.length}
-• Administradores: ${users.filter(u => u.isAdmin).length}
-• Jugadores (whitelisted): ${users.filter(u => u.isWhitelisted && !u.isAdmin).length}
-
-📅 Disponibilidad:
-• Registros totales: ${availability.length}
-• Mes actual: ${currentMonth}/${currentYear}
-• Domingos próximos: ${upcomingSundays.length}
-
-🗓️ Agosto ${currentYear}:
-• Registros de disponibilidad: ${augustAvailability.length}
-• Mock users con disponibilidad: ${mockUsersWithAugust.length}/${mockUsers.length}
-
-🎮 Partidos:
-• Total creados: ${games.length}
-• Estados: ${games.map(g => g.status).join(', ') || 'Ninguno'}
-
-👤 Usuario actual:
-• Admin: ${currentUser?.isAdmin ? 'Sí' : 'No'}
-• ID: ${currentUser?.id}
-    `.trim();
-    
-    console.log(debugInfo);
-    alert(debugInfo);
-  };
+    loadData();
+  }, [isLoaded, user]);
 
   const getAvailablePlayersForSunday = (year: number, month: number, sunday: number): User[] => {
-    const availability = LocalStorage.getMonthlyAvailability();
     return users.filter(user => {
       if (!user.isWhitelisted || user.isAdmin) return false;
       const userAvailability = availability.find(
@@ -365,7 +315,7 @@ export default function GamesPage() {
     });
   };
 
-  const createGameForSunday = (year: number, month: number, sunday: number) => {
+  const createGameForSunday = async (year: number, month: number, sunday: number) => {
     const gameDate = new Date(year, month - 1, sunday);
     const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
     
@@ -377,42 +327,60 @@ export default function GamesPage() {
     const newGame: Game = {
       id: `game-${Date.now()}`,
       date: gameDate,
-      status: availablePlayers.length >= 10 ? 'confirmed' : 'scheduled',
+      status: 'confirmed',
       participants: availablePlayers.slice(0, 10).map(p => p.id),
+      reservationInfo: {
+        location: 'Cancha Principal', 
+        time: '10:00',
+        cost: 25,
+        reservedBy: currentUser?.name || 'Administrador'
+      },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
+    try {
     const updatedGames = [...games, newGame];
     setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
+      await apiClient.saveGames(updatedGames);
+      alert('¡Partido creado exitosamente!');
+    } catch (error) {
+      console.error('Error creating game:', error);
+      alert('Error al crear el partido');
+    }
   };
 
-  const organizeTeams = (gameId: string) => {
-    const game = games.find(g => g.id === gameId);
-    if (!game || game.participants.length !== 10) return;
-
-    const teams = generateTeams(game.participants);
-    const updatedGame = { ...game, teams, updatedAt: new Date() };
+  const updateGame = async (gameId: string, updatedGame: Game) => {
+    try {
     const updatedGames = games.map(g => g.id === gameId ? updatedGame : g);
-    
-    setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
+      setGames(updatedGames);
+      await apiClient.saveGames(updatedGames);
+    } catch (error) {
+      console.error('Error updating game:', error);
+    }
   };
 
-  const deleteGame = (gameId: string) => {
+  const deleteGame = async (gameId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este partido?')) return;
     
-    const updatedGames = games.filter(g => g.id !== gameId);
+    try {
+      const updatedGames = games.filter(g => g.id !== gameId);
     setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
+      await apiClient.saveGames(updatedGames);
+    } catch (error) {
+      console.error('Error deleting game:', error);
+    }
   };
 
-  const handleEditGame = (updatedGame: Game) => {
-    const updatedGames = games.map(g => g.id === updatedGame.id ? updatedGame : g);
-    setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
-    setEditingGame(null);
+  const handleEditGame = async (updatedGame: Game) => {
+    try {
+      const updatedGames = games.map(g => g.id === updatedGame.id ? updatedGame : g);
+      setGames(updatedGames);
+      await apiClient.saveGames(updatedGames);
+      setEditingGame(null);
+    } catch (error) {
+      console.error('Error editing game:', error);
+    }
   };
 
   const getCurrentMonthSundays = () => {
@@ -420,48 +388,40 @@ export default function GamesPage() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     
-    // Always show August (where mock users have availability) and current month
+    // Show current and next month's Sundays
     const monthsToShow = [
-      { year: currentYear, month: 8 }, // August with mock users
-      { year: currentYear, month: currentMonth }, // Current month
+      { year: currentYear, month: currentMonth },
+      { year: currentMonth === 12 ? currentYear + 1 : currentYear, month: currentMonth === 12 ? 1 : currentMonth + 1 }
     ];
-    
-    // Remove duplicates if current month is August
-    const uniqueMonths = monthsToShow.filter((item, index, arr) => 
-      index === arr.findIndex(t => t.year === item.year && t.month === item.month)
-    );
     
     const allSundays = [];
     
-    for (const { year, month } of uniqueMonths) {
-      const sundays = getSundaysInMonth(year, month);
-      
+    for (const { year, month } of monthsToShow) {
+    const sundays = getSundaysInMonth(year, month);
+    
       const filteredSundays = sundays
-        .filter(sunday => {
-          // For current month, only show future dates
-          // For August, show all dates to see mock availability
-          if (month === currentMonth && year === currentYear) {
-            const sundayDate = new Date(year, month - 1, sunday);
-            return sundayDate >= now;
-          }
-          return true; // Show all August Sundays
-        })
-        .map(sunday => {
-          const date = new Date(year, month - 1, sunday);
-          const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
-          const existingGame = games.find(g => 
-            g.date.getTime() === date.getTime()
-          );
-          
-          return {
-            date,
-            sunday,
-            month,
-            year,
-            availablePlayers,
-            existingGame,
-          };
-        });
+      .filter(sunday => {
+        const sundayDate = new Date(year, month - 1, sunday);
+          // Only show future or current day
+          return sundayDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      })
+      .map(sunday => {
+        const date = new Date(year, month - 1, sunday);
+        const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
+          const existingGame = games.find(g => {
+            const gameDate = g.date instanceof Date ? g.date : new Date(g.date);
+            return gameDate.getTime() === date.getTime();
+          });
+        
+        return {
+          date,
+          sunday,
+          month,
+          year,
+          availablePlayers,
+          existingGame,
+        };
+      });
         
       allSundays.push(...filteredSundays);
     }
@@ -470,7 +430,34 @@ export default function GamesPage() {
     return allSundays.sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
-  if (!isLoaded || !currentUser) {
+  const organizeTeams = async (gameId: string) => {
+    const game = games.find(g => g.id === gameId);
+    if (!game || game.participants.length !== 10) return;
+
+    const teams = generateTeams(game.participants);
+    const updatedGame = { ...game, teams, updatedAt: new Date() };
+    
+    try {
+      const updatedGames = games.map(g => g.id === gameId ? updatedGame : g);
+      setGames(updatedGames);
+      await apiClient.saveGames(updatedGames);
+    } catch (error) {
+      console.error('Error organizing teams:', error);
+    }
+  };
+
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
   }
 
@@ -481,38 +468,10 @@ export default function GamesPage() {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Partidos Programados</h1>
-            <p className="text-gray-600">Gestiona partidos de Agosto (usuarios mock) y del mes actual</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Partidos Programados</h1>
+            <p className="text-gray-600">Gestiona partidos y organiza equipos automáticamente</p>
           </div>
-          <div className="flex gap-2">
-            {showMockUsersButton && currentUser.isAdmin && (
-              <button
-                onClick={handleCreateMockUsers}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
-              >
-                <span>👥</span>
-                Crear Usuarios de Prueba
-              </button>
-            )}
-            {currentUser?.isAdmin && (
-              <>
-                <button
-                  onClick={createTestMatch}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <span>🎮</span>
-                  Crear Partido de Prueba
-                </button>
-                <button
-                  onClick={showDebugInfo}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <span>🔍</span>
-                  Debug Info
-                </button>
-              </>
-            )}
-          </div>
+
         </div>
       </div>
 
@@ -548,6 +507,13 @@ export default function GamesPage() {
                 >
                   Confirmar Partido
                 </button>
+              )}
+              
+              {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
+                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                  <span>🚫</span>
+                  <span className="text-sm font-medium">Día completo (10 jugadores)</span>
+                </div>
               )}
             </div>
 
@@ -588,12 +554,12 @@ export default function GamesPage() {
                   {currentUser.isAdmin && (
                     <div className="flex gap-2">
                       {!existingGame.teams && existingGame.participants.length === 10 && (
-                        <button
-                          onClick={() => organizeTeams(existingGame.id)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                        >
-                          Organizar Equipos
-                        </button>
+                    <button
+                      onClick={() => organizeTeams(existingGame.id)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      Organizar Equipos
+                    </button>
                       )}
                       <button
                         onClick={() => setEditingGame(existingGame)}
@@ -672,7 +638,7 @@ export default function GamesPage() {
                 )}
               </div>
             )}
-              </div>
+          </div>
             </div>
           );
         })}

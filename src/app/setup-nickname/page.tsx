@@ -3,160 +3,184 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LocalStorage } from '@/lib/store';
 import { User } from '@/types';
+
+// API helper functions
+const apiClient = {
+  async getUserById(id: string) {
+    const res = await fetch(`/api/users/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch user');
+    const user = await res.json();
+    return user === null ? undefined : user;
+  },
+  
+  async updateUser(user: User) {
+    const res = await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error('Failed to update user');
+    return res.json();
+  },
+  
+  async addUser(user: User) {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error('Failed to add user');
+    return res.json();
+  }
+};
 
 export default function SetupNickname() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const [nickname, setNickname] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      const existingUser = LocalStorage.getUserById(user.id);
-      if (existingUser?.nickname) {
-        router.push('/dashboard');
+    const checkUser = async () => {
+      if (!isLoaded || !user) return;
+      
+      setIsInitialLoading(true);
+      try {
+        const existingUser = await apiClient.getUserById(user.id);
+        
+        if (existingUser?.nickname) {
+          // User already has a nickname, redirect to dashboard
+          router.push('/dashboard');
+          return;
+        }
+        
+        // Pre-fill with user's first name if available
+        if (user.firstName) {
+          setNickname(user.firstName);
+        }
+      } catch (error) {
+        console.error('Error checking user:', error);
+      } finally {
+        setIsInitialLoading(false);
       }
-    }
+    };
+
+    checkUser();
   }, [isLoaded, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!nickname.trim()) {
-      setError('Por favor ingresa un apodo');
-      return;
-    }
-
-    if (nickname.length < 2) {
-      setError('El apodo debe tener al menos 2 caracteres');
-      return;
-    }
-
-    if (nickname.length > 20) {
-      setError('El apodo no puede tener más de 20 caracteres');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
+    if (!user || !nickname.trim()) return;
+    
+    setIsLoading(true);
     try {
-      if (user) {
-        const existingUser = LocalStorage.getUserById(user.id);
-        
-        if (existingUser) {
-          const updatedUser: User = {
-            ...existingUser,
-            nickname: nickname.trim(),
-          };
-          LocalStorage.updateUser(updatedUser);
-        } else {
-          const newUser: User = {
-            id: user.id,
-            email: user.emailAddresses[0]?.emailAddress || '',
-            name: user.fullName || user.firstName || 'Usuario',
-            nickname: nickname.trim(),
-            imageUrl: user.imageUrl,
-            isAdmin: false,
-            isWhitelisted: true,
-            createdAt: new Date(),
-          };
-          LocalStorage.addUser(newUser);
-        }
-
-        router.push('/dashboard');
+      const existingUser = await apiClient.getUserById(user.id);
+      
+      if (existingUser) {
+        // Update existing user
+        const updatedUser = { ...existingUser, nickname: nickname.trim() };
+        await apiClient.updateUser(updatedUser);
+      } else {
+        // Create new user with nickname
+        const userEmail = user.emailAddresses[0]?.emailAddress || '';
+        const newUser: User = {
+          id: user.id,
+          email: userEmail,
+          name: user.fullName || user.firstName || 'Usuario',
+          nickname: nickname.trim(),
+          imageUrl: user.imageUrl,
+          isAdmin: userEmail === 'ivanrubin10@gmail.com',
+          isWhitelisted: true,
+          createdAt: new Date(),
+        };
+        await apiClient.addUser(newUser);
       }
-    } catch {
-      setError('Ocurrió un error. Intenta nuevamente.');
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error saving nickname:', error);
+      alert('Error al guardar el apodo. Por favor, inténtalo de nuevo.');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  if (!isLoaded) {
-    return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
+  if (!isLoaded || isInitialLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
-    router.push('/');
-    return null;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-gray-600">No se pudo cargar el usuario</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50 flex items-center justify-center p-4">
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-200 p-10 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-2xl flex items-center justify-center mb-6 mx-auto shadow-lg">
-            <span className="text-3xl">👋</span>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">
-            ¡Bienvenido!
-          </h1>
-          <p className="text-slate-600 text-lg leading-relaxed">
-            Para empezar, elige un apodo que te identifique en los partidos
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-bold text-slate-900">
+            ¡Bienvenido! ⚽
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Configura tu apodo para comenzar
           </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="nickname" className="block text-sm font-semibold text-slate-800 mb-3">
-              Tu apodo
-            </label>
-            <input
-              type="text"
-              id="nickname"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="Ej: neox, dami, lazurro..."
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-              maxLength={20}
-              disabled={isSubmitting}
-            />
-            <p className="text-sm text-slate-500 mt-2 flex items-center gap-1">
-              <span>📝</span>
-              Entre 2 y 20 caracteres
-            </p>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-red-500">❌</span>
-                <p className="text-red-700 font-medium">{error}</p>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8">
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="nickname" className="block text-sm font-medium text-slate-700 mb-2">
+                  Tu apodo
+                </label>
+                <input
+                  id="nickname"
+                  name="nickname"
+                  type="text"
+                  required
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  className="appearance-none relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:z-10 text-base"
+                  placeholder="Como te gusta que te llamen"
+                  disabled={isLoading}
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Este nombre aparecerá en los partidos y la lista de jugadores
+                </p>
               </div>
             </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting || !nickname.trim()}
-            className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:hover:shadow-lg"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Guardando...
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <span>🚀</span>
-                Continuar
-              </div>
-            )}
-          </button>
-        </form>
-
-        <div className="mt-8 text-center">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <p className="text-sm text-slate-600 flex items-center justify-center gap-1">
-              <span>💡</span>
-              Podrás cambiar tu apodo más tarde en la configuración
-            </p>
           </div>
-        </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={!nickname.trim() || isLoading}
+              className="group relative w-full flex justify-center py-4 px-6 border border-transparent text-base font-semibold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Guardando...
+                </div>
+              ) : (
+                'Continuar al Dashboard'
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

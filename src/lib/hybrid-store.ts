@@ -1,70 +1,38 @@
-import { LocalStorage } from './store';
 import { DatabaseService } from './db/service';
-import type { User } from '@/types';
-
-// Check if we're running on the server and have database access
-const USE_DATABASE = typeof window === 'undefined' && process.env.DATABASE_URL;
+import type { User, Game, MonthlyAvailability } from '@/types';
 
 export class HybridStore {
   // User management
   static async getUsers(): Promise<User[]> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getUsers();
-    }
-    return LocalStorage.getUsers();
+    return await DatabaseService.getUsers();
   }
 
   static async getUserById(id: string): Promise<User | undefined> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getUserById(id);
-    }
-    return LocalStorage.getUserById(id);
+    return await DatabaseService.getUserById(id);
   }
 
   static async addUser(user: User): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.addUser(user);
-    } else {
-      LocalStorage.addUser(user);
-    }
+    await DatabaseService.addUser(user);
   }
 
   static async updateUser(user: User): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.updateUser(user);
-    } else {
-      LocalStorage.updateUser(user);
-    }
+    await DatabaseService.updateUser(user);
   }
 
   static async saveUsers(users: User[]): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.saveUsers(users);
-    } else {
-      LocalStorage.saveUsers(users);
-    }
+    await DatabaseService.saveUsers(users);
   }
 
   static async toggleUserWhitelist(userId: string): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.toggleUserWhitelist(userId);
-    } else {
-      LocalStorage.toggleUserWhitelist(userId);
-    }
+    await DatabaseService.toggleUserWhitelist(userId);
   }
 
   static async getWhitelistedUsers(): Promise<User[]> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getWhitelistedUsers();
-    }
-    return LocalStorage.getWhitelistedUsers();
+    return await DatabaseService.getWhitelistedUsers();
   }
 
   static async getWhitelistedUserCount(): Promise<number> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getWhitelistedUserCount();
-    }
-    return LocalStorage.getWhitelistedUserCount();
+    return await DatabaseService.getWhitelistedUserCount();
   }
 
   // Monthly availability
@@ -75,86 +43,65 @@ export class HybridStore {
     availableSundays: number[],
     cannotPlayAnyDay: boolean = false
   ): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.updateMonthlyAvailability(userId, month, year, availableSundays, cannotPlayAnyDay);
-    } else {
-      LocalStorage.updateMonthlyAvailability(userId, month, year, availableSundays, cannotPlayAnyDay);
-    }
+    await DatabaseService.updateMonthlyAvailability(userId, month, year, availableSundays, cannotPlayAnyDay);
   }
 
   static async getUserMonthlyAvailability(userId: string, month: number, year: number): Promise<number[]> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getUserMonthlyAvailability(userId, month, year);
-    }
-    return LocalStorage.getUserMonthlyAvailability(userId, month, year);
+    return await DatabaseService.getUserMonthlyAvailability(userId, month, year);
   }
 
   static async getUserVotingStatus(userId: string, month: number, year: number): Promise<{ hasVoted: boolean; cannotPlayAnyDay: boolean }> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getUserVotingStatus(userId, month, year);
-    }
-    return LocalStorage.getUserVotingStatus(userId, month, year);
+    return await DatabaseService.getUserVotingStatus(userId, month, year);
   }
 
   // Reminder management
   static async updateReminderStatus(userId: string, month: number, year: number): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.updateReminderStatus(userId, month, year);
-    } else {
-      LocalStorage.updateReminderStatus(userId, month, year);
-    }
+    await DatabaseService.updateReminderStatus(userId, month, year);
   }
 
   static async deactivateReminders(userId: string, month: number, year: number): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.deactivateReminders(userId, month, year);
-    } else {
-      LocalStorage.deactivateReminders(userId, month, year);
-    }
+    await DatabaseService.deactivateReminders(userId, month, year);
   }
 
   static async getUsersNeedingReminders(month: number, year: number): Promise<User[]> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getUsersNeedingReminders(month, year);
-    }
-    return LocalStorage.getUsersNeedingReminders(month, year);
+    return await DatabaseService.getUsersNeedingReminders(month, year);
   }
 
   // Settings
   static async getCurrentActiveMonth(): Promise<{ month: number; year: number }> {
-    if (USE_DATABASE) {
-      return await DatabaseService.getCurrentActiveMonth();
-    }
-    return LocalStorage.getCurrentActiveMonth();
+    return await DatabaseService.getCurrentActiveMonth();
   }
 
   static async setCurrentActiveMonth(month: number, year: number): Promise<void> {
-    if (USE_DATABASE) {
-      await DatabaseService.setCurrentActiveMonth(month, year);
-    } else {
-      LocalStorage.setCurrentActiveMonth(month, year);
-    }
+    await DatabaseService.setCurrentActiveMonth(month, year);
   }
 
-  // Migration helper - sync LocalStorage to Database
-  static async migrateToDatabase(): Promise<void> {
-    if (!USE_DATABASE) {
-      throw new Error('Database not available for migration');
-    }
+  // Games management
+  static async getGames(): Promise<Game[]> {
+    // TODO: Implement games in DatabaseService
+    return [];
+  }
 
-    console.log('Starting migration from LocalStorage to Database...');
+  static async saveGames(games: Game[]): Promise<void> {
+    // TODO: Implement games in DatabaseService
+    return;
+  }
 
-    // Migrate users
-    const localUsers = LocalStorage.getUsers();
-    await DatabaseService.saveUsers(localUsers);
-    console.log(`Migrated ${localUsers.length} users`);
+  // Monthly availability data access
+  static async getMonthlyAvailability(): Promise<MonthlyAvailability[]> {
+    // TODO: Implement in DatabaseService
+    return [];
+  }
 
-    // Migrate settings
-    const localSettings = LocalStorage.getSettings();
-    if (localSettings.currentMonth && localSettings.currentYear) {
-      await DatabaseService.setCurrentActiveMonth(localSettings.currentMonth, localSettings.currentYear);
-    }
+  // Get blocked Sundays (days with confirmed games)
+  static async getBlockedSundays(month: number, year: number): Promise<number[]> {
+    // TODO: Implement in DatabaseService using games data
+    return [];
+  }
 
-    console.log('Migration completed successfully!');
+  // Settings management (for backward compatibility)
+  static async getSettings(): Promise<{ currentMonth?: number; currentYear?: number }> {
+    const activeMonth = await DatabaseService.getCurrentActiveMonth();
+    return { currentMonth: activeMonth.month, currentYear: activeMonth.year };
   }
 }

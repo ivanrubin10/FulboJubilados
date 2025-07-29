@@ -52,16 +52,24 @@ export class DatabaseService {
       await db.insert(users)
         .values({
           ...user,
-          updatedAt: new Date(),
+          nickname: user.nickname || null,
+          imageUrl: user.imageUrl || null,
+          updatedAt: user.updatedAt || new Date(),
         })
         .onConflictDoUpdate({
           target: users.id,
           set: {
             ...user,
+            nickname: user.nickname || null,
+            imageUrl: user.imageUrl || null,
             updatedAt: new Date(),
           }
         });
     }
+  }
+
+  static async deleteUser(userId: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   static async toggleUserWhitelist(userId: string): Promise<void> {
@@ -103,12 +111,15 @@ export class DatabaseService {
     availableSundays: number[],
     cannotPlayAnyDay: boolean = false
   ): Promise<void> {
+    // Check for confirmed games that would prevent availability
+    const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays, month, year);
+    
     await db.insert(monthlyAvailability)
       .values({
         userId,
         month,
         year,
-        availableSundays: cannotPlayAnyDay ? [] : availableSundays,
+        availableSundays: filteredSundays,
         cannotPlayAnyDay,
         hasVoted: true,
         updatedAt: new Date(),
@@ -116,7 +127,7 @@ export class DatabaseService {
       .onConflictDoUpdate({
         target: [monthlyAvailability.userId, monthlyAvailability.month, monthlyAvailability.year],
         set: {
-          availableSundays: cannotPlayAnyDay ? [] : availableSundays,
+          availableSundays: filteredSundays,
           cannotPlayAnyDay,
           hasVoted: true,
           updatedAt: new Date(),
@@ -125,6 +136,13 @@ export class DatabaseService {
 
     // Stop reminders for this user/month when they vote
     await this.deactivateReminders(userId, month, year);
+  }
+
+  // Helper function to filter out Sundays that already have confirmed games
+  static async filterAvailableSundays(requestedSundays: number[], month: number, year: number): Promise<number[]> {
+    // TODO: Implement games filtering for database version
+    // For now, return all requested Sundays since games management is not yet implemented in database
+    return requestedSundays;
   }
 
   static async getUserMonthlyAvailability(userId: string, month: number, year: number): Promise<number[]> {

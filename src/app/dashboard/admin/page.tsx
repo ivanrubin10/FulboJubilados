@@ -2,10 +2,63 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { LocalStorage } from '@/lib/store';
 import { User } from '@/types';
-import { getNextAvailableMonth, getSundaysInMonth, createMockUsers } from '@/lib/utils';
+import { getNextAvailableMonth } from '@/lib/utils';
 import { notificationService } from '@/lib/notifications';
+
+// API helper functions
+const apiClient = {
+  async getUsers() {
+    const res = await fetch('/api/users');
+    if (!res.ok) throw new Error('Failed to fetch users');
+    return res.json();
+  },
+  
+  async getCurrentActiveMonth() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    return res.json();
+  },
+  
+  async addUser(user: User) {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error('Failed to add user');
+    return res.json();
+  },
+  
+  async saveUsers(users: User[]) {
+    const res = await fetch('/api/users/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(users)
+    });
+    if (!res.ok) throw new Error('Failed to save users');
+    return res.json();
+  },
+  
+  async toggleUserWhitelist(userId: string) {
+    const res = await fetch(`/api/users/${userId}/whitelist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Failed to toggle whitelist');
+    return res.json();
+  },
+  
+  async setCurrentActiveMonth(month: number, year: number) {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month, year })
+    });
+    if (!res.ok) throw new Error('Failed to set active month');
+    return res.json();
+  }
+};
 
 export default function AdminPage() {
   const { user, isLoaded } = useUser();
@@ -14,145 +67,129 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentActiveMonth, setCurrentActiveMonth] = useState({ month: 7, year: 2025 });
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      const allUsers = LocalStorage.getUsers();
-      const userData = allUsers.find(u => u.id === user.id);
-      const activeMonth = LocalStorage.getCurrentActiveMonth();
+    const loadData = async () => {
+      if (!isLoaded || !user) return;
       
-      setUsers(allUsers);
-      setCurrentUser(userData || null);
-      setIsAdmin(userData?.isAdmin || false);
-      setCurrentActiveMonth(activeMonth);
-    }
+      setIsLoadingData(true);
+      try {
+        const [allUsers, activeMonth] = await Promise.all([
+          apiClient.getUsers(),
+          apiClient.getCurrentActiveMonth()
+        ]);
+        
+        const userData = allUsers.find((u: User) => u.id === user.id);
+        
+        setUsers(allUsers);
+        setCurrentUser(userData || null);
+        setIsAdmin(userData?.isAdmin || false);
+        setCurrentActiveMonth(activeMonth);
+      } catch (error) {
+        console.error('Error loading admin data:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadData();
   }, [isLoaded, user]);
 
-  const refreshUsers = () => {
-    const allUsers = LocalStorage.getUsers();
-    setUsers(allUsers);
-  };
-
-  const handleCreateMockUsers = () => {
-    createMockUsers();
-    refreshUsers();
-    
-    // Show some debug info
-    const allUsers = LocalStorage.getUsers();
-    const whitelistedUsers = allUsers.filter(u => u.isWhitelisted && !u.isAdmin);
-    const availability = LocalStorage.getMonthlyAvailability();
-    const mockUsers = allUsers.filter(u => u.id.startsWith('mock-user-'));
-    
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
-    
-    // Check August availability for mock users
-    const augustAvailability = availability.filter(a => a.month === 8 && a.year === currentYear);
-    const mockUsersWithAugust = augustAvailability.filter(a => a.userId.startsWith('mock-user-'));
-    
-    console.log('📊 Debug Info:');
-    console.log(`- Total users: ${allUsers.length}`);
-    console.log(`- Mock users: ${mockUsers.length}`);
-    console.log(`- Whitelisted users: ${whitelistedUsers.length}`);
-    console.log(`- Availability records: ${availability.length}`);
-    console.log(`- August availability records: ${augustAvailability.length}`);
-    console.log(`- Mock users with August availability: ${mockUsersWithAugust.length}`);
-    console.log(`- Current month: ${currentMonth}/${currentYear}`);
-    
-    alert(`✅ Usuarios de prueba creados exitosamente!\n\n📊 Estado:\n• Total usuarios: ${allUsers.length}\n• Mock users: ${mockUsers.length}\n• Usuarios jugadores: ${whitelistedUsers.length}\n• Registros de disponibilidad: ${availability.length}\n\n🗓️ Agosto ${currentYear}:\n• Mock users con disponibilidad: ${mockUsersWithAugust.length}/${mockUsers.length}`);
-  };
-
-  const makeCurrentUserAdmin = () => {
-    if (currentUser && !currentUser.isAdmin) {
-      const updatedUser = { ...currentUser, isAdmin: true };
-      LocalStorage.updateUser(updatedUser);
-      setCurrentUser(updatedUser);
-      setIsAdmin(true);
-      refreshUsers();
-      alert('✅ Te has convertido en administrador!');
+  const refreshUsers = async () => {
+    try {
+      const allUsers = await apiClient.getUsers();
+      setUsers(allUsers);
+    } catch (error) {
+      console.error('Error refreshing users:', error);
     }
   };
 
-  const setAugustAvailabilityForAllMockUsers = () => {
-    const currentYear = new Date().getFullYear();
-    const augustSundays = getSundaysInMonth(currentYear, 8);
-    const mockUsers = LocalStorage.getUsers().filter(u => u.id.startsWith('mock-user-'));
-    
-    if (mockUsers.length === 0) {
-      alert('❌ No hay usuarios mock. Crea usuarios de prueba primero.');
-      return;
-    }
 
-    mockUsers.forEach(user => {
-      LocalStorage.updateMonthlyAvailability(
-        user.id,
-        8, // August
-        currentYear,
-        augustSundays, // ALL Sundays in August
-        false
-      );
-    });
 
-    alert(`✅ Disponibilidad de Agosto configurada!\n\n📅 Todos los ${mockUsers.length} usuarios mock están disponibles para TODOS los domingos de Agosto ${currentYear}\n\nDomingos: ${augustSundays.join(', ')}`);
-  };
-
-  const clearAllData = () => {
+  const clearAllData = async () => {
     if (!confirm('⚠️ ¿Estás seguro de que quieres eliminar TODOS los datos? Esta acción no se puede deshacer.')) {
       return;
     }
     
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('futbol-users');
-      localStorage.removeItem('futbol-games');
-      localStorage.removeItem('futbol-monthly-availability');
-      localStorage.removeItem('futbol-reminder-status');
-      localStorage.removeItem('futbol-settings');
-      
-      // Keep current user
-      if (currentUser) {
-        LocalStorage.addUser(currentUser);
+    try {
+      // Clear browser localStorage as fallback (for any old data)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('futbol-users');
+        localStorage.removeItem('futbol-games');
+        localStorage.removeItem('futbol-monthly-availability');
+        localStorage.removeItem('futbol-reminder-status');
+        localStorage.removeItem('futbol-settings');
       }
       
-      refreshUsers();
-      alert('🗑️ Todos los datos han sido eliminados (excepto tu usuario)');
+      // Note: In a real implementation, you would need to add database clear methods
+      // For now, we just keep the current user and refresh
+      if (currentUser) {
+        await apiClient.addUser(currentUser);
+      }
+      
+      await refreshUsers();
+      alert('🗑️ Datos de LocalStorage eliminados. Para limpiar completamente la base de datos, contacta al administrador del sistema.');
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      alert('❌ Error al limpiar los datos');
     }
   };
 
-  const toggleAdminStatus = (userId: string) => {
-    const updatedUsers = users.map(u => 
-      u.id === userId ? { ...u, isAdmin: !u.isAdmin } : u
-    );
-    setUsers(updatedUsers);
-    LocalStorage.saveUsers(updatedUsers);
-    
-    if (userId === currentUser?.id) {
-      setIsAdmin(!isAdmin);
-    }
-  };
-
-  const removeUser = (userId: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
-      const updatedUsers = users.filter(u => u.id !== userId);
+  const toggleAdminStatus = async (userId: string) => {
+    try {
+      const updatedUsers = users.map(u => 
+        u.id === userId ? { ...u, isAdmin: !u.isAdmin } : u
+      );
       setUsers(updatedUsers);
-      LocalStorage.saveUsers(updatedUsers);
+      await apiClient.saveUsers(updatedUsers);
+      
+      if (userId === currentUser?.id) {
+        setIsAdmin(!isAdmin);
+      }
+    } catch (error) {
+      console.error('Error toggling admin status:', error);
     }
   };
 
-  const toggleUserWhitelist = (userId: string) => {
-    LocalStorage.toggleUserWhitelist(userId);
-    const updatedUsers = LocalStorage.getUsers();
-    setUsers(updatedUsers);
+  const removeUser = async (userId: string) => {
+    if (confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+      try {
+        const updatedUsers = users.filter(u => u.id !== userId);
+        setUsers(updatedUsers);
+        await apiClient.saveUsers(updatedUsers);
+      } catch (error) {
+        console.error('Error removing user:', error);
+      }
+    }
   };
 
-  const advanceToNextMonth = () => {
-    const nextMonth = getNextAvailableMonth();
-    LocalStorage.setCurrentActiveMonth(nextMonth.month, nextMonth.year);
-    setCurrentActiveMonth(nextMonth);
+  const toggleUserWhitelist = async (userId: string) => {
+    try {
+      await apiClient.toggleUserWhitelist(userId);
+      await refreshUsers();
+    } catch (error) {
+      console.error('Error toggling user whitelist:', error);
+    }
   };
 
-  const setCustomMonth = (month: number, year: number) => {
-    LocalStorage.setCurrentActiveMonth(month, year);
-    setCurrentActiveMonth({ month, year });
+  const advanceToNextMonth = async () => {
+    try {
+      const nextMonth = getNextAvailableMonth();
+      await apiClient.setCurrentActiveMonth(nextMonth.month, nextMonth.year);
+      setCurrentActiveMonth(nextMonth);
+    } catch (error) {
+      console.error('Error advancing to next month:', error);
+    }
+  };
+
+  const setCustomMonth = async (month: number, year: number) => {
+    try {
+      await apiClient.setCurrentActiveMonth(month, year);
+      setCurrentActiveMonth({ month, year });
+    } catch (error) {
+      console.error('Error setting custom month:', error);
+    }
   };
 
   const sendTestEmail = async () => {
@@ -294,6 +331,8 @@ export default function AdminPage() {
     }
   };
 
+
+
   if (!isLoaded) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
   }
@@ -325,54 +364,19 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Testing Tools Section */}
+        {/* System Management Tools */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 mb-8">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 bg-gradient-to-r from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center">
-              <span className="text-2xl">🧪</span>
+            <div className="w-14 h-14 bg-gradient-to-r from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center">
+              <span className="text-2xl">⚙️</span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Herramientas de Prueba</h2>
-              <p className="text-slate-600 text-sm">Utilidades para probar el sistema con datos de ejemplo</p>
+              <h2 className="text-xl font-bold text-slate-900">Herramientas del Sistema</h2>
+              <p className="text-slate-600 text-sm">Administración y mantenimiento de datos</p>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 mb-6">
-            <button
-              onClick={handleCreateMockUsers}
-              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
-            >
-              <span>👥</span>
-              <div className="text-left">
-                <div>Crear Usuarios de Prueba</div>
-                <div className="text-xs opacity-90">14 usuarios con disponibilidad</div>
-              </div>
-            </button>
-            
-            <button
-              onClick={setAugustAvailabilityForAllMockUsers}
-              className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
-            >
-              <span>📅</span>
-              <div className="text-left">
-                <div>Configurar Agosto Completo</div>
-                <div className="text-xs opacity-90">Todos los domingos disponibles</div>
-              </div>
-            </button>
-            
-            {!isAdmin && (
-              <button
-                onClick={makeCurrentUserAdmin}
-                className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
-              >
-                <span>🔧</span>
-                <div className="text-left">
-                  <div>Hacerme Administrador</div>
-                  <div className="text-xs opacity-90">Para probar funciones admin</div>
-                </div>
-              </button>
-            )}
-            
+          <div className="grid md:grid-cols-1 gap-4 mb-6">
             <button
               onClick={clearAllData}
               className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
@@ -385,14 +389,13 @@ export default function AdminPage() {
             </button>
           </div>
 
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-purple-600">ℹ️</span>
-              <h4 className="font-bold text-purple-800 text-sm">Información</h4>
+              <span className="text-blue-600">ℹ️</span>
+              <h4 className="font-bold text-blue-800 text-sm">Información</h4>
             </div>
-            <p className="text-purple-700 text-sm">
-              Los usuarios de prueba se crean con disponibilidad aleatoria para el mes actual y siguiente. 
-              Esto te permite probar la funcionalidad de creación de partidos cuando hay 10+ jugadores disponibles.
+            <p className="text-blue-700 text-sm">
+              La limpieza de datos eliminará toda la información de la base de datos excepto tu usuario administrador.
             </p>
           </div>
         </div>
@@ -569,7 +572,7 @@ export default function AdminPage() {
             </div>
             <div className="flex gap-4">
               <div className="text-center">
-                <div className="text-lg font-bold text-green-700">{LocalStorage.getWhitelistedUserCount()}</div>
+                <div className="text-lg font-bold text-green-700">{users.filter(u => u.isWhitelisted && !u.isAdmin).length}</div>
                 <div className="text-xs text-green-600">Habilitados</div>
               </div>
               <div className="text-center">

@@ -69,6 +69,9 @@ export class LocalStorage {
     availableSundays: number[], 
     cannotPlayAnyDay: boolean = false
   ): void {
+    // Check for confirmed games that would prevent availability
+    const filteredSundays = cannotPlayAnyDay ? [] : this.filterAvailableSundays(availableSundays, month, year);
+    
     const availability = this.getMonthlyAvailability();
     const existingIndex = availability.findIndex(
       a => a.userId === userId && a.month === month && a.year === year
@@ -78,7 +81,7 @@ export class LocalStorage {
       userId,
       month,
       year,
-      availableSundays: cannotPlayAnyDay ? [] : availableSundays,
+      availableSundays: filteredSundays,
       cannotPlayAnyDay,
       hasVoted: true,
       updatedAt: new Date(),
@@ -94,6 +97,56 @@ export class LocalStorage {
     
     // Stop reminders for this user/month when they vote
     this.deactivateReminders(userId, month, year);
+  }
+
+  // Helper function to filter out Sundays that already have confirmed games
+  static filterAvailableSundays(requestedSundays: number[], month: number, year: number): number[] {
+    const games = this.getGames();
+    const blockedSundays = new Set<number>();
+    
+    // Find confirmed games with 10 players for the given month/year
+    games.forEach(game => {
+      const gameDate = new Date(game.date);
+      if (gameDate.getFullYear() === year && 
+          gameDate.getMonth() + 1 === month &&
+          game.status === 'confirmed' &&
+          game.participants.length >= 10) {
+        blockedSundays.add(gameDate.getDate());
+      }
+    });
+    
+    // Filter out blocked Sundays and warn user if any were blocked
+    const filteredSundays = requestedSundays.filter(sunday => !blockedSundays.has(sunday));
+    const blockedDays = requestedSundays.filter(sunday => blockedSundays.has(sunday));
+    
+    if (blockedDays.length > 0 && typeof window !== 'undefined') {
+      const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+      alert(
+        `⚠️ Algunos domingos ya tienen partidos confirmados con 10 jugadores:\n\n` +
+        `🚫 ${monthName}: ${blockedDays.join(', ')}\n\n` +
+        `Estos días han sido removidos de tu disponibilidad automáticamente.`
+      );
+    }
+    
+    return filteredSundays;
+  }
+
+  // Get list of blocked Sundays for a specific month/year
+  static getBlockedSundays(month: number, year: number): number[] {
+    const games = this.getGames();
+    const blockedSundays: number[] = [];
+    
+    games.forEach(game => {
+      const gameDate = new Date(game.date);
+      if (gameDate.getFullYear() === year && 
+          gameDate.getMonth() + 1 === month &&
+          game.status === 'confirmed' &&
+          game.participants.length >= 10) {
+        blockedSundays.push(gameDate.getDate());
+      }
+    });
+    
+    return blockedSundays.sort((a, b) => a - b);
   }
 
   static getUserMonthlyAvailability(userId: string, month: number, year: number): number[] {
