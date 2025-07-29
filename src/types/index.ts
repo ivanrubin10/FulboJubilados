@@ -46,5 +46,16 @@ export interface MonthlyAvailability {
   month: number;
   year: number;
   availableSundays: number[]; // Day numbers of the month
+  cannotPlayAnyDay: boolean; // "No puedo ningún día" option
+  hasVoted: boolean; // Track if user has submitted their availability
   updatedAt: Date;
+}
+
+export interface ReminderStatus {
+  userId: string;
+  month: number;
+  year: number;
+  lastReminderSent: Date;
+  reminderCount: number;
+  isActive: boolean; // Stop sending when user votes or opts out
 }

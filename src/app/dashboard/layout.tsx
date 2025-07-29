@@ -21,30 +21,30 @@ export default function DashboardLayout({
                 <div className="w-11 h-11 flex items-center justify-center bouncing-ball group-hover:scale-110 transition-transform duration-300">
                   <span className="text-2xl">⚽</span>
                 </div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-slate-800 text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
               </Link>
               <div className="hidden md:flex space-x-2">
                 <Link 
                   href="/dashboard" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-5 py-3 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   📅 Mi Disponibilidad
                 </Link>
                 <Link 
                   href="/dashboard/games" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-5 py-3 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   ⚽ Partidos
                 </Link>
                 <Link 
                   href="/dashboard/history" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-5 py-3 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   📊 Historial
                 </Link>
                 <Link 
                   href="/dashboard/admin" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-5 py-3 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   ⚙️ Admin
                 </Link>
@@ -73,28 +73,28 @@ export default function DashboardLayout({
               <div className="flex flex-col space-y-2 pt-4">
                 <Link 
                   href="/dashboard" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-3 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   📅 Mi Disponibilidad
                 </Link>
                 <Link 
                   href="/dashboard/games" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-3 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   ⚽ Partidos
                 </Link>
                 <Link 
                   href="/dashboard/history" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-3 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   📊 Historial
                 </Link>
                 <Link 
                   href="/dashboard/admin" 
-                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-3 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm"
+                  className="text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   ⚙️ Admin

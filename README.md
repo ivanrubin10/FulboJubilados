@@ -1,4 +1,4 @@
-# ⚽ Fulbo Organizer
+# ⚽ Fulbo Jubilados
 
 Una aplicación web para organizar partidos de fútbol 5v5 los domingos. Permite a los usuarios marcar su disponibilidad mensual, organizar equipos automáticamente y llevar un historial de partidos con resultados.
 

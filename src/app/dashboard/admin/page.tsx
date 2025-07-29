@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { LocalStorage } from '@/lib/store';
 import { User } from '@/types';
 import { getNextAvailableMonth } from '@/lib/utils';
+import { notificationService } from '@/lib/notifications';
 
 export default function AdminPage() {
   const { user, isLoaded } = useUser();
@@ -12,6 +13,7 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentActiveMonth, setCurrentActiveMonth] = useState({ month: 7, year: 2025 });
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -57,6 +59,115 @@ export default function AdminPage() {
     setCurrentActiveMonth({ month, year });
   };
 
+  const sendTestEmail = async () => {
+    setIsLoadingEmail(true);
+    try {
+      const testDate = new Date();
+      testDate.setDate(testDate.getDate() + 7); // Next week
+
+      const success = await notificationService.notifyGameCreated(testDate, users.slice(0, 3));
+      
+      if (success) {
+        alert('✅ Email de prueba enviado correctamente');
+      } else {
+        alert('❌ Error al enviar el email. Verifica tu configuración de Resend.');
+      }
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      alert('❌ Error al enviar el email.');
+    } finally {
+      setIsLoadingEmail(false);
+    }
+  };
+
+  const sendGameReminder = async () => {
+    setIsLoadingEmail(true);
+    try {
+      const gameDate = new Date();
+      gameDate.setDate(gameDate.getDate() + 1); // Tomorrow
+
+      const success = await notificationService.notifyGameReminder(gameDate, users);
+      
+      if (success) {
+        alert('✅ Recordatorio enviado a todos los usuarios');
+      } else {
+        alert('❌ Error al enviar el recordatorio');
+      }
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      alert('❌ Error al enviar el recordatorio');
+    } finally {
+      setIsLoadingEmail(false);
+    }
+  };
+
+  const sendTeamAssignmentNotification = async () => {
+    setIsLoadingEmail(true);
+    try {
+      const gameDate = new Date();
+      gameDate.setDate(gameDate.getDate() + 2); // Day after tomorrow
+
+      // Mock team assignment
+      const team1 = users.slice(0, 5);
+      const team2 = users.slice(5, 10);
+
+      const success = await notificationService.notifyTeamAssignments(gameDate, team1, team2);
+      
+      if (success) {
+        alert('✅ Notificación de equipos enviada');
+      } else {
+        alert('❌ Error al enviar la notificación');
+      }
+    } catch (error) {
+      console.error('Error sending team notification:', error);
+      alert('❌ Error al enviar la notificación');
+    } finally {
+      setIsLoadingEmail(false);
+    }
+  };
+
+  const sendDailyReminders = async () => {
+    setIsLoadingEmail(true);
+    try {
+      const response = await fetch('/api/send-daily-reminders', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || 'test-token'}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`✅ Recordatorios enviados a ${result.count} usuarios`);
+      } else {
+        alert(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error sending daily reminders:', error);
+      alert('❌ Error al enviar recordatorios');
+    } finally {
+      setIsLoadingEmail(false);
+    }
+  };
+
+  const checkReminderStatus = async () => {
+    try {
+      const response = await fetch('/api/send-daily-reminders');
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`📊 Estado de recordatorios:\n\n• Mes activo: ${result.activeMonth.month}/${result.activeMonth.year}\n• Usuarios pendientes: ${result.count}\n• Nombres: ${result.usersNeedingReminders.map((u: { name: string }) => u.name).join(', ') || 'Ninguno'}`);
+      } else {
+        alert('❌ Error al obtener estado');
+      }
+    } catch (error) {
+      console.error('Error checking reminder status:', error);
+      alert('❌ Error al verificar estado');
+    }
+  };
+
   if (!isLoaded) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
   }
@@ -82,8 +193,8 @@ export default function AdminPage() {
               <span className="text-2xl">⚙️</span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Panel de Administración</h1>
-              <p className="text-slate-600 text-lg">Gestiona usuarios, permisos y configuración del sistema</p>
+              <h1 className="text-2xl font-bold text-slate-900">Panel de Administración</h1>
+              <p className="text-slate-600 text-base">Gestiona usuarios, permisos y configuración del sistema</p>
             </div>
           </div>
         </div>
@@ -94,8 +205,8 @@ export default function AdminPage() {
               <span className="text-2xl">📅</span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Gestión de Mes Activo</h2>
-              <p className="text-slate-600">Controla qué mes ven los usuarios por defecto</p>
+              <h2 className="text-xl font-bold text-slate-900">Gestión de Mes Activo</h2>
+              <p className="text-slate-600 text-sm">Controla qué mes ven los usuarios por defecto</p>
             </div>
           </div>
           
@@ -105,8 +216,8 @@ export default function AdminPage() {
                 <p className="text-slate-700 font-medium mb-1">
                   Mes activo actual:
                 </p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {new Date(currentActiveMonth.year, currentActiveMonth.month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                <p className="text-xl font-bold text-slate-900">
+                  {new Date(currentActiveMonth.year, currentActiveMonth.month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
                 </p>
                 <p className="text-sm text-slate-500 mt-1">
                   Este es el mes que se muestra por defecto a todos los usuarios
@@ -127,23 +238,104 @@ export default function AdminPage() {
               <select
                 value={currentActiveMonth.month}
                 onChange={(e) => setCustomMonth(parseInt(e.target.value), currentActiveMonth.year)}
-                className="border border-slate-300 rounded-xl px-4 py-3 bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="border border-slate-300 rounded-xl pl-4 pr-10 py-3 bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>
-                    {new Date(currentActiveMonth.year, i, 1).toLocaleDateString('es-ES', { month: 'long' })}
+                    {new Date(currentActiveMonth.year, i, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(currentActiveMonth.year, i, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
                   </option>
                 ))}
               </select>
               <select
                 value={currentActiveMonth.year}
                 onChange={(e) => setCustomMonth(currentActiveMonth.month, parseInt(e.target.value))}
-                className="border border-slate-300 rounded-xl px-4 py-3 bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="border border-slate-300 rounded-xl pl-4 pr-10 py-3 bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
                 <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 bg-gradient-to-r from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center">
+              <span className="text-2xl">📧</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Notificaciones por Email</h2>
+              <p className="text-slate-600 text-sm">Envía notificaciones a los jugadores</p>
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <button
+              onClick={sendTestEmail}
+              disabled={isLoadingEmail}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {isLoadingEmail ? '⏳ Enviando...' : '🧪 Email de Prueba'}
+            </button>
+            
+            <button
+              onClick={sendGameReminder}
+              disabled={isLoadingEmail}
+              className="bg-gradient-to-r from-orange-600 to-orange-700 text-white px-4 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-orange-800 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {isLoadingEmail ? '⏳ Enviando...' : '🔔 Recordatorio'}
+            </button>
+            
+            <button
+              onClick={sendTeamAssignmentNotification}
+              disabled={isLoadingEmail}
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {isLoadingEmail ? '⏳ Enviando...' : '👥 Notificar Equipos'}
+            </button>
+          </div>
+
+          <div className="border-t border-slate-200 pt-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">🤖 Recordatorios Automáticos</h3>
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <button
+                onClick={sendDailyReminders}
+                disabled={isLoadingEmail}
+                className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {isLoadingEmail ? '⏳ Enviando...' : '📧 Enviar Recordatorios Diarios'}
+              </button>
+              
+              <button
+                onClick={checkReminderStatus}
+                className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-3 rounded-xl font-semibold hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
+              >
+                📊 Ver Estado de Recordatorios
+              </button>
+            </div>
+            
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-purple-600">🤖</span>
+                <h4 className="font-bold text-purple-800 text-sm">Automatización con GitHub Actions</h4>
+              </div>
+              <p className="text-purple-700 text-xs leading-relaxed">
+                Los recordatorios se envían automáticamente todos los días a las 10:00 AM UTC usando GitHub Actions.
+                Solo se envían a usuarios que no han marcado su disponibilidad para el mes activo.
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-blue-600">ℹ️</span>
+              <h3 className="font-bold text-blue-800 text-sm">Configuración de Email</h3>
+            </div>
+            <p className="text-blue-700 text-xs leading-relaxed">
+              Para usar las notificaciones por email, agrega tu API key de Resend en el archivo .env.local:
+              <br />
+              <code className="bg-blue-100 px-2 py-1 rounded text-xs">RESEND_API_KEY=tu_api_key_aqui</code>
+            </p>
           </div>
         </div>
 
@@ -153,10 +345,10 @@ export default function AdminPage() {
               <span className="text-2xl">👥</span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold text-slate-900">
                 Usuarios Registrados ({users.length})
               </h2>
-              <p className="text-slate-600">Gestiona permisos y usuarios del sistema</p>
+              <p className="text-slate-600 text-sm">Gestiona permisos y usuarios del sistema</p>
             </div>
           </div>
         
@@ -166,44 +358,44 @@ export default function AdminPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="text-left py-4 px-6 font-semibold text-slate-900">Foto</th>
-                      <th className="text-left py-4 px-6 font-semibold text-slate-900">Nombre</th>
-                      <th className="text-left py-4 px-6 font-semibold text-slate-900">Email</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-900">Administrador</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-900">Fecha de Registro</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-900">Acciones</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Foto</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Nombre</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900 text-sm">Email</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Administrador</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Fecha de Registro</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-900 text-sm">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map(userData => (
                       <tr key={userData.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                        <td className="py-4 px-6">
+                        <td className="py-3 px-4">
                           {userData.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img 
                               src={userData.imageUrl} 
                               alt={userData.name}
-                              className="w-10 h-10 rounded-full border-2 border-slate-200"
+                              className="w-8 h-8 rounded-full border-2 border-slate-200"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-100 to-sky-100 flex items-center justify-center border-2 border-slate-200">
-                              <span className="text-slate-700 text-sm font-bold">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-emerald-100 to-sky-100 flex items-center justify-center border-2 border-slate-200">
+                              <span className="text-slate-700 text-xs font-bold">
                                 {userData.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
                           )}
                     </td>
-                        <td className="py-4 px-6">
+                        <td className="py-3 px-4">
                           <div>
-                            <p className="font-semibold text-slate-900">{userData.name}</p>
+                            <p className="font-semibold text-slate-900 text-sm">{userData.name}</p>
                             {userData.nickname && (
-                              <p className="text-sm text-slate-500">@{userData.nickname}</p>
+                              <p className="text-xs text-slate-500">@{userData.nickname}</p>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-6 text-slate-600">{userData.email}</td>
-                        <td className="py-4 px-6 text-center">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                        <td className="py-3 px-4 text-slate-600 text-sm">{userData.email}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                             userData.isAdmin 
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
@@ -211,14 +403,14 @@ export default function AdminPage() {
                             {userData.isAdmin ? '✓ Admin' : 'Usuario'}
                           </span>
                     </td>
-                        <td className="py-4 px-6 text-center text-slate-600 font-medium">
+                        <td className="py-3 px-4 text-center text-slate-600 font-medium text-sm">
                           {new Date(userData.createdAt).toLocaleDateString('es-ES')}
                         </td>
-                        <td className="py-4 px-6 text-center">
-                          <div className="flex justify-center space-x-2">
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex justify-center space-x-1">
                             <button
                               onClick={() => toggleAdminStatus(userData.id)}
-                              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                                 userData.isAdmin
                                   ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                                   : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200'
@@ -230,7 +422,7 @@ export default function AdminPage() {
                             {userData.id !== currentUser.id && (
                               <button
                                 onClick={() => removeUser(userData.id)}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 transition-all"
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 transition-all"
                               >
                                 🗑️ Eliminar
                               </button>
@@ -248,7 +440,7 @@ export default function AdminPage() {
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">👥</span>
               </div>
-              <p className="text-slate-500 text-lg font-medium">
+              <p className="text-slate-500 text-base font-medium">
                 No hay usuarios registrados
               </p>
             </div>
