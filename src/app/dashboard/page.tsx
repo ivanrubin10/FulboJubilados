@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, formatDate } from '@/lib/utils';
 import { User } from '@/types';
+import { useToast } from '@/components/ui/toast';
 
 // API helper functions
 const apiClient = {
@@ -63,6 +64,7 @@ const apiClient = {
 export default function Dashboard() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+  const { warning } = useToast();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [availableSundays, setAvailableSundays] = useState<number[]>([]);
@@ -169,10 +171,19 @@ export default function Dashboard() {
     // If trying to add a blocked day, show warning and prevent selection
     if (!availableSundays.includes(sunday) && isBlocked) {
       const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-      alert(
-        `⚠️ No puedes seleccionar este domingo\n\n` +
-        `🚫 ${monthName} ${sunday}: Ya hay un partido confirmado con 10 jugadores\n\n` +
-        `Este día está completo y no acepta más jugadores.`
+      warning(
+        'Día completo',
+        `${monthName} ${sunday}: Ya hay un partido confirmado con 10 jugadores. Este día está completo y no acepta más jugadores.`
+      );
+      return;
+    }
+
+    // If trying to remove a blocked day, show warning and prevent unvoting
+    if (availableSundays.includes(sunday) && isBlocked) {
+      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+      warning(
+        'No se puede desvotar',
+        `${monthName} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
       );
       return;
     }
@@ -194,6 +205,10 @@ export default function Dashboard() {
         newAvailability,
         false
       );
+      
+      // Refresh blocked Sundays after voting (voting might create new games)
+      const updatedBlocked = await apiClient.getBlockedSundays(selectedMonth, selectedYear);
+      setBlockedSundays(updatedBlocked);
     } catch (error) {
       console.error('Error updating availability:', error);
       // Revert UI changes on error
@@ -270,11 +285,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1">
             ¡Hola, {currentUser.nickname || currentUser.name}! ⚽
           </h1>
-          <p className="text-base sm:text-lg text-slate-600">
+          <p className="text-sm sm:text-base text-slate-600">
             Marca los domingos que puedes jugar
           </p>
         </div>
@@ -289,23 +304,26 @@ export default function Dashboard() {
               </p>
             </div>
             <p className="text-orange-700 text-xs">
-              Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.join(', ')}
+              Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.map(sunday => {
+                const date = new Date(selectedYear, selectedMonth - 1, sunday);
+                return `${sunday} de ${date.toLocaleDateString('es-ES', { month: 'long' })}`;
+              }).join(', ')}
             </p>
           </div>
         )}
 
         {/* Month Navigation */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
             <button
               onClick={prevMonth}
-              className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-2"
+              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-1"
             >
               <span className="text-lg">←</span>
               <span className="hidden sm:inline text-sm font-medium text-slate-700">Anterior</span>
             </button>
             
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 text-center">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 text-center">
               {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
                 month: 'long', 
                 year: 'numeric' 
@@ -314,7 +332,7 @@ export default function Dashboard() {
             
             <button
               onClick={nextMonth}
-              className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-2"
+              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-1"
             >
               <span className="hidden sm:inline text-sm font-medium text-slate-700">Siguiente</span>
               <span className="text-lg">→</span>
@@ -339,7 +357,7 @@ export default function Dashboard() {
           </div>
 
           {/* Sundays Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
             {sundaysInMonth.map((sunday) => {
               const date = new Date(selectedYear, selectedMonth - 1, sunday);
               const isSelected = availableSundays.includes(sunday);
@@ -351,7 +369,7 @@ export default function Dashboard() {
                 <div
                   key={sunday}
                   onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
-                  className={`p-4 sm:p-6 rounded-2xl transition-colors duration-200 ${
+                  className={`p-4 rounded-xl transition-all duration-200 hover:shadow-md ${
                     isDisabled
                       ? 'opacity-50 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
                       : isBlocked && !isSelected
@@ -367,34 +385,39 @@ export default function Dashboard() {
                       <span className="text-2xl">
                         {isSelected ? '✅' : isBlocked && !isSelected ? '🚫' : '⚽'}
                       </span>
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-600">
-                        Dom
-                      </span>
+                      {isSelected && (
+                        <span className="text-emerald-600 font-bold text-xs bg-emerald-100 px-2 py-1 rounded-full">
+                          DISPONIBLE
+                        </span>
+                      )}
                     </div>
-                    {isSelected && (
-                      <span className="text-emerald-600 font-bold text-sm">DISPONIBLE</span>
+                    {isBlocked && !isSelected && (
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                        Completo
+                      </span>
                     )}
                   </div>
                   
-                  <h3 className={`text-base sm:text-lg md:text-xl font-bold mb-1 ${
+                  <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
                     isSelected ? 'text-emerald-900' :
                     isBlocked ? 'text-orange-900' : 'text-slate-900'
                   }`}>
-                    Domingo {sunday} de {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
-                    {isBlocked && !isSelected && <span className="ml-2 text-orange-600">🚫</span>}
+                    {sunday}
                   </h3>
-                  <p className={`text-sm sm:text-base font-medium mb-1 ${
+                  
+                  <p className={`text-sm font-medium mb-2 ${
                     isSelected ? 'text-emerald-700' :
                     isBlocked ? 'text-orange-700' : 'text-slate-600'
                   }`}>
-                    {isBlocked && !isSelected ? 'Día completo - 10 jugadores confirmados' : formatDate(date)}
+                    {isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
                   </p>
+                  
                   <p className={`text-xs ${
                     isSelected ? 'text-emerald-600' :
                     isBlocked ? 'text-orange-600' : 'text-slate-500'
                   }`}>
                     {isSelected ? 'Toca para desmarcar' : 
-                     isBlocked && !isSelected ? 'Partido confirmado' : 'Toca para marcar como disponible'}
+                     isBlocked && !isSelected ? '10 jugadores confirmados' : 'Toca para marcar disponibilidad'}
                   </p>
                 </div>
               );

@@ -25,6 +25,10 @@ export const games = pgTable('games', {
     cost?: number,
     reservedBy: string
   }>(),
+  adminNotificationSent: boolean('admin_notification_sent').default(false).notNull(),
+  adminNotificationTimeout: timestamp('admin_notification_timeout'),
+  customTime: text('custom_time'), // Custom time if not 10am
+  calendarEventId: text('calendar_event_id'), // Google Calendar event ID
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -61,6 +65,19 @@ export const settings = pgTable('settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const adminNotifications = pgTable('admin_notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  type: text('type', { enum: ['match_ready', 'voting_reminder'] }).notNull(),
+  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
+  month: integer('month'),
+  year: integer('year'),
+  message: text('message').notNull(),
+  isRead: boolean('is_read').default(false).notNull(),
+  actionRequired: boolean('action_required').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -70,3 +87,5 @@ export type MonthlyAvailability = typeof monthlyAvailability.$inferSelect;
 export type NewMonthlyAvailability = typeof monthlyAvailability.$inferInsert;
 export type ReminderStatus = typeof reminderStatus.$inferSelect;
 export type NewReminderStatus = typeof reminderStatus.$inferInsert;
+export type AdminNotification = typeof adminNotifications.$inferSelect;
+export type NewAdminNotification = typeof adminNotifications.$inferInsert;

@@ -119,13 +119,9 @@ export class LocalStorage {
     const filteredSundays = requestedSundays.filter(sunday => !blockedSundays.has(sunday));
     const blockedDays = requestedSundays.filter(sunday => blockedSundays.has(sunday));
     
-    if (blockedDays.length > 0 && typeof window !== 'undefined') {
+    if (blockedDays.length > 0) {
       const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-      alert(
-        `⚠️ Algunos domingos ya tienen partidos confirmados con 10 jugadores:\n\n` +
-        `🚫 ${monthName}: ${blockedDays.join(', ')}\n\n` +
-        `Estos días han sido removidos de tu disponibilidad automáticamente.`
-      );
+      console.warn(`⚠️ Algunos domingos ya tienen partidos confirmados con 10 jugadores: ${monthName}: ${blockedDays.join(', ')}. Estos días han sido removidos de tu disponibilidad automáticamente.`);
     }
     
     return filteredSundays;

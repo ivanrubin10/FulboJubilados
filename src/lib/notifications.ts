@@ -1,7 +1,15 @@
 import { User } from '@/types';
 
+// Interface for reservation info
+interface ReservationInfo {
+  location: string;
+  time: string;
+  cost?: number;
+  reservedBy: string;
+}
+
 export interface EmailNotificationRequest {
-  type: 'game-created' | 'game-reminder' | 'team-assignment';
+  type: 'game-created' | 'game-reminder' | 'team-assignment' | 'match-confirmed' | 'voting-reminder';
   data: {
     gameDate?: string;
     players?: string[];
@@ -9,6 +17,16 @@ export interface EmailNotificationRequest {
       team1: string[];
       team2: string[];
     };
+    customTime?: string;
+    reservationInfo?: {
+      location: string;
+      time: string;
+      cost?: number;
+      reservedBy: string;
+    };
+    calendarEventId?: string;
+    month?: number;
+    year?: number;
   };
 }
 
@@ -97,6 +115,55 @@ export class NotificationService {
     // This would integrate with your availability system
     // For now, return all users as a placeholder
     return allUsers.filter(user => !user.isAdmin); // Exclude admins from game notifications
+  }
+
+  // New notification methods
+  async notifyMatchConfirmed(
+    gameDate: Date, 
+    participants: User[], 
+    customTime?: string, 
+    reservationInfo?: ReservationInfo,
+    calendarEventId?: string
+  ): Promise<boolean> {
+    const playerEmails = participants.map(user => user.email);
+    
+    return this.sendEmailNotification({
+      type: 'match-confirmed',
+      data: {
+        gameDate: gameDate.toISOString(),
+        players: playerEmails,
+        customTime,
+        reservationInfo,
+        calendarEventId,
+      },
+    });
+  }
+
+  async notifyVotingReminder(users: User[], month: number, year: number): Promise<boolean> {
+    const playerEmails = users.map(user => user.email);
+    
+    return this.sendEmailNotification({
+      type: 'voting-reminder',
+      data: {
+        players: playerEmails,
+        month,
+        year,
+      },
+    });
+  }
+
+  // Calendar integration
+  async createCalendarEvent(gameDate: Date, participants: User[], customTime?: string): Promise<string | null> {
+    try {
+      // This would integrate with Google Calendar API
+      // For now, return a mock calendar event ID
+      const mockEventId = `event_${Date.now()}_${gameDate.getTime()}`;
+      console.log(`Calendar event created: ${mockEventId} for ${gameDate.toISOString()}`);
+      return mockEventId;
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      return null;
+    }
   }
 
   // Schedule reminder emails (would need a cron job or similar in production)

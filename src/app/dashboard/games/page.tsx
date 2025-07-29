@@ -4,6 +4,8 @@ import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { getSundaysInMonth, formatDate, generateTeams } from '@/lib/utils';
 import { Game, User, MonthlyAvailability } from '@/types';
+import { useToast } from '@/components/ui/toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // API helper functions
 const apiClient = {
@@ -107,7 +109,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             <select
               value={editedGame.status}
               onChange={(e) => setEditedGame(prev => ({ ...prev, status: e.target.value as Game['status'] }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
             >
               <option value="scheduled">Programado</option>
               <option value="confirmed">Confirmado</option>
@@ -127,7 +129,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                   value={reservationInfo.location}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, location: e.target.value }))}
                   placeholder="Ej: Cancha Municipal"
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
               <div>
@@ -136,7 +138,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                   type="time"
                   value={reservationInfo.time}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, time: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
               <div>
@@ -146,7 +148,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                   value={reservationInfo.cost}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, cost: e.target.value }))}
                   placeholder="0"
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
               <div>
@@ -156,7 +158,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                   value={reservationInfo.reservedBy}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, reservedBy: e.target.value }))}
                   placeholder="Nombre de quien reservó"
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
             </div>
@@ -262,6 +264,8 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
 export default function GamesPage() {
   const { user, isLoaded } = useUser();
+  const { success, error } = useToast();
+  const { confirm } = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -307,10 +311,14 @@ export default function GamesPage() {
 
   const getAvailablePlayersForSunday = (year: number, month: number, sunday: number): User[] => {
     return users.filter(user => {
-      if (!user.isWhitelisted || user.isAdmin) return false;
+      // Include all whitelisted users (both admins and regular players)
+      if (!user.isWhitelisted) return false;
+      
       const userAvailability = availability.find(
         a => a.userId === user.id && a.month === month && a.year === year
       );
+      
+      // Only show users who have explicitly voted for this Sunday
       return userAvailability?.availableSundays.includes(sunday) || false;
     });
   };
@@ -319,8 +327,21 @@ export default function GamesPage() {
     const gameDate = new Date(year, month - 1, sunday);
     const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
     
+    // Double-check for existing games to prevent duplicates
+    const existingGame = games.find(g => {
+      const gDate = g.date instanceof Date ? g.date : new Date(g.date);
+      return gDate.getFullYear() === gameDate.getFullYear() &&
+             gDate.getMonth() === gameDate.getMonth() &&
+             gDate.getDate() === gameDate.getDate();
+    });
+    
+    if (existingGame) {
+      error('Partido ya existe', 'Ya existe un partido programado para esta fecha.');
+      return;
+    }
+    
     if (availablePlayers.length < 10) {
-      alert(`Solo hay ${availablePlayers.length} jugadores disponibles. Se necesitan 10 para crear un partido.`);
+      error('Jugadores insuficientes', `Solo hay ${availablePlayers.length} jugadores disponibles. Se necesitan 10 para crear un partido.`);
       return;
     }
 
@@ -343,10 +364,10 @@ export default function GamesPage() {
     const updatedGames = [...games, newGame];
     setGames(updatedGames);
       await apiClient.saveGames(updatedGames);
-      alert('¡Partido creado exitosamente!');
-    } catch (error) {
-      console.error('Error creating game:', error);
-      alert('Error al crear el partido');
+      success('Partido creado', '¡Partido creado exitosamente!');
+    } catch (err) {
+      console.error('Error creating game:', err);
+      error('Error al crear partido', 'No se pudo crear el partido');
     }
   };
 
@@ -360,17 +381,6 @@ export default function GamesPage() {
     }
   };
 
-  const deleteGame = async (gameId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este partido?')) return;
-    
-    try {
-      const updatedGames = games.filter(g => g.id !== gameId);
-    setGames(updatedGames);
-      await apiClient.saveGames(updatedGames);
-    } catch (error) {
-      console.error('Error deleting game:', error);
-    }
-  };
 
   const handleEditGame = async (updatedGame: Game) => {
     try {
@@ -410,7 +420,10 @@ export default function GamesPage() {
         const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
           const existingGame = games.find(g => {
             const gameDate = g.date instanceof Date ? g.date : new Date(g.date);
-            return gameDate.getTime() === date.getTime();
+            // Compare only year, month, and day (ignore time)
+            return gameDate.getFullYear() === date.getFullYear() &&
+                   gameDate.getMonth() === date.getMonth() &&
+                   gameDate.getDate() === date.getDate();
           });
         
         return {
@@ -567,12 +580,6 @@ export default function GamesPage() {
                       >
                         Editar
                       </button>
-                      <button
-                        onClick={() => deleteGame(existingGame.id)}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                      >
-                        Eliminar
-                      </button>
                     </div>
                   )}
                 </div>
@@ -626,13 +633,13 @@ export default function GamesPage() {
                 {existingGame.reservationInfo && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h5 className="font-semibold text-gray-800 mb-2">Información de Reserva</h5>
-                    <p><strong>Lugar:</strong> {existingGame.reservationInfo.location}</p>
-                    <p><strong>Hora:</strong> {existingGame.reservationInfo.time}</p>
+                    <p className="text-gray-900"><strong>Lugar:</strong> {existingGame.reservationInfo.location}</p>
+                    <p className="text-gray-900"><strong>Hora:</strong> {existingGame.reservationInfo.time}</p>
                     {existingGame.reservationInfo.cost && (
-                      <p><strong>Costo:</strong> ${existingGame.reservationInfo.cost}</p>
+                      <p className="text-gray-900"><strong>Costo:</strong> ${existingGame.reservationInfo.cost}</p>
                     )}
                     {existingGame.reservationInfo.reservedBy && (
-                      <p><strong>Reservado por:</strong> {existingGame.reservationInfo.reservedBy}</p>
+                      <p className="text-gray-900"><strong>Reservado por:</strong> {existingGame.reservationInfo.reservedBy}</p>
                     )}
                   </div>
                 )}

@@ -4,6 +4,7 @@ import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
+import { useToast } from '@/components/ui/toast';
 
 // API helper functions
 const apiClient = {
@@ -38,6 +39,7 @@ const apiClient = {
 export default function SetupNickname() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+  const { error } = useToast();
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -100,9 +102,18 @@ export default function SetupNickname() {
       }
       
       router.push('/dashboard');
-    } catch (error) {
-      console.error('Error saving nickname:', error);
-      alert('Error al guardar el apodo. Por favor, inténtalo de nuevo.');
+    } catch (err) {
+      console.error('Error saving nickname:', err);
+      
+      // Show more detailed error information
+      const errorMessage = 'Error al guardar el apodo. Por favor, inténtalo de nuevo.';
+      let errorDetails = '';
+      if (err instanceof Error) {
+        console.error('Error details:', err.message);
+        errorDetails = `Detalles técnicos: ${err.message}`;
+      }
+      
+      error(errorMessage, errorDetails);
     } finally {
       setIsLoading(false);
     }
