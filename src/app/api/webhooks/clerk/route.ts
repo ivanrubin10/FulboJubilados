@@ -106,6 +106,14 @@ export async function POST(req: NextRequest) {
       case 'user.deleted': {
         const clerkUser = evt.data;
         
+        if (!clerkUser.id) {
+          console.error('No user ID provided in delete event');
+          return NextResponse.json(
+            { error: 'No user ID provided' },
+            { status: 400 }
+          );
+        }
+
         await DatabaseService.deleteUser(clerkUser.id);
         console.log(`User ${clerkUser.id} deleted successfully from database`);
         
