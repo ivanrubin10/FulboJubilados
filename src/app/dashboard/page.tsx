@@ -136,27 +136,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
-          {currentUser && !currentUser.isAdmin && (
-            <div className="mt-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-amber-800 text-base">Configuración temporal</h3>
-                  <p className="text-amber-700 font-medium text-sm">Activar permisos de administrador para pruebas</p>
-                </div>
-                <button
-                  onClick={() => {
-                    const updatedUser = { ...currentUser, isAdmin: true };
-                    LocalStorage.updateUser(updatedUser);
-                    setCurrentUser(updatedUser);
-                  }}
-                  className="button-glow px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl hover:from-amber-700 hover:to-amber-800 transition-all duration-300 font-bold shadow-lg hover:shadow-amber-500/25 transform hover:-translate-y-0.5"
-                >
-                  🔧 Hacer Admin
-                </button>
-              </div>
-            </div>
-          )}
+
 
           {currentUser?.isAdmin && (
             <div className="mt-8 p-6 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl">

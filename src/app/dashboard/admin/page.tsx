@@ -4,7 +4,7 @@ import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { LocalStorage } from '@/lib/store';
 import { User } from '@/types';
-import { getNextAvailableMonth } from '@/lib/utils';
+import { getNextAvailableMonth, getSundaysInMonth, createMockUsers } from '@/lib/utils';
 import { notificationService } from '@/lib/notifications';
 
 export default function AdminPage() {
@@ -27,6 +27,96 @@ export default function AdminPage() {
       setCurrentActiveMonth(activeMonth);
     }
   }, [isLoaded, user]);
+
+  const refreshUsers = () => {
+    const allUsers = LocalStorage.getUsers();
+    setUsers(allUsers);
+  };
+
+  const handleCreateMockUsers = () => {
+    createMockUsers();
+    refreshUsers();
+    
+    // Show some debug info
+    const allUsers = LocalStorage.getUsers();
+    const whitelistedUsers = allUsers.filter(u => u.isWhitelisted && !u.isAdmin);
+    const availability = LocalStorage.getMonthlyAvailability();
+    const mockUsers = allUsers.filter(u => u.id.startsWith('mock-user-'));
+    
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    // Check August availability for mock users
+    const augustAvailability = availability.filter(a => a.month === 8 && a.year === currentYear);
+    const mockUsersWithAugust = augustAvailability.filter(a => a.userId.startsWith('mock-user-'));
+    
+    console.log('📊 Debug Info:');
+    console.log(`- Total users: ${allUsers.length}`);
+    console.log(`- Mock users: ${mockUsers.length}`);
+    console.log(`- Whitelisted users: ${whitelistedUsers.length}`);
+    console.log(`- Availability records: ${availability.length}`);
+    console.log(`- August availability records: ${augustAvailability.length}`);
+    console.log(`- Mock users with August availability: ${mockUsersWithAugust.length}`);
+    console.log(`- Current month: ${currentMonth}/${currentYear}`);
+    
+    alert(`✅ Usuarios de prueba creados exitosamente!\n\n📊 Estado:\n• Total usuarios: ${allUsers.length}\n• Mock users: ${mockUsers.length}\n• Usuarios jugadores: ${whitelistedUsers.length}\n• Registros de disponibilidad: ${availability.length}\n\n🗓️ Agosto ${currentYear}:\n• Mock users con disponibilidad: ${mockUsersWithAugust.length}/${mockUsers.length}`);
+  };
+
+  const makeCurrentUserAdmin = () => {
+    if (currentUser && !currentUser.isAdmin) {
+      const updatedUser = { ...currentUser, isAdmin: true };
+      LocalStorage.updateUser(updatedUser);
+      setCurrentUser(updatedUser);
+      setIsAdmin(true);
+      refreshUsers();
+      alert('✅ Te has convertido en administrador!');
+    }
+  };
+
+  const setAugustAvailabilityForAllMockUsers = () => {
+    const currentYear = new Date().getFullYear();
+    const augustSundays = getSundaysInMonth(currentYear, 8);
+    const mockUsers = LocalStorage.getUsers().filter(u => u.id.startsWith('mock-user-'));
+    
+    if (mockUsers.length === 0) {
+      alert('❌ No hay usuarios mock. Crea usuarios de prueba primero.');
+      return;
+    }
+
+    mockUsers.forEach(user => {
+      LocalStorage.updateMonthlyAvailability(
+        user.id,
+        8, // August
+        currentYear,
+        augustSundays, // ALL Sundays in August
+        false
+      );
+    });
+
+    alert(`✅ Disponibilidad de Agosto configurada!\n\n📅 Todos los ${mockUsers.length} usuarios mock están disponibles para TODOS los domingos de Agosto ${currentYear}\n\nDomingos: ${augustSundays.join(', ')}`);
+  };
+
+  const clearAllData = () => {
+    if (!confirm('⚠️ ¿Estás seguro de que quieres eliminar TODOS los datos? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('futbol-users');
+      localStorage.removeItem('futbol-games');
+      localStorage.removeItem('futbol-monthly-availability');
+      localStorage.removeItem('futbol-reminder-status');
+      localStorage.removeItem('futbol-settings');
+      
+      // Keep current user
+      if (currentUser) {
+        LocalStorage.addUser(currentUser);
+      }
+      
+      refreshUsers();
+      alert('🗑️ Todos los datos han sido eliminados (excepto tu usuario)');
+    }
+  };
 
   const toggleAdminStatus = (userId: string) => {
     const updatedUsers = users.map(u => 
@@ -232,6 +322,78 @@ export default function AdminPage() {
               <h1 className="text-2xl font-bold text-slate-900">Panel de Administración</h1>
               <p className="text-slate-600 text-base">Gestiona usuarios, permisos y configuración del sistema</p>
             </div>
+          </div>
+        </div>
+
+        {/* Testing Tools Section */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 bg-gradient-to-r from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center">
+              <span className="text-2xl">🧪</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Herramientas de Prueba</h2>
+              <p className="text-slate-600 text-sm">Utilidades para probar el sistema con datos de ejemplo</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <button
+              onClick={handleCreateMockUsers}
+              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
+            >
+              <span>👥</span>
+              <div className="text-left">
+                <div>Crear Usuarios de Prueba</div>
+                <div className="text-xs opacity-90">14 usuarios con disponibilidad</div>
+              </div>
+            </button>
+            
+            <button
+              onClick={setAugustAvailabilityForAllMockUsers}
+              className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
+            >
+              <span>📅</span>
+              <div className="text-left">
+                <div>Configurar Agosto Completo</div>
+                <div className="text-xs opacity-90">Todos los domingos disponibles</div>
+              </div>
+            </button>
+            
+            {!isAdmin && (
+              <button
+                onClick={makeCurrentUserAdmin}
+                className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
+              >
+                <span>🔧</span>
+                <div className="text-left">
+                  <div>Hacerme Administrador</div>
+                  <div className="text-xs opacity-90">Para probar funciones admin</div>
+                </div>
+              </button>
+            )}
+            
+            <button
+              onClick={clearAllData}
+              className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg hover:shadow-xl text-sm flex items-center gap-3"
+            >
+              <span>🗑️</span>
+              <div className="text-left">
+                <div>Limpiar Todos los Datos</div>
+                <div className="text-xs opacity-90">Mantiene tu usuario admin</div>
+              </div>
+            </button>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-purple-600">ℹ️</span>
+              <h4 className="font-bold text-purple-800 text-sm">Información</h4>
+            </div>
+            <p className="text-purple-700 text-sm">
+              Los usuarios de prueba se crean con disponibilidad aleatoria para el mes actual y siguiente. 
+              Esto te permite probar la funcionalidad de creación de partidos cuando hay 10+ jugadores disponibles.
+            </p>
           </div>
         </div>
 
