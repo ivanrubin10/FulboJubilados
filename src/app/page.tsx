@@ -1,6 +1,11 @@
-import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+"use client";
+
+import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import Link from "next/link";
 
 export default function Home() {
+  const { isSignedIn, isLoaded } = useUser();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50">
       <nav className="glass-morphism border-b border-white/20 sticky top-0 z-50">
@@ -12,6 +17,13 @@ export default function Home() {
             <h1 className="text-xl font-bold text-slate-800 text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
           </div>
           <div className="flex items-center gap-4">
+            {isLoaded && isSignedIn && (
+              <Link href="/dashboard">
+                <button className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-2 rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 text-sm">
+                  Dashboard
+                </button>
+              </Link>
+            )}
             <UserButton />
           </div>
         </div>
@@ -41,18 +53,30 @@ export default function Home() {
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <SignInButton mode="modal">
-              <button className="button-glow bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 shadow-2xl hover:shadow-emerald-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                ✨ Iniciar Sesión
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="button-glow bg-gradient-to-r from-sky-600 to-sky-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-sky-700 hover:to-sky-800 transition-all duration-300 shadow-2xl hover:shadow-sky-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                🚀 Registrarse
-              </button>
-            </SignUpButton>
-          </div>
+          {isLoaded && (
+            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+              {!isSignedIn ? (
+                <>
+                  <SignInButton mode="modal">
+                    <button className="button-glow bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 shadow-2xl hover:shadow-emerald-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
+                      ✨ Iniciar Sesión
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="button-glow bg-gradient-to-r from-sky-600 to-sky-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-sky-700 hover:to-sky-800 transition-all duration-300 shadow-2xl hover:shadow-sky-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
+                      🚀 Registrarse
+                    </button>
+                  </SignUpButton>
+                </>
+              ) : (
+                <Link href="/dashboard">
+                  <button className="button-glow bg-gradient-to-r from-violet-600 to-violet-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-violet-700 hover:to-violet-800 transition-all duration-300 shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
+                    🎯 Ir al Dashboard
+                  </button>
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">

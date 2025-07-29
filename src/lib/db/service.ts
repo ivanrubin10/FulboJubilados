@@ -9,6 +9,9 @@ export class DatabaseService {
     const result = await db.select().from(users).orderBy(desc(users.createdAt));
     return result.map(user => ({
       ...user,
+      nickname: user.nickname ?? undefined,
+      imageUrl: user.imageUrl ?? undefined,
+      updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
       createdAt: new Date(user.createdAt),
     }));
   }
@@ -19,6 +22,9 @@ export class DatabaseService {
     
     return {
       ...result[0],
+      nickname: result[0].nickname ?? undefined,
+      imageUrl: result[0].imageUrl ?? undefined,
+      updatedAt: result[0].updatedAt ? new Date(result[0].updatedAt) : undefined,
       createdAt: new Date(result[0].createdAt),
     };
   }
@@ -77,6 +83,9 @@ export class DatabaseService {
     
     return result.map(user => ({
       ...user,
+      nickname: user.nickname ?? undefined,
+      imageUrl: user.imageUrl ?? undefined,
+      updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
       createdAt: new Date(user.createdAt),
     }));
   }
@@ -233,7 +242,7 @@ export class DatabaseService {
   }
 
   // Settings management
-  static async getSetting(key: string): Promise<any> {
+  static async getSetting(key: string): Promise<unknown> {
     const result = await db.select()
       .from(settings)
       .where(eq(settings.key, key))
@@ -242,7 +251,7 @@ export class DatabaseService {
     return result.length > 0 ? result[0].value : null;
   }
 
-  static async setSetting(key: string, value: any): Promise<void> {
+  static async setSetting(key: string, value: unknown): Promise<void> {
     await db.insert(settings)
       .values({
         key,
@@ -262,7 +271,7 @@ export class DatabaseService {
     const currentMonth = await this.getSetting('currentMonth');
     const currentYear = await this.getSetting('currentYear');
     
-    if (currentMonth && currentYear) {
+    if (currentMonth && currentYear && typeof currentMonth === 'number' && typeof currentYear === 'number') {
       return { month: currentMonth, year: currentYear };
     }
 

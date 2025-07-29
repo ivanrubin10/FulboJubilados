@@ -1,6 +1,6 @@
 import { LocalStorage } from './store';
 import { DatabaseService } from './db/service';
-import type { User, MonthlyAvailability, ReminderStatus } from '@/types';
+import type { User } from '@/types';
 
 // Check if we're running on the server and have database access
 const USE_DATABASE = typeof window === 'undefined' && process.env.DATABASE_URL;

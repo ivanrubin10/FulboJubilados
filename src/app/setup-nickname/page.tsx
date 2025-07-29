@@ -61,6 +61,7 @@ export default function SetupNickname() {
             nickname: nickname.trim(),
             imageUrl: user.imageUrl,
             isAdmin: false,
+            isWhitelisted: true,
             createdAt: new Date(),
           };
           LocalStorage.addUser(newUser);
