@@ -104,6 +104,37 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, month, year, availableSundays, cannotPlayAnyDay } = await request.json();
     
+    // Validate that the month is within the 3-month voting limit
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    // Calculate 3 months from current date
+    let maxMonth = currentMonth + 3;
+    let maxYear = currentYear;
+    
+    if (maxMonth > 12) {
+      maxMonth = maxMonth - 12;
+      maxYear = maxYear + 1;
+    }
+    
+    const isBeyondLimit = year > maxYear || (year === maxYear && month > maxMonth);
+    const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth);
+    
+    if (isBeyondLimit) {
+      return NextResponse.json({
+        error: 'Fuera del período de votación',
+        details: 'Solo puedes votar hasta 3 meses en el futuro'
+      }, { status: 400 });
+    }
+    
+    if (isPastMonth) {
+      return NextResponse.json({
+        error: 'Mes cerrado',
+        details: 'No puedes votar en meses pasados'
+      }, { status: 400 });
+    }
+    
     // Update availability in database only
     await DatabaseService.updateMonthlyAvailability(
       userId,

@@ -150,6 +150,24 @@ export default function Dashboard() {
     setSundaysInMonth(getSundaysInMonth(selectedYear, selectedMonth));
   }, [selectedMonth, selectedYear]);
 
+  // Helper function to check if a month is beyond the 3-month voting limit
+  const isMonthBeyondVotingLimit = (month: number, year: number) => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    // Calculate 3 months from current date
+    let maxMonth = currentMonth + 3;
+    let maxYear = currentYear;
+    
+    if (maxMonth > 12) {
+      maxMonth = maxMonth - 12;
+      maxYear = maxYear + 1;
+    }
+    
+    return year > maxYear || (year === maxYear && month > maxMonth);
+  };
+
   const loadUserAvailability = async (userId: string, month: number, year: number) => {
     try {
       const [userAvailability, votingStatus, blocked] = await Promise.all([
@@ -176,6 +194,15 @@ export default function Dashboard() {
       warning(
         'Mes cerrado',
         `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
+      );
+      return;
+    }
+
+    // Check if this month is beyond the 3-month voting limit
+    if (isMonthBeyondVotingLimit(selectedMonth, selectedYear)) {
+      warning(
+        'Fuera del período de votación',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: Solo puedes votar hasta 3 meses en el futuro. Este límite mantiene la flexibilidad del sistema.`
       );
       return;
     }
@@ -243,6 +270,15 @@ export default function Dashboard() {
       return;
     }
 
+    // Check if this month is beyond the 3-month voting limit
+    if (isMonthBeyondVotingLimit(selectedMonth, selectedYear)) {
+      warning(
+        'Fuera del período de votación',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: Solo puedes votar hasta 3 meses en el futuro. Este límite mantiene la flexibilidad del sistema.`
+      );
+      return;
+    }
+
     const newCannotPlayAnyDay = !cannotPlayAnyDay;
     
     // Update UI immediately
@@ -292,12 +328,27 @@ export default function Dashboard() {
   }
 
   const nextMonth = () => {
+    // Calculate the next month
+    let nextSelectedMonth, nextSelectedYear;
     if (selectedMonth === 12) {
-      setSelectedMonth(1);
-      setSelectedYear(selectedYear + 1);
+      nextSelectedMonth = 1;
+      nextSelectedYear = selectedYear + 1;
     } else {
-      setSelectedMonth(selectedMonth + 1);
+      nextSelectedMonth = selectedMonth + 1;
+      nextSelectedYear = selectedYear;
     }
+
+    // Check if the next month would be beyond the 3-month limit
+    if (isMonthBeyondVotingLimit(nextSelectedMonth, nextSelectedYear)) {
+      warning(
+        'Límite alcanzado',
+        'Solo puedes votar hasta 3 meses en el futuro. Este límite evita la planificación excesiva y mantiene la flexibilidad del sistema.'
+      );
+      return;
+    }
+
+    setSelectedMonth(nextSelectedMonth);
+    setSelectedYear(nextSelectedYear);
   };
 
   const prevMonth = () => {
