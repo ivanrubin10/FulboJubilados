@@ -2,24 +2,25 @@
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { Calendar, Users, BarChart3, Trophy } from "lucide-react";
 
 export default function Home() {
   const { isSignedIn, isLoaded } = useUser();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50">
-      <nav className="glass-morphism border-b border-white/20 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto flex justify-between items-center px-6 py-5">
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-6xl mx-auto flex justify-between items-center px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 flex items-center justify-center bouncing-ball">
-              <span className="text-2xl">⚽</span>
+            <div className="w-10 h-10 flex items-center justify-center bouncing-ball">
+              <span className="text-xl">⚽</span>
             </div>
-            <h1 className="text-xl font-bold text-slate-800 text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Fulbo Jubilados</h1>
           </div>
           <div className="flex items-center gap-4">
             {isLoaded && isSignedIn && (
               <Link href="/dashboard">
-                <button className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-2 rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 text-sm">
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 shadow-sm transition-all duration-200">
                   Dashboard
                 </button>
               </Link>
@@ -29,49 +30,48 @@ export default function Home() {
         </div>
       </nav>
       
-      <main className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center mb-20">
-          <div className="inline-block mb-8">
-            <div className="w-24 h-24 flex items-center justify-center mb-6 mx-auto bouncing-ball">
-              <span className="text-6xl drop-shadow-lg">⚽</span>
-            </div>
+      <main className="max-w-4xl mx-auto px-6 py-16">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <div className="w-24 h-24 flex items-center justify-center mb-8 mx-auto bouncing-ball">
+            <span className="text-5xl drop-shadow-lg">⚽</span>
           </div>
-          <h2 className="text-4xl font-black text-slate-900 mb-6 leading-tight text-shadow-soft tracking-tight">
-            Organiza tus partidos de<br />
-            <span className="text-gradient bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 bg-clip-text text-transparent">
-              fútbol 5v5
-            </span>
+          
+          <h2 className="text-4xl font-bold text-gray-900 mb-6 leading-tight">
+            Bienvenidos a Fulbo Jubilados
           </h2>
-          <p className="text-lg text-slate-600 mb-6 max-w-3xl mx-auto leading-relaxed font-medium">
-            Marca tu disponibilidad para los domingos, organiza equipos de manera equilibrada 
-            y lleva un historial completo de todos tus partidos
+          
+          <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+            Marca tu disponibilidad, 
+            forma equipos equilibrados y lleva un historial completo de todos tus partidos.
           </p>
-          <div className="inline-flex items-center gap-3 bg-gradient-to-r from-emerald-100 to-sky-100 px-6 py-3 rounded-2xl border border-emerald-200 mb-12">
-            <span className="text-2xl">🕙</span>
-            <p className="text-emerald-800 font-bold text-base">
+          
+          <div className="inline-flex items-center gap-3 bg-amber-50 border border-amber-200 px-6 py-3 rounded-full mb-12 shadow-sm">
+            <span className="text-xl">🕙</span>
+            <p className="text-amber-700 font-semibold">
               Domingos a las 10:00 AM
             </p>
           </div>
           
           {isLoaded && (
-            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {!isSignedIn ? (
                 <>
                   <SignInButton mode="modal">
-                    <button className="button-glow bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 shadow-2xl hover:shadow-emerald-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                      ✨ Iniciar Sesión
+                    <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
+                      Iniciar Sesión
                     </button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <button className="button-glow bg-gradient-to-r from-sky-600 to-sky-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-sky-700 hover:to-sky-800 transition-all duration-300 shadow-2xl hover:shadow-sky-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                      🚀 Registrarse
+                    <button className="bg-emerald-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-emerald-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
+                      Registrarse
                     </button>
                   </SignUpButton>
                 </>
               ) : (
                 <Link href="/dashboard">
-                  <button className="button-glow bg-gradient-to-r from-violet-600 to-violet-700 text-white px-8 py-4 rounded-2xl font-bold hover:from-violet-700 hover:to-violet-800 transition-all duration-300 shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105 text-base tracking-wide">
-                    🎯 Ir al Dashboard
+                  <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
+                    Ir al Dashboard
                   </button>
                 </Link>
               )}
@@ -79,34 +79,45 @@ export default function Home() {
           )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="glass-morphism card-hover p-10 rounded-3xl border border-white/30 group">
-            <div className="w-16 h-16 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-8 shadow-xl group-hover:scale-110 transition-transform duration-300">
-              <span className="text-3xl">📅</span>
+        {/* Features Section */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          <div className="group bg-white border border-gray-200 rounded-xl p-8 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all duration-300 transform hover:-translate-y-1 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 mx-auto">
+              <Calendar className="h-8 w-8 text-blue-600" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-3 text-shadow-soft">Marca tu disponibilidad</h3>
-            <p className="text-slate-600 leading-relaxed font-medium text-base">
-              Selecciona fácilmente los domingos del mes en los que puedes jugar y mantén actualizada tu disponibilidad
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Gestiona tu disponibilidad</h3>
+            <p className="text-gray-600 leading-relaxed">
+              Marca fácilmente los domingos que puedes jugar y mantén actualizada tu disponibilidad mensual.
             </p>
           </div>
           
-          <div className="glass-morphism card-hover p-10 rounded-3xl border border-white/30 group">
-            <div className="w-16 h-16 bg-gradient-to-r from-sky-400 to-sky-600 rounded-2xl flex items-center justify-center mb-8 shadow-xl group-hover:scale-110 transition-transform duration-300">
-              <span className="text-3xl">👥</span>
+          <div className="group bg-white border border-gray-200 rounded-xl p-8 shadow-sm hover:shadow-lg hover:border-emerald-200 transition-all duration-300 transform hover:-translate-y-1 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 mx-auto">
+              <Users className="h-8 w-8 text-emerald-600" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-3 text-shadow-soft">Organiza equipos</h3>
-            <p className="text-slate-600 leading-relaxed font-medium text-base">
-              Una vez confirmados 10 jugadores, el sistema organiza automáticamente los equipos de manera equilibrada
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Equipos equilibrados</h3>
+            <p className="text-gray-600 leading-relaxed">
+              Con 10 jugadores confirmados, organizamos automáticamente equipos balanceados para partidos justos.
             </p>
           </div>
           
-          <div className="glass-morphism card-hover p-10 rounded-3xl border border-white/30 group">
-            <div className="w-16 h-16 bg-gradient-to-r from-violet-400 to-violet-600 rounded-2xl flex items-center justify-center mb-8 shadow-xl group-hover:scale-110 transition-transform duration-300">
-              <span className="text-3xl">📊</span>
+          <div className="group bg-white border border-gray-200 rounded-xl p-8 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all duration-300 transform hover:-translate-y-1 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 mx-auto">
+              <BarChart3 className="h-8 w-8 text-purple-600" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-3 text-shadow-soft">Historial de partidos</h3>
-            <p className="text-slate-600 leading-relaxed font-medium text-base">
-              Registra resultados y analiza estadísticas para ver qué tan equilibrados estuvieron los equipos
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Estadísticas completas</h3>
+            <p className="text-gray-600 leading-relaxed">
+              Registra resultados y analiza tu rendimiento con estadísticas detalladas de todos los partidos.
+            </p>
+          </div>
+          
+          <div className="group bg-white border border-gray-200 rounded-xl p-8 shadow-sm hover:shadow-lg hover:border-orange-200 transition-all duration-300 transform hover:-translate-y-1 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 mx-auto">
+              <Trophy className="h-8 w-8 text-orange-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Rankings y logros</h3>
+            <p className="text-gray-600 leading-relaxed">
+              Compite sanamente con rankings de victorias, efectividad y el famoso &quot;Hall of Shame&quot;.
             </p>
           </div>
         </div>

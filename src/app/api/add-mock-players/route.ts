@@ -99,33 +99,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // Get current active month
-    const { month, year } = await DatabaseService.getCurrentActiveMonth();
-    
-    // Get all Sundays for the current month
-    const getSundaysInMonth = (month: number, year: number): number[] => {
-      const sundays: number[] = [];
-      const date = new Date(year, month - 1, 1); // month - 1 because Date months are 0-indexed
-      
-      // Find first Sunday
-      while (date.getDay() !== 0) {
-        date.setDate(date.getDate() + 1);
-      }
-      
-      // Add all Sundays in the month
-      while (date.getMonth() === month - 1) {
-        sundays.push(date.getDate());
-        date.setDate(date.getDate() + 7);
-      }
-      
-      return sundays;
-    };
-
-    const allSundays = getSundaysInMonth(month, year);
     let playersAdded = 0;
     
-    console.log(`Setting up mock players for active month: ${month}/${year}`);
-    console.log(`Available Sundays in ${month}/${year}:`, allSundays);
+    console.log(`Adding mock players without availability votes`);
 
     // Add each mock player
     for (const player of mockPlayers) {
@@ -136,80 +112,19 @@ export async function POST(request: NextRequest) {
           createdAt: new Date()
         });
 
-        // Make ALL mock players available on the FIRST Sunday for easy testing
-        let availableSundays: number[];
-        if (allSundays.length > 0) {
-          // All players available on the first Sunday of the month
-          const firstSunday = allSundays[0];
-          availableSundays = [firstSunday];
-          
-          // Also add them to a couple more Sundays for variety
-          if (allSundays.length > 1) {
-            availableSundays.push(allSundays[1]);
-          }
-          if (allSundays.length > 2) {
-            availableSundays.push(allSundays[2]);
-          }
-        } else {
-          // Fallback if no Sundays found
-          availableSundays = [];
-        }
-
-        console.log(`Setting availability for ${player.name}:`, availableSundays);
-
-        await DatabaseService.updateMonthlyAvailability(
-          player.id,
-          month,
-          year,
-          availableSundays,
-          false
-        );
-
+        console.log(`Added mock player: ${player.name}`);
         playersAdded++;
       } catch (error) {
-        // Player might already exist, try to update their availability anyway
-        console.log(`Player ${player.name} might already exist, trying to set availability...`);
-        try {
-          // Use the same availability logic as above
-          let availableSundays: number[];
-          if (allSundays.length > 0) {
-            const firstSunday = allSundays[0];
-            availableSundays = [firstSunday];
-            
-            if (allSundays.length > 1) {
-              availableSundays.push(allSundays[1]);
-            }
-            if (allSundays.length > 2) {
-              availableSundays.push(allSundays[2]);
-            }
-          } else {
-            availableSundays = [];
-          }
-
-          await DatabaseService.updateMonthlyAvailability(
-            player.id,
-            month,
-            year,
-            availableSundays,
-            false
-          );
-        } catch (availabilityError) {
-          console.log(`Failed to set availability for ${player.name}:`, availabilityError);
-        }
+        // Player might already exist, just log and continue
+        console.log(`Player ${player.name} might already exist:`, error instanceof Error ? error.message : String(error));
       }
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `${playersAdded} mock players added with availability for ${month}/${year}. ALL players available on first Sunday: ${allSundays.length > 0 ? allSundays[0] : 'none'}`,
+      message: `${playersAdded} mock players added without any availability votes`,
       players: mockPlayers.map(p => ({ name: p.name, email: p.email })),
-      availabilityDetails: {
-        month,
-        year,
-        allSundaysInMonth: allSundays,
-        playersWithAvailability: playersAdded,
-        totalSundaysInMonth: allSundays.length
-      }
+      playersAdded
     });
   } catch (error) {
     console.error('Error adding mock players:', error);

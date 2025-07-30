@@ -3,7 +3,7 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSundaysInMonth, formatDate } from '@/lib/utils';
+import { getSundaysInMonth, formatDate, getCapitalizedMonthName, getCapitalizedMonthYear } from '@/lib/utils';
 import { User } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
@@ -173,10 +173,9 @@ export default function Dashboard() {
     // Check if this is a past month (before active month)
     const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
     if (isPastMonth) {
-      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
       warning(
         'Mes cerrado',
-        `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())}.`
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
       );
       return;
     }
@@ -186,20 +185,18 @@ export default function Dashboard() {
     
     // If trying to add a blocked day, show warning and prevent selection
     if (!availableSundays.includes(sunday) && isBlocked) {
-      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
       warning(
         'Día completo',
-        `${monthName} ${sunday}: Ya hay un partido confirmado con 10 jugadores. Este día está completo y no acepta más jugadores.`
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado con 10 jugadores. Este día está completo y no acepta más jugadores.`
       );
       return;
     }
 
     // If trying to remove a blocked day, show warning and prevent unvoting
     if (availableSundays.includes(sunday) && isBlocked) {
-      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
       warning(
         'No se puede desvotar',
-        `${monthName} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
       );
       return;
     }
@@ -239,10 +236,9 @@ export default function Dashboard() {
     // Check if this is a past month (before active month)
     const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
     if (isPastMonth) {
-      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
       warning(
         'Mes cerrado',
-        `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())}.`
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
       );
       return;
     }
@@ -274,6 +270,7 @@ export default function Dashboard() {
       setCannotPlayAnyDay(!newCannotPlayAnyDay);
     }
   };
+
 
   if (!isLoaded || isLoading) {
     return (
@@ -328,19 +325,35 @@ export default function Dashboard() {
           </p>
         </div>
 
+
+        {/* Non-whitelisted User Warning */}
+        {!currentUser.isWhitelisted && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <p className="text-red-800 font-semibold text-sm">
+                Usuario no habilitado
+              </p>
+            </div>
+            <p className="text-red-700 text-sm ml-8">
+              Tu voto no está siendo contado para la creación de partidos. Necesitas ser habilitado por un administrador primero. 
+              Los votos de usuarios no habilitados no contribuyen al sistema de organización de partidos.
+            </p>
+          </div>
+        )}
+
         {/* Blocked Days Info */}
         {blockedSundays.length > 0 && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-center gap-3 mb-2">
               <Ban className="h-5 w-5 text-amber-600" />
               <p className="text-amber-800 font-semibold text-sm">
-                Días completos en {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' })}
+                Días completos en {getCapitalizedMonthName(selectedYear, selectedMonth)}
               </p>
             </div>
             <p className="text-amber-700 text-sm ml-8">
               Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.map(sunday => {
-                const date = new Date(selectedYear, selectedMonth - 1, sunday);
-                return `${sunday} de ${date.toLocaleDateString('es-ES', { month: 'long' })}`;
+                return `${sunday} de ${getCapitalizedMonthName(selectedYear, selectedMonth)}`;
               }).join(', ')}
             </p>
           </div>
@@ -397,7 +410,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <p className="text-sm text-amber-700 text-center">
-                    No puedes votar en meses anteriores al mes activo ({new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())})
+                    No puedes votar en meses anteriores al mes activo ({getCapitalizedMonthYear(activeYear, activeMonth)})
                   </p>
                 </div>
               );

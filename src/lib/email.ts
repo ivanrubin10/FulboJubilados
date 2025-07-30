@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { getCapitalizedMonthName } from './utils';
 
 // Interface for reservation info
 interface ReservationInfo {
@@ -107,8 +108,7 @@ export class EmailService {
   }
 
   async sendDailyVotingReminder(month: number, year: number, players: string[]): Promise<boolean> {
-    const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const subject = `🗳️ Recordatorio: Marca tu disponibilidad para ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
+    const subject = `🗳️ Recordatorio: Marca tu disponibilidad para ${getCapitalizedMonthName(year, month)}`;
     const html = this.generateDailyReminderEmail(month, year);
     
     return this.sendEmail({
@@ -136,8 +136,7 @@ export class EmailService {
   }
 
   async sendVotingReminderNotification(players: string[], month: number, year: number): Promise<boolean> {
-    const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const subject = `📊 Recordatorio: Jugadores pendientes de votar para ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
+    const subject = `📊 Recordatorio: Jugadores pendientes de votar para ${getCapitalizedMonthName(year, month)}`;
     const html = this.generateVotingReminderEmail(month, year);
     
     return this.sendEmail({
@@ -342,8 +341,7 @@ export class EmailService {
   }
 
   private generateDailyReminderEmail(month: number, year: number): string {
-    const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const monthCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const monthCapitalized = getCapitalizedMonthName(year, month);
     
     return `
       <!DOCTYPE html>
@@ -491,8 +489,7 @@ export class EmailService {
   }
 
   private generateVotingReminderEmail(month: number, year: number): string {
-    const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const monthCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const monthCapitalized = getCapitalizedMonthName(year, month);
     
     return `
       <!DOCTYPE html>
@@ -620,8 +617,7 @@ export class EmailService {
 
   // Individual notification methods for admin functions
   async sendVotingReminder(data: { to: string; name: string; month: number; year: number }): Promise<boolean> {
-    const monthName = new Date(data.year, data.month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const monthCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const monthCapitalized = getCapitalizedMonthName(data.year, data.month);
     const subject = `🗳️ Recordatorio: Marca tu disponibilidad para ${monthCapitalized}`;
     const html = this.generateIndividualVotingReminderEmail(data.name, data.month, data.year);
     
@@ -652,8 +648,7 @@ export class EmailService {
   }
 
   private generateIndividualVotingReminderEmail(name: string, month: number, year: number): string {
-    const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-    const monthCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const monthCapitalized = getCapitalizedMonthName(year, month);
     
     return `
       <!DOCTYPE html>

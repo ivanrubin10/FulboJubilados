@@ -1,4 +1,5 @@
 import { User, Game, MonthlyAvailability, ReminderStatus } from '@/types';
+import { getCapitalizedMonthName } from './utils';
 
 const STORAGE_KEYS = {
   USERS: 'futbol-users',
@@ -120,8 +121,7 @@ export class LocalStorage {
     const blockedDays = requestedSundays.filter(sunday => blockedSundays.has(sunday));
     
     if (blockedDays.length > 0) {
-      const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
-      console.warn(`⚠️ Algunos domingos ya tienen partidos confirmados con 10 jugadores: ${monthName}: ${blockedDays.join(', ')}. Estos días han sido removidos de tu disponibilidad automáticamente.`);
+      console.warn(`⚠️ Algunos domingos ya tienen partidos confirmados con 10 jugadores: ${getCapitalizedMonthName(year, month)}: ${blockedDays.join(', ')}. Estos días han sido removidos de tu disponibilidad automáticamente.`);
     }
     
     return filteredSundays;

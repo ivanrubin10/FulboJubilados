@@ -199,7 +199,7 @@ export default function HistoryPage() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando historial...</p>
+          <p className="text-black">Cargando historial...</p>
         </div>
       </div>
     );
@@ -214,14 +214,14 @@ export default function HistoryPage() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Historial de Partidos</h1>
-        <p className="text-gray-600">Resultados y estadísticas de los partidos jugados</p>
+        <h1 className="text-2xl font-bold text-black mb-2">Historial de Partidos</h1>
+        <p className="text-black">Resultados y estadísticas de los partidos jugados</p>
       </div>
 
       {/* Partidos pendientes de resultado */}
       {confirmedGames.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          <h2 className="text-xl font-semibold text-black mb-4">
             Partidos pendientes de resultado
           </h2>
           <div className="space-y-4">
@@ -229,9 +229,9 @@ export default function HistoryPage() {
               <div key={game.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="font-semibold">{formatDate(new Date(game.date))}</h3>
+                    <h3 className="font-semibold text-black">{formatDate(new Date(game.date))}</h3>
                     {game.reservationInfo && (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-black">
                         {game.reservationInfo.location} - {game.reservationInfo.time}
                       </p>
                     )}
@@ -251,7 +251,7 @@ export default function HistoryPage() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-red-50 p-3 rounded">
                       <h4 className="font-medium text-red-800 mb-2">Equipo 1</h4>
-                      <ul className="text-sm text-red-700">
+                      <ul className="text-sm text-black">
                         {game.teams.team1.map(playerId => (
                           <li key={playerId}>{getPlayerName(playerId)}</li>
                         ))}
@@ -259,7 +259,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="bg-blue-50 p-3 rounded">
                       <h4 className="font-medium text-blue-800 mb-2">Equipo 2</h4>
-                      <ul className="text-sm text-blue-700">
+                      <ul className="text-sm text-black">
                         {game.teams.team2.map(playerId => (
                           <li key={playerId}>{getPlayerName(playerId)}</li>
                         ))}
@@ -270,10 +270,10 @@ export default function HistoryPage() {
 
                 {selectedGame === game.id && (
                   <div className="mt-4 border-t pt-4">
-                    <h4 className="font-medium mb-3">Agregar resultado</h4>
+                    <h4 className="font-medium mb-3 text-black">Agregar resultado</h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-black mb-1">
                           Goles Equipo 1
                         </label>
                         <input
@@ -284,11 +284,12 @@ export default function HistoryPage() {
                             ...prev, 
                             team1Score: parseInt(e.target.value) || 0 
                           }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
+                          placeholder="0"
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-black placeholder:text-gray-600"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-black mb-1">
                           Goles Equipo 2
                         </label>
                         <input
@@ -299,18 +300,19 @@ export default function HistoryPage() {
                             ...prev, 
                             team2Score: parseInt(e.target.value) || 0 
                           }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
+                          placeholder="0"
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-black placeholder:text-gray-600"
                         />
                       </div>
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-black mb-1">
                         Notas (opcional)
                       </label>
                       <textarea
                         value={resultForm.notes}
                         onChange={(e) => setResultForm(prev => ({ ...prev, notes: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 placeholder:text-gray-600"
                         rows={3}
                         placeholder="Comentarios sobre el partido..."
                       />
@@ -324,7 +326,7 @@ export default function HistoryPage() {
                       </button>
                       <button
                         onClick={() => setSelectedGame(null)}
-                        className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                        className="bg-gray-300 text-black px-4 py-2 rounded-lg hover:bg-gray-400"
                       >
                         Cancelar
                       </button>
@@ -339,7 +341,7 @@ export default function HistoryPage() {
 
       {/* Historial de partidos completados */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <h2 className="text-xl font-semibold text-black mb-4">
           Partidos completados ({completedGames.length})
         </h2>
         
@@ -351,9 +353,9 @@ export default function HistoryPage() {
                 <div key={game.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-semibold">{formatDate(new Date(game.date))}</h3>
+                      <h3 className="font-semibold text-black">{formatDate(new Date(game.date))}</h3>
                       {game.reservationInfo && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-black">
                           {game.reservationInfo.location} - {game.reservationInfo.time}
                         </p>
                       )}
@@ -361,10 +363,10 @@ export default function HistoryPage() {
                     
                     {game.result && (
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-black">
                           {game.result.team1Score} - {game.result.team2Score}
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-black">
                           {game.result.team1Score > game.result.team2Score 
                             ? 'Victoria Equipo 1' 
                             : game.result.team2Score > game.result.team1Score 
@@ -386,7 +388,7 @@ export default function HistoryPage() {
                         <h4 className="font-medium text-red-800 mb-2">
                           Equipo 1 {game.result && `(${game.result.team1Score})`}
                         </h4>
-                        <ul className="text-sm text-red-700">
+                        <ul className="text-sm text-black">
                           {game.teams.team1.map(playerId => (
                             <li key={playerId}>{getPlayerName(playerId)}</li>
                           ))}
@@ -400,7 +402,7 @@ export default function HistoryPage() {
                         <h4 className="font-medium text-blue-800 mb-2">
                           Equipo 2 {game.result && `(${game.result.team2Score})`}
                         </h4>
-                        <ul className="text-sm text-blue-700">
+                        <ul className="text-sm text-black">
                           {game.teams.team2.map(playerId => (
                             <li key={playerId}>{getPlayerName(playerId)}</li>
                           ))}
@@ -411,7 +413,7 @@ export default function HistoryPage() {
 
                   {game.result?.notes && (
                     <div className="bg-gray-50 p-3 rounded">
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-black">
                         <strong>Notas:</strong> {game.result.notes}
                       </p>
                     </div>
@@ -420,7 +422,7 @@ export default function HistoryPage() {
               ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">
+          <p className="text-black text-center py-8">
             No hay partidos completados aún
           </p>
         )}
@@ -433,7 +435,7 @@ export default function HistoryPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">🏆</span>
-              <h2 className="text-xl font-semibold text-gray-900">Top Ganadores</h2>
+              <h2 className="text-xl font-semibold text-black">Top Ganadores</h2>
             </div>
             <div className="space-y-3">
               {Object.entries(teamStats)
@@ -444,20 +446,20 @@ export default function HistoryPage() {
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                         index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                        index === 1 ? 'bg-gray-100 text-gray-800' :
+                        index === 1 ? 'bg-gray-100 text-black' :
                         index === 2 ? 'bg-orange-100 text-orange-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
                         {index + 1}
                       </div>
                       <div>
-                        <p className="font-medium">{stats.player.nickname || stats.player.name}</p>
-                        <p className="text-xs text-gray-500">{stats.wins + stats.losses + stats.draws} partidos</p>
+                        <p className="font-medium text-black">{stats.player.nickname || stats.player.name}</p>
+                        <p className="text-xs text-black">{stats.wins + stats.losses + stats.draws} partidos</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-green-600">{stats.wins}</p>
-                      <p className="text-xs text-gray-500">victorias</p>
+                      <p className="font-bold text-black">{stats.wins}</p>
+                      <p className="text-xs text-black">victorias</p>
                     </div>
                   </div>
                 ))}
@@ -468,7 +470,7 @@ export default function HistoryPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">📈</span>
-              <h2 className="text-xl font-semibold text-gray-900">Mejor Efectividad</h2>
+              <h2 className="text-xl font-semibold text-black">Mejor Efectividad</h2>
             </div>
             <div className="space-y-3">
               {Object.entries(teamStats)
@@ -490,20 +492,20 @@ export default function HistoryPage() {
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                           index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                          index === 1 ? 'bg-gray-100 text-gray-800' :
+                          index === 1 ? 'bg-gray-100 text-black' :
                           index === 2 ? 'bg-orange-100 text-orange-800' :
                           'bg-blue-100 text-blue-800'
                         }`}>
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-medium">{stats.player.nickname || stats.player.name}</p>
-                          <p className="text-xs text-gray-500">{stats.wins}V - {stats.losses}D - {stats.draws}E</p>
+                          <p className="font-medium text-black">{stats.player.nickname || stats.player.name}</p>
+                          <p className="text-xs text-black">{stats.wins}V - {stats.losses}D - {stats.draws}E</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-blue-600">{winRate}%</p>
-                        <p className="text-xs text-gray-500">efectividad</p>
+                        <p className="font-bold text-black">{winRate}%</p>
+                        <p className="text-xs text-black">efectividad</p>
                       </div>
                     </div>
                   );
@@ -515,30 +517,40 @@ export default function HistoryPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">📊</span>
-              <h2 className="text-xl font-semibold text-gray-900">Estadísticas</h2>
+              <h2 className="text-xl font-semibold text-black">Estadísticas</h2>
             </div>
             <div className="space-y-4">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-2xl font-bold text-blue-800">{completedGames.length}</p>
-                <p className="text-sm text-blue-600">Partidos completados</p>
+                <p className="text-sm text-black">Partidos completados</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg">
                 <p className="text-2xl font-bold text-green-800">
-                  {Object.values(teamStats).reduce((sum, stats) => sum + stats.goalsFor, 0)}
+                  {completedGames.reduce((sum, game) => {
+                    if (game.result) {
+                      return sum + game.result.team1Score + game.result.team2Score;
+                    }
+                    return sum;
+                  }, 0)}
                 </p>
-                <p className="text-sm text-green-600">Goles totales</p>
+                <p className="text-sm text-black">Goles totales</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg">
                 <p className="text-2xl font-bold text-purple-800">
-                  {Math.round(Object.values(teamStats).reduce((sum, stats) => sum + stats.goalsFor, 0) / Math.max(completedGames.length, 1) * 10) / 10}
+                  {Math.round(completedGames.reduce((sum, game) => {
+                    if (game.result) {
+                      return sum + game.result.team1Score + game.result.team2Score;
+                    }
+                    return sum;
+                  }, 0) / Math.max(completedGames.length, 1) * 10) / 10}
                 </p>
-                <p className="text-sm text-purple-600">Goles por partido</p>
+                <p className="text-sm text-black">Goles por partido</p>
               </div>
               <div className="p-3 bg-orange-50 rounded-lg">
                 <p className="text-2xl font-bold text-orange-800">
                   {Object.keys(teamStats).length}
                 </p>
-                <p className="text-sm text-orange-600">Jugadores activos</p>
+                <p className="text-sm text-black">Jugadores activos</p>
               </div>
             </div>
           </div>
@@ -548,21 +560,21 @@ export default function HistoryPage() {
       {/* Tabla detallada */}
       {Object.keys(teamStats).length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Estadísticas Detalladas</h2>
+          <h2 className="text-xl font-semibold text-black mb-4">Estadísticas Detalladas</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-gray-200">
-                  <th className="text-left py-3 px-2">Pos</th>
-                  <th className="text-left py-3 px-2">Jugador</th>
-                  <th className="text-center py-3 px-2">PJ</th>
-                  <th className="text-center py-3 px-2">V</th>
-                  <th className="text-center py-3 px-2">E</th>
-                  <th className="text-center py-3 px-2">D</th>
-                  <th className="text-center py-3 px-2">GF</th>
-                  <th className="text-center py-3 px-2">GC</th>
-                  <th className="text-center py-3 px-2">DG</th>
-                  <th className="text-center py-3 px-2">%</th>
+                  <th className="text-left py-3 px-2 text-black">Pos</th>
+                  <th className="text-left py-3 px-2 text-black">Jugador</th>
+                  <th className="text-center py-3 px-2 text-black">PJ</th>
+                  <th className="text-center py-3 px-2 text-black">V</th>
+                  <th className="text-center py-3 px-2 text-black">E</th>
+                  <th className="text-center py-3 px-2 text-black">D</th>
+                  <th className="text-center py-3 px-2 text-black">GF</th>
+                  <th className="text-center py-3 px-2 text-black">GC</th>
+                  <th className="text-center py-3 px-2 text-black">DG</th>
+                  <th className="text-center py-3 px-2 text-black">%</th>
                 </tr>
               </thead>
               <tbody>
@@ -573,9 +585,9 @@ export default function HistoryPage() {
                     const winRateA = totalA > 0 ? a.wins / totalA : 0;
                     const winRateB = totalB > 0 ? b.wins / totalB : 0;
                     
-                    // First sort by win rate, then by total wins, then by goal difference
-                    if (winRateB !== winRateA) return winRateB - winRateA;
+                    // First sort by total wins, then by win rate, then by goal difference
                     if (b.wins !== a.wins) return b.wins - a.wins;
+                    if (winRateB !== winRateA) return winRateB - winRateA;
                     return (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
                   })
                   .map(([playerId, stats], index) => {
@@ -585,10 +597,10 @@ export default function HistoryPage() {
                     
                     return (
                       <tr key={playerId} className={`border-b hover:bg-gray-50 ${
-                        index < 3 ? 'bg-yellow-50' : ''
+                        index < 3 ? 'bg-amber-50' : ''
                       }`}>
-                        <td className="py-3 px-2 font-medium">{index + 1}</td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 font-medium text-black">{index + 1}</td>
+                        <td className="py-3 px-2 text-black">
                           <div className="flex items-center gap-2">
                             {stats.player.imageUrl && (
                               <img 
@@ -597,33 +609,118 @@ export default function HistoryPage() {
                                 className="w-6 h-6 rounded-full"
                               />
                             )}
-                            <span className="font-medium">{stats.player.nickname || stats.player.name}</span>
+                            <span className="font-medium text-black">{stats.player.nickname || stats.player.name}</span>
                           </div>
                         </td>
-                        <td className="text-center py-3 px-2">{total}</td>
-                        <td className="text-center py-3 px-2 text-green-600 font-semibold">{stats.wins}</td>
-                        <td className="text-center py-3 px-2 text-yellow-600">{stats.draws}</td>
-                        <td className="text-center py-3 px-2 text-red-600">{stats.losses}</td>
-                        <td className="text-center py-3 px-2">{stats.goalsFor}</td>
-                        <td className="text-center py-3 px-2">{stats.goalsAgainst}</td>
-                        <td className={`text-center py-3 px-2 font-medium ${
-                          goalDiff > 0 ? 'text-green-600' : goalDiff < 0 ? 'text-red-600' : 'text-gray-600'
-                        }`}>
+                        <td className="text-center py-3 px-2 text-black">{total}</td>
+                        <td className="text-center py-3 px-2 text-black font-semibold">{stats.wins}</td>
+                        <td className="text-center py-3 px-2 text-black">{stats.draws}</td>
+                        <td className="text-center py-3 px-2 text-black">{stats.losses}</td>
+                        <td className="text-center py-3 px-2 text-black">{stats.goalsFor}</td>
+                        <td className="text-center py-3 px-2 text-black">{stats.goalsAgainst}</td>
+                        <td className="text-center py-3 px-2 font-medium text-black">
                           {goalDiff > 0 ? '+' : ''}{goalDiff}
                         </td>
-                        <td className="text-center py-3 px-2 font-semibold text-blue-600">{winRate}%</td>
+                        <td className="text-center py-3 px-2 font-semibold text-black">{winRate}%</td>
                       </tr>
                     );
                   })}
               </tbody>
             </table>
           </div>
-          <div className="mt-4 text-xs text-gray-500">
+          <div className="mt-4 text-xs text-black">
             <p><strong>PJ:</strong> Partidos Jugados, <strong>V:</strong> Victorias, <strong>E:</strong> Empates, <strong>D:</strong> Derrotas</p>
             <p><strong>GF:</strong> Goles a Favor, <strong>GC:</strong> Goles en Contra, <strong>DG:</strong> Diferencia de Goles, <strong>%:</strong> Porcentaje de Victorias</p>
           </div>
         </div>
       )}
+
+      {/* Hall of Shame - Jugadores con más ausencias */}
+      {(() => {
+        // Calcular ausencias para cada jugador
+        const playerAbsences: Record<string, { player: User; attended: number; invited: number; absences: number }> = {};
+        
+        // Contar invitaciones y asistencias para cada jugador
+        completedGames.forEach(game => {
+          if (game.participants && game.teams) {
+            // Todos los participantes fueron invitados
+            game.participants.forEach(playerId => {
+              const player = users.find(u => u.id === playerId);
+              if (player && player.isWhitelisted && !player.isAdmin) {
+                if (!playerAbsences[playerId]) {
+                  playerAbsences[playerId] = {
+                    player,
+                    attended: 0,
+                    invited: 0,
+                    absences: 0
+                  };
+                }
+                playerAbsences[playerId].invited++;
+                
+                // Verificar si asistió (está en algún equipo)
+                const attended = game.teams ? [...game.teams.team1, ...game.teams.team2].includes(playerId) : false;
+                if (attended) {
+                  playerAbsences[playerId].attended++;
+                }
+              }
+            });
+          }
+        });
+        
+        // Calcular ausencias y filtrar solo jugadores que NO fueron a todos los partidos
+        const playersWithAbsences = Object.values(playerAbsences)
+          .map(data => ({
+            ...data,
+            absences: data.invited - data.attended
+          }))
+          .filter(data => data.absences > 0) // Solo jugadores que faltaron al menos una vez
+          .sort((a, b) => b.absences - a.absences) // Ordenar por más ausencias
+          .slice(0, 5); // Top 5
+        
+        return playersWithAbsences.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">😅</span>
+              <h2 className="text-xl font-semibold text-black">Hall of Shame</h2>
+              <span className="text-sm text-black opacity-70">(Jugadores con más ausencias)</span>
+            </div>
+            <div className="space-y-3">
+              {playersWithAbsences.map((data, index) => {
+                const attendanceRate = data.invited > 0 ? ((data.attended / data.invited) * 100).toFixed(1) : '0.0';
+                
+                return (
+                  <div key={data.player.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-red-100 text-red-800">
+                        {index + 1}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {data.player.imageUrl && (
+                          <img 
+                            src={data.player.imageUrl} 
+                            alt={data.player.name} 
+                            className="w-6 h-6 rounded-full"
+                          />
+                        )}
+                        <div>
+                          <p className="font-medium text-black">{data.player.nickname || data.player.name}</p>
+                          <p className="text-xs text-black">
+                            {data.attended}/{data.invited} partidos - {attendanceRate}% asistencia
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-red-700">{data.absences}</p>
+                      <p className="text-xs text-black">ausencias</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

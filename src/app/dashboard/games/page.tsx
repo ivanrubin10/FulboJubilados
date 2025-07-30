@@ -2,11 +2,11 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { getSundaysInMonth, formatDate, generateTeams } from '@/lib/utils';
+import { getSundaysInMonth, formatDate, generateTeams, getCapitalizedMonthYear } from '@/lib/utils';
 import { Game, User, MonthlyAvailability } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Calendar, Ban, Trophy, Users, MapPin, Clock } from 'lucide-react';
+import { Calendar, Ban, Trophy, Users, MapPin, Clock, Edit3, Plus } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -242,6 +242,87 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             </div>
           )}
 
+          {/* Match Result Section */}
+          {editedGame.status === 'completed' && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Resultado del Partido</h3>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Goles Equipo 1 {editedGame.teams && `(${editedGame.teams.team1.map(id => users.find(u => u.id === id)?.nickname || users.find(u => u.id === id)?.name).join(', ')})`}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editedGame.result?.team1Score ?? ''}
+                      onChange={(e) => setEditedGame(prev => ({
+                        ...prev,
+                        result: {
+                          ...prev.result,
+                          team1Score: parseInt(e.target.value) || 0,
+                          team2Score: prev.result?.team2Score ?? 0,
+                          notes: prev.result?.notes
+                        }
+                      }))}
+                      placeholder="0"
+                      className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Goles Equipo 2 {editedGame.teams && `(${editedGame.teams.team2.map(id => users.find(u => u.id === id)?.nickname || users.find(u => u.id === id)?.name).join(', ')})`}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editedGame.result?.team2Score ?? ''}
+                      onChange={(e) => setEditedGame(prev => ({
+                        ...prev,
+                        result: {
+                          ...prev.result,
+                          team1Score: prev.result?.team1Score ?? 0,
+                          team2Score: parseInt(e.target.value) || 0,
+                          notes: prev.result?.notes
+                        }
+                      }))}
+                      placeholder="0"
+                      className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    {editedGame.result && (
+                      <div className="text-center p-2 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-slate-900">
+                          {editedGame.result.team1Score} - {editedGame.result.team2Score}
+                        </div>
+                        <div className="text-xs text-slate-600">Resultado</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+                  <textarea
+                    value={editedGame.result?.notes ?? ''}
+                    onChange={(e) => setEditedGame(prev => ({
+                      ...prev,
+                      result: {
+                        ...prev.result,
+                        team1Score: prev.result?.team1Score ?? 0,
+                        team2Score: prev.result?.team2Score ?? 0,
+                        notes: e.target.value || undefined
+                      }
+                    }))}
+                    placeholder="Ej: Partido muy reñido, gran actuación de Juan..."
+                    rows={3}
+                    className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex justify-end gap-3">
             <button
@@ -271,6 +352,7 @@ export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [addingResultToGame, setAddingResultToGame] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
   const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
@@ -501,6 +583,35 @@ export default function GamesPage() {
     }
   };
 
+  const updateGameResult = async (gameId: string, team1Score: number, team2Score: number, notes?: string) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/result`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ team1Score, team2Score, notes })
+      });
+
+      if (response.ok) {
+        // Update local games state
+        const updatedGames = games.map(g => 
+          g.id === gameId 
+            ? { ...g, result: { team1Score, team2Score, notes } }
+            : g
+        );
+        setGames(updatedGames);
+        success('Resultado guardado', 'El resultado del partido se guardó correctamente');
+      } else {
+        const errorData = await response.json();
+        error('Error al guardar', errorData.error || 'No se pudo guardar el resultado');
+      }
+    } catch (err) {
+      console.error('Error updating game result:', err);
+      error('Error de conexión', 'No se pudo conectar con el servidor');
+    }
+  };
+
   if (!isLoaded || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -541,7 +652,7 @@ export default function GamesPage() {
                 <div className="mb-4">
                   <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg">
                     <Calendar className="h-5 w-5" />
-                    {new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
+                    {getCapitalizedMonthYear(year, month)}
                   </h2>
                 </div>
               )}
@@ -617,6 +728,15 @@ export default function GamesPage() {
                       Organizar Equipos
                     </button>
                       )}
+                      {existingGame.status === 'completed' && !existingGame.result && (
+                        <button
+                          onClick={() => setAddingResultToGame(existingGame)}
+                          className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                        >
+                          <Trophy className="h-4 w-4" />
+                          Agregar Resultado
+                        </button>
+                      )}
                       <button
                         onClick={() => setEditingGame(existingGame)}
                         className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
@@ -673,6 +793,41 @@ export default function GamesPage() {
                   </div>
                 )}
 
+                {existingGame.result && (
+                  <div className="bg-green-50 p-4 rounded-lg mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-semibold text-green-800 flex items-center gap-2">
+                        <Trophy className="h-5 w-5" />
+                        Resultado Final
+                      </h5>
+                      {currentUser.isAdmin && (
+                        <button
+                          onClick={() => setAddingResultToGame(existingGame)}
+                          className="text-green-600 hover:text-green-800 p-1"
+                          title="Editar resultado"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-slate-900 mb-2">
+                        {existingGame.result.team1Score} - {existingGame.result.team2Score}
+                      </div>
+                      {existingGame.teams && (
+                        <div className="text-sm text-green-700 mb-2">
+                          <span className="font-medium">Equipo 1</span> vs <span className="font-medium">Equipo 2</span>
+                        </div>
+                      )}
+                      {existingGame.result.notes && (
+                        <div className="text-sm text-slate-700 italic bg-white p-2 rounded border">
+                          &quot;{existingGame.result.notes}&quot;
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {existingGame.reservationInfo && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h5 className="font-semibold text-gray-800 mb-2">Información de Reserva</h5>
@@ -711,6 +866,143 @@ export default function GamesPage() {
           users={users}
         />
       )}
+
+      {addingResultToGame && (
+        <ResultInputModal 
+          game={addingResultToGame}
+          users={users}
+          onSave={updateGameResult}
+          onClose={() => setAddingResultToGame(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Result Input Modal Component
+interface ResultInputModalProps {
+  game: Game;
+  users: User[];
+  onSave: (gameId: string, team1Score: number, team2Score: number, notes?: string) => void;
+  onClose: () => void;
+}
+
+function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProps) {
+  const [team1Score, setTeam1Score] = useState(game.result?.team1Score ?? 0);
+  const [team2Score, setTeam2Score] = useState(game.result?.team2Score ?? 0);
+  const [notes, setNotes] = useState(game.result?.notes ?? '');
+
+  const handleSave = () => {
+    onSave(game.id, team1Score, team2Score, notes.trim() || undefined);
+    onClose();
+  };
+
+  const getTeamName = (teamIds: string[]) => {
+    return teamIds.map(id => {
+      const player = users.find(u => u.id === id);
+      return player?.nickname || player?.name || 'Jugador';
+    }).slice(0, 3).join(', ') + (teamIds.length > 3 ? '...' : '');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Trophy className="h-6 w-6 text-green-600" />
+              {game.result ? 'Editar Resultado' : 'Agregar Resultado'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-4">
+                {formatDate(game.date)}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium text-red-700 mb-1">
+                  Equipo 1
+                </label>
+                {game.teams && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    {getTeamName(game.teams.team1)}
+                  </p>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  value={team1Score}
+                  onChange={(e) => setTeam1Score(parseInt(e.target.value) || 0)}
+                  className="w-full p-3 border border-gray-300 rounded-lg text-center text-xl font-bold"
+                />
+              </div>
+
+              <div className="text-center">
+                <div className="text-2xl font-bold text-slate-500 mb-4">VS</div>
+                <div className="text-3xl font-bold text-slate-900">
+                  {team1Score} - {team2Score}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-blue-700 mb-1">
+                  Equipo 2
+                </label>
+                {game.teams && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    {getTeamName(game.teams.team2)}
+                  </p>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  value={team2Score}
+                  onChange={(e) => setTeam2Score(parseInt(e.target.value) || 0)}
+                  className="w-full p-3 border border-gray-300 rounded-lg text-center text-xl font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notas del partido (opcional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ej: Partido muy reñido, gran actuación de Juan..."
+                rows={3}
+                className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Guardar Resultado
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

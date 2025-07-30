@@ -6,6 +6,7 @@ import type { Game, AdminNotification, NewGame, NewAdminNotification } from './s
 import { calendarService } from '../calendar';
 import { notificationService } from '../notifications';
 import { emailService } from '../email';
+import { getCapitalizedMonthYear } from '../utils';
 
 // Interface for reservation info
 interface ReservationInfo {
@@ -453,7 +454,7 @@ export class DatabaseService {
         type: 'voting_reminder',
         month,
         year,
-        message: `${usersNeedingReminders.length} players haven't voted for ${new Date(year, month - 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`,
+        message: `${usersNeedingReminders.length} players haven't voted for ${getCapitalizedMonthYear(year, month)}`,
         actionRequired: true,
         isRead: false
       });

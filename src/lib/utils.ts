@@ -75,3 +75,19 @@ export function generateTeams(players: string[]): { team1: string[]; team2: stri
   };
 }
 
+// Utility functions for proper Spanish month capitalization
+export function getCapitalizedMonthName(year: number, month: number): string {
+  const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+  return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+}
+
+export function getCapitalizedMonthYear(year: number, month: number): string {
+  const monthYear = new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  return monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+}
+
+export function getCapitalizedDateWithMonth(date: Date): string {
+  const formatted = date.toLocaleDateString('es-ES', { month: 'long' });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+

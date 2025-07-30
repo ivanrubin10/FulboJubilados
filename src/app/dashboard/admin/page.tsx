@@ -3,7 +3,7 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { User } from '@/types';
-import { getNextAvailableMonth } from '@/lib/utils';
+import { getNextAvailableMonth, getCapitalizedMonthYear, getCapitalizedMonthName } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { 
@@ -14,6 +14,7 @@ import {
   Calendar, 
   ChevronRight, 
   Users, 
+  User as UserIcon,
   UserPlus, 
   Shield, 
   ShieldOff, 
@@ -154,6 +155,8 @@ export default function AdminPage() {
   const [isLoadingMatchConfirmation, setIsLoadingMatchConfirmation] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [manualAdminMode, setManualAdminMode] = useState(false);
+  const [pendingMonth, setPendingMonth] = useState<number | null>(null);
+  const [pendingYear, setPendingYear] = useState<number | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -189,7 +192,9 @@ export default function AdminPage() {
         
         const userData = allUsers.find((u: User) => u.id === user.id);
         
-        setUsers(allUsers);
+        // Filter out mock players from admin view
+        const realUsers = allUsers.filter((user: User) => !user.id.startsWith('mock_player_'));
+        setUsers(realUsers);
         setCurrentUser(userData || null);
         setIsAdmin(isUserAdmin);
         setCurrentActiveMonth(activeMonth);
@@ -207,7 +212,9 @@ export default function AdminPage() {
   const refreshUsers = async () => {
     try {
       const allUsers = await apiClient.getUsers();
-      setUsers(allUsers);
+      // Filter out mock players from admin view
+      const realUsers = allUsers.filter((user: User) => !user.id.startsWith('mock_player_'));
+      setUsers(realUsers);
     } catch (error) {
       console.error('Error refreshing users:', error);
     }
@@ -291,6 +298,41 @@ export default function AdminPage() {
     }
   };
 
+  // New functions with confirmation modals
+  const handleAdvanceToNextMonth = async () => {
+    const nextMonth = getNextAvailableMonth();
+    const nextMonthName = getCapitalizedMonthYear(nextMonth.year, nextMonth.month);
+    
+    const confirmed = await confirm({
+      title: 'Confirmar avance de mes',
+      message: `¿Estás seguro de que quieres avanzar al mes ${nextMonthName}? Esta acción cambiará el mes que ven todos los usuarios por defecto.`,
+      type: 'warning'
+    });
+    
+    if (confirmed) {
+      await advanceToNextMonth();
+    }
+  };
+
+  const handleSetCustomMonth = async () => {
+    if (!pendingMonth && !pendingYear) return;
+    
+    const targetMonth = pendingMonth || currentActiveMonth.month;
+    const targetYear = pendingYear || currentActiveMonth.year;
+    const targetMonthName = getCapitalizedMonthYear(targetYear, targetMonth);
+    
+    const confirmed = await confirm({
+      title: 'Confirmar cambio de mes',
+      message: `¿Estás seguro de que quieres cambiar el mes activo a ${targetMonthName}? Esta acción cambiará el mes que ven todos los usuarios por defecto.`,
+      type: 'warning'
+    });
+    
+    if (confirmed) {
+      await setCustomMonth(targetMonth, targetYear);
+      setPendingMonth(null);
+      setPendingYear(null);
+    }
+  };
 
   const sendVotingReminder = async () => {
     setIsLoadingVotingReminder(true);
@@ -446,7 +488,7 @@ export default function AdminPage() {
             <button
               onClick={sendVotingReminder}
               disabled={isLoadingVotingReminder}
-              className="bg-blue-600 text-white px-6 py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-50 text-blue-700 border border-blue-200 px-6 py-4 rounded-lg font-medium hover:bg-blue-100 hover:border-blue-300 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Vote className="h-5 w-5" />
@@ -469,7 +511,7 @@ export default function AdminPage() {
             <button
               onClick={sendMatchConfirmation}
               disabled={isLoadingMatchConfirmation}
-              className="bg-green-600 text-white px-6 py-4 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-6 py-4 rounded-lg font-medium hover:bg-emerald-100 hover:border-emerald-300 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Trophy className="h-5 w-5" />
@@ -511,7 +553,7 @@ export default function AdminPage() {
                   Mes activo actual:
                 </p>
                 <p className="text-xl font-bold text-emerald-900">
-                  {new Date(currentActiveMonth.year, currentActiveMonth.month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
+                  {getCapitalizedMonthYear(currentActiveMonth.year, currentActiveMonth.month)}
                 </p>
                 <p className="text-sm text-emerald-700 mt-1">
                   Este es el mes que se muestra por defecto a todos los usuarios
@@ -520,52 +562,69 @@ export default function AdminPage() {
             </div>
           </div>
           
-          <div className="flex flex-col lg:flex-row gap-4">
-            <button
-              onClick={advanceToNextMonth}
-              className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center justify-center gap-2"
-            >
-              <ChevronRight className="h-5 w-5" />
-              Avanzar al Siguiente Mes
-            </button>
+          <div className="space-y-4">
+            {/* Quick Actions */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 min-w-[120px]">Acciones rápidas:</span>
+              <button
+                onClick={handleAdvanceToNextMonth}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center gap-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+                Avanzar Mes
+              </button>
+            </div>
             
-            <div className="flex gap-3">
-              <select
-                value={currentActiveMonth.month}
-                onChange={(e) => setCustomMonth(parseInt(e.target.value), currentActiveMonth.year)}
-                className="border border-gray-300 rounded-lg pl-4 pr-10 py-3 bg-white text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {new Date(currentActiveMonth.year, i, 1).toLocaleDateString('es-ES', { month: 'long' }).charAt(0).toUpperCase() + new Date(currentActiveMonth.year, i, 1).toLocaleDateString('es-ES', { month: 'long' }).slice(1)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={currentActiveMonth.year}
-                onChange={(e) => setCustomMonth(currentActiveMonth.month, parseInt(e.target.value))}
-                className="border border-gray-300 rounded-lg pl-4 pr-10 py-3 bg-white text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
-                <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
-              </select>
+            {/* Manual Selection */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 sm:min-w-[120px]">Selección manual:</span>
+              <div className="flex flex-col xs:flex-row gap-2">
+                <select
+                  value={pendingMonth || currentActiveMonth.month}
+                  onChange={(e) => setPendingMonth(parseInt(e.target.value))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 xs:flex-none"
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {getCapitalizedMonthName(pendingYear || currentActiveMonth.year, i + 1)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={pendingYear || currentActiveMonth.year}
+                  onChange={(e) => setPendingYear(parseInt(e.target.value))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 xs:flex-none"
+                >
+                  <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                  <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                </select>
+                <button
+                  onClick={handleSetCustomMonth}
+                  disabled={!pendingMonth && !pendingYear}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed flex-1 xs:flex-none"
+                >
+                  Aplicar
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="h-6 w-6 text-blue-600" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Usuarios Registrados ({users.length})
+                </h2>
+                <p className="text-gray-600 text-sm">Gestiona permisos y usuarios del sistema</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">
-                Usuarios Registrados ({users.length})
-              </h2>
-              <p className="text-gray-600 text-sm">Gestiona permisos y usuarios del sistema</p>
-            </div>
-            <div className="flex gap-4">
+            <div className="flex gap-3 sm:gap-4 justify-center sm:justify-end">
               <div className="text-center">
                 <div className="text-lg font-bold text-green-700">{users.filter(u => u.isWhitelisted).length}</div>
                 <div className="text-xs text-green-600">Jugadores Activos</div>
@@ -593,137 +652,269 @@ export default function AdminPage() {
           </div>
         
           {users.length > 0 ? (
-            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm">Foto</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm">Nombre</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm">Email</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm">Admin</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm">Habilitado</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm">Registro</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map(userData => (
-                      <tr key={userData.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-4">
-                          {userData.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img 
-                              src={userData.imageUrl} 
-                              alt={userData.name}
-                              className="w-8 h-8 rounded-full border-2 border-slate-200"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
-                              <span className="text-gray-700 text-xs font-bold">
-                                {userData.name.charAt(0).toUpperCase()}
-                              </span>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden lg:block bg-white rounded-lg overflow-hidden border border-gray-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Foto</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Nombre</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Email</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Admin</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Habilitado</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Registro</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map(userData => (
+                        <tr key={userData.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="py-3 px-4">
+                            {userData.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img 
+                                src={userData.imageUrl} 
+                                alt={userData.name}
+                                className="w-8 h-8 rounded-full border-2 border-slate-200"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                                <span className="text-gray-700 text-xs font-bold">
+                                  {userData.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                      </td>
+                          <td className="py-3 px-4">
+                            <div>
+                              <p className="font-semibold text-gray-900 text-sm">{userData.name}</p>
+                              {userData.nickname && (
+                                <p className="text-xs text-gray-500">@{userData.nickname}</p>
+                              )}
                             </div>
-                          )}
-                    </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <p className="font-semibold text-gray-900 text-sm">{userData.name}</p>
-                            {userData.nickname && (
-                              <p className="text-xs text-gray-500">@{userData.nickname}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-gray-600 text-sm">{userData.email}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                            userData.isAdmin 
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                              : 'bg-gray-100 text-gray-600 border border-gray-200'
-                          }`}>
-                            {userData.isAdmin ? (
-                              <>
-                                <Shield className="h-3 w-3" />
-                                Admin
-                              </>
-                            ) : (
-                              'Usuario'
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                            userData.isWhitelisted 
-                              ? 'bg-green-100 text-green-800 border border-green-200' 
-                              : 'bg-red-100 text-red-800 border border-red-200'
-                          }`}>
-                            {userData.isWhitelisted ? (
-                              <>
-                                <CheckCircle className="h-3 w-3" />
-                                Activo
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-3 w-3" />
-                                Inactivo
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center text-gray-600 font-medium text-sm">
-                          {new Date(userData.createdAt).toLocaleDateString('es-ES')}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex justify-center space-x-1">
-                            <button
-                              onClick={() => toggleAdminStatus(userData.id)}
-                              className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                                userData.isAdmin
-                                  ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                                  : 'bg-blue-600 text-white hover:bg-blue-700'
-                              }`}
-                            >
+                          </td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{userData.email}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                              userData.isAdmin 
+                                ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                            }`}>
                               {userData.isAdmin ? (
                                 <>
-                                  <ShieldOff className="h-3 w-3" />
-                                  Quitar Admin
+                                  <Shield className="h-3 w-3" />
+                                  Admin
                                 </>
                               ) : (
                                 <>
-                                  <Shield className="h-3 w-3" />
-                                  Hacer Admin
+                                  <UserIcon className="h-3 w-3" />
+                                  Usuario
                                 </>
                               )}
-                            </button>
-                            
-                            <button
-                              onClick={() => toggleUserWhitelist(userData.id)}
-                              className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                                userData.isWhitelisted
-                                  ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                                  : 'bg-green-600 text-white hover:bg-green-700'
-                              }`}
-                            >
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                              userData.isWhitelisted 
+                                ? 'bg-green-100 text-green-800 border border-green-200' 
+                                : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
                               {userData.isWhitelisted ? (
                                 <>
-                                  <XCircle className="h-3 w-3" />
-                                  Deshabilitar
+                                  <CheckCircle className="h-3 w-3" />
+                                  Activo
                                 </>
                               ) : (
                                 <>
-                                  <CheckCircle className="h-3 w-3" />
-                                  Habilitar
+                                  <XCircle className="h-3 w-3" />
+                                  Inactivo
                                 </>
                               )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center text-gray-600 font-medium text-sm">
+                            {new Date(userData.createdAt).toLocaleDateString('es-ES')}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex justify-center space-x-1">
+                              <button
+                                onClick={() => toggleAdminStatus(userData.id)}
+                                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                  userData.isAdmin
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
+                                }`}
+                              >
+                                {userData.isAdmin ? (
+                                  <>
+                                    <ShieldOff className="h-3 w-3" />
+                                    Quitar Admin
+                                  </>
+                                ) : (
+                                  <>
+                                    <Shield className="h-3 w-3" />
+                                    Hacer Admin
+                                  </>
+                                )}
+                              </button>
+                              
+                              <button
+                                onClick={() => toggleUserWhitelist(userData.id)}
+                                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                  userData.isWhitelisted
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
+                                }`}
+                              >
+                                {userData.isWhitelisted ? (
+                                  <>
+                                    <XCircle className="h-3 w-3" />
+                                    Deshabilitar
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-3 w-3" />
+                                    Habilitar
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Mobile/Tablet Cards */}
+              <div className="lg:hidden space-y-4">
+                {users.map(userData => (
+                  <div key={userData.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-start gap-3 mb-3">
+                      {userData.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img 
+                          src={userData.imageUrl} 
+                          alt={userData.name}
+                          className="w-10 h-10 rounded-full border-2 border-slate-200 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                          <span className="text-gray-700 text-sm font-bold">
+                            {userData.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm truncate">{userData.name}</h3>
+                        {userData.nickname && (
+                          <p className="text-xs text-gray-500">@{userData.nickname}</p>
+                        )}
+                        <p className="text-xs text-gray-600 truncate">{userData.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 mb-1">Estado Admin</p>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                          userData.isAdmin 
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {userData.isAdmin ? (
+                            <>
+                              <Shield className="h-3 w-3" />
+                              Admin
+                            </>
+                          ) : (
+                            <>
+                              <UserIcon className="h-3 w-3" />
+                              Usuario
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 mb-1">Estado Usuario</p>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                          userData.isWhitelisted 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}>
+                          {userData.isWhitelisted ? (
+                            <>
+                              <CheckCircle className="h-3 w-3" />
+                              Activo
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-3 w-3" />
+                              Inactivo
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center mb-4">
+                      <p className="text-xs text-gray-500 mb-1">Fecha de Registro</p>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {new Date(userData.createdAt).toLocaleDateString('es-ES')}
+                      </p>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => toggleAdminStatus(userData.id)}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 ${
+                          userData.isAdmin
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {userData.isAdmin ? (
+                          <>
+                            <ShieldOff className="h-4 w-4" />
+                            Quitar Admin
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="h-4 w-4" />
+                            Hacer Admin
+                          </>
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={() => toggleUserWhitelist(userData.id)}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 ${
+                          userData.isWhitelisted
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        {userData.isWhitelisted ? (
+                          <>
+                            <XCircle className="h-4 w-4" />
+                            Deshabilitar
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            Habilitar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
