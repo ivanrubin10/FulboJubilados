@@ -27,6 +27,10 @@ export class HybridStore {
     await DatabaseService.toggleUserWhitelist(userId);
   }
 
+  static async toggleAdminStatus(userId: string): Promise<void> {
+    await DatabaseService.toggleAdminStatus(userId);
+  }
+
   static async getWhitelistedUsers(): Promise<User[]> {
     return await DatabaseService.getWhitelistedUsers();
   }

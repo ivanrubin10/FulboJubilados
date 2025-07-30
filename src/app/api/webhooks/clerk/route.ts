@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           nickname: clerkUser.username || undefined,
           imageUrl: clerkUser.image_url || undefined,
           isAdmin: false,
-          isWhitelisted: false,
+          isWhitelisted: true,
         };
 
         await DatabaseService.addUser(newUser);

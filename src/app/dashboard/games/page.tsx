@@ -6,6 +6,7 @@ import { getSundaysInMonth, formatDate, generateTeams } from '@/lib/utils';
 import { Game, User, MonthlyAvailability } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { Calendar, Ban, Trophy, Users, MapPin, Clock } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -272,6 +273,7 @@ export default function GamesPage() {
   const [editingGame, setEditingGame] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
+  const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -309,14 +311,49 @@ export default function GamesPage() {
     loadData();
   }, [isLoaded, user]);
 
+  const fetchAvailabilityForMonth = async (year: number, month: number): Promise<MonthlyAvailability[]> => {
+    const cacheKey = `${year}-${month}`;
+    if (availabilityCache[cacheKey]) {
+      return availabilityCache[cacheKey];
+    }
+
+    try {
+      const response = await fetch(`/api/availability/month?year=${year}&month=${month}`);
+      if (!response.ok) {
+        console.error(`Failed to fetch availability for ${year}-${month}`);
+        return [];
+      }
+      const monthlyData = await response.json();
+      
+      setAvailabilityCache(prev => ({
+        ...prev,
+        [cacheKey]: monthlyData
+      }));
+      
+      return monthlyData;
+    } catch (error) {
+      console.error(`Error fetching availability for ${year}-${month}:`, error);
+      return [];
+    }
+  };
+
   const getAvailablePlayersForSunday = (year: number, month: number, sunday: number): User[] => {
     return users.filter(user => {
       // Include all whitelisted users (both admins and regular players)
       if (!user.isWhitelisted) return false;
       
-      const userAvailability = availability.find(
+      // First check from main availability (current active month)
+      let userAvailability = availability.find(
         a => a.userId === user.id && a.month === month && a.year === year
       );
+      
+      // If not found, check from cache for this specific month
+      const cacheKey = `${year}-${month}`;
+      if (!userAvailability && availabilityCache[cacheKey]) {
+        userAvailability = availabilityCache[cacheKey].find(
+          a => a.userId === user.id && a.month === month && a.year === year
+        );
+      }
       
       // Only show users who have explicitly voted for this Sunday
       return userAvailability?.availableSundays.includes(sunday) || false;
@@ -404,6 +441,11 @@ export default function GamesPage() {
       { year: currentMonth === 12 ? currentYear + 1 : currentYear, month: currentMonth === 12 ? 1 : currentMonth + 1 }
     ];
     
+    // Pre-fetch availability for months being displayed
+    monthsToShow.forEach(({ year, month }) => {
+      fetchAvailabilityForMonth(year, month);
+    });
+    
     const allSundays = [];
     
     for (const { year, month } of monthsToShow) {
@@ -477,8 +519,8 @@ export default function GamesPage() {
   const upcomingSundays = getCurrentMonthSundays();
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-gray-50">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div className="flex justify-between items-center">
           <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Partidos Programados</h1>
@@ -497,12 +539,13 @@ export default function GamesPage() {
             <div key={`${year}-${month}-${sunday}`}>
               {showMonthHeader && (
                 <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg">
-                    {month === 8 ? '🗓️ Agosto (Mock Users Disponibles)' : `📅 ${new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}`}
+                  <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg">
+                    <Calendar className="h-5 w-5" />
+                    {new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
                   </h2>
                 </div>
               )}
-              <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -524,7 +567,7 @@ export default function GamesPage() {
               
               {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
                 <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
-                  <span>🚫</span>
+                  <Ban className="h-4 w-4" />
                   <span className="text-sm font-medium">Día completo (10 jugadores)</span>
                 </div>
               )}

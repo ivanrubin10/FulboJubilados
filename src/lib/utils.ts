@@ -20,12 +20,16 @@ export function getSundaysInMonth(year: number, month: number): number[] {
 }
 
 export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-ES', {
+  const formatted = new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   }).format(date);
+  
+  // Capitalize the first letter (weekday) and the month
+  return formatted.replace(/^(\w)/, (match) => match.toUpperCase())
+                  .replace(/ de (\w)/, (match, monthFirst) => ` de ${monthFirst.toUpperCase()}`);
 }
 
 export function getNextSunday(): Date {

@@ -2,16 +2,43 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { LocalStorage } from '@/lib/store';
 import { formatDate } from '@/lib/utils';
 import { Game, User } from '@/types';
+import { useToast } from '@/components/ui/toast';
+
+// API helper functions
+const apiClient = {
+  async getUsers() {
+    const res = await fetch('/api/users');
+    if (!res.ok) throw new Error('Failed to fetch users');
+    return res.json();
+  },
+  
+  async getGames() {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('Failed to fetch games');
+    return res.json();
+  },
+  
+  async updateGame(gameId: string, updates: Partial<Game>) {
+    const res = await fetch(`/api/games/${gameId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update game');
+    return res.json();
+  }
+};
 
 export default function HistoryPage() {
   const { user, isLoaded } = useUser();
+  const { success, error } = useToast();
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [resultForm, setResultForm] = useState({
     team1Score: 0,
     team2Score: 0,
@@ -19,16 +46,39 @@ export default function HistoryPage() {
   });
 
   useEffect(() => {
-    if (isLoaded && user) {
-      const allUsers = LocalStorage.getUsers();
-      const allGames = LocalStorage.getGames();
-      const userData = allUsers.find(u => u.id === user.id);
+    const loadData = async () => {
+      if (!isLoaded || !user) return;
       
-      setUsers(allUsers);
-      setGames(allGames);
-      setCurrentUser(userData || null);
-    }
-  }, [isLoaded, user]);
+      setIsLoading(true);
+      try {
+        const [allUsers, allGames] = await Promise.all([
+          apiClient.getUsers(),
+          apiClient.getGames()
+        ]);
+        
+        const userData = allUsers.find((u: User) => u.id === user.id);
+        
+        // Fix dates that might be serialized as strings
+        const gamesWithFixedDates = allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt),
+        }));
+        
+        setUsers(allUsers);
+        setGames(gamesWithFixedDates);
+        setCurrentUser(userData || null);
+      } catch (err) {
+        console.error('Error loading history data:', err);
+        error('Error de carga', 'No se pudieron cargar los datos del historial');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [isLoaded, user, error]);
 
   const completedGames = games.filter(game => game.status === 'completed');
   const confirmedGames = games.filter(game => 
@@ -37,35 +87,48 @@ export default function HistoryPage() {
     new Date(game.date) < new Date()
   );
 
-  const addResult = (gameId: string) => {
-    const updatedGames = games.map(game => 
-      game.id === gameId 
-        ? { 
-            ...game, 
-            status: 'completed' as const,
-            result: {
-              team1Score: resultForm.team1Score,
-              team2Score: resultForm.team2Score,
-              notes: resultForm.notes,
-            },
-            updatedAt: new Date()
-          }
-        : game
-    );
-    
-    setGames(updatedGames);
-    LocalStorage.saveGames(updatedGames);
-    setSelectedGame(null);
-    setResultForm({ team1Score: 0, team2Score: 0, notes: '' });
+  const addResult = async (gameId: string) => {
+    try {
+      const updates = {
+        status: 'completed' as const,
+        result: {
+          team1Score: resultForm.team1Score,
+          team2Score: resultForm.team2Score,
+          notes: resultForm.notes,
+        },
+        updatedAt: new Date()
+      };
+      
+      await apiClient.updateGame(gameId, updates);
+      
+      const updatedGames = games.map(game => 
+        game.id === gameId ? { ...game, ...updates } : game
+      );
+      
+      setGames(updatedGames);
+      setSelectedGame(null);
+      setResultForm({ team1Score: 0, team2Score: 0, notes: '' });
+      success('Resultado guardado', 'El resultado del partido se ha guardado correctamente');
+    } catch (err) {
+      console.error('Error saving result:', err);
+      error('Error al guardar', 'No se pudo guardar el resultado del partido');
+    }
   };
 
   const getPlayerName = (playerId: string): string => {
     const player = users.find(u => u.id === playerId);
-    return player?.name || 'Jugador desconocido';
+    return player?.nickname || player?.name || 'Jugador desconocido';
   };
 
   const getTeamStats = () => {
-    const stats: Record<string, { wins: number; losses: number; draws: number }> = {};
+    const stats: Record<string, { 
+      wins: number; 
+      losses: number; 
+      draws: number; 
+      goalsFor: number; 
+      goalsAgainst: number;
+      player: User;
+    }> = {};
     
     completedGames.forEach(game => {
       if (!game.teams || !game.result) return;
@@ -74,27 +137,76 @@ export default function HistoryPage() {
       const { team1Score, team2Score } = game.result;
       
       [...team1, ...team2].forEach(playerId => {
-        if (!stats[playerId]) {
-          stats[playerId] = { wins: 0, losses: 0, draws: 0 };
+        const player = users.find(u => u.id === playerId);
+        if (!stats[playerId] && player) {
+          stats[playerId] = { 
+            wins: 0, 
+            losses: 0, 
+            draws: 0, 
+            goalsFor: 0, 
+            goalsAgainst: 0,
+            player 
+          };
         }
       });
       
       if (team1Score > team2Score) {
-        team1.forEach(playerId => stats[playerId].wins++);
-        team2.forEach(playerId => stats[playerId].losses++);
+        team1.forEach(playerId => {
+          if (stats[playerId]) {
+            stats[playerId].wins++;
+            stats[playerId].goalsFor += team1Score;
+            stats[playerId].goalsAgainst += team2Score;
+          }
+        });
+        team2.forEach(playerId => {
+          if (stats[playerId]) {
+            stats[playerId].losses++;
+            stats[playerId].goalsFor += team2Score;
+            stats[playerId].goalsAgainst += team1Score;
+          }
+        });
       } else if (team2Score > team1Score) {
-        team2.forEach(playerId => stats[playerId].wins++);
-        team1.forEach(playerId => stats[playerId].losses++);
+        team2.forEach(playerId => {
+          if (stats[playerId]) {
+            stats[playerId].wins++;
+            stats[playerId].goalsFor += team2Score;
+            stats[playerId].goalsAgainst += team1Score;
+          }
+        });
+        team1.forEach(playerId => {
+          if (stats[playerId]) {
+            stats[playerId].losses++;
+            stats[playerId].goalsFor += team1Score;
+            stats[playerId].goalsAgainst += team2Score;
+          }
+        });
       } else {
-        [...team1, ...team2].forEach(playerId => stats[playerId].draws++);
+        [...team1, ...team2].forEach(playerId => {
+          if (stats[playerId]) {
+            stats[playerId].draws++;
+            stats[playerId].goalsFor += team1Score; // Same for both teams in draw
+            stats[playerId].goalsAgainst += team2Score;
+          }
+        });
       }
     });
     
     return stats;
   };
 
-  if (!isLoaded || !currentUser) {
-    return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando historial...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <div className="flex justify-center items-center min-h-screen">Usuario no encontrado</div>;
   }
 
   const teamStats = getTeamStats();
@@ -314,20 +426,143 @@ export default function HistoryPage() {
         )}
       </div>
 
-      {/* Estadísticas */}
+      {/* Estadísticas y Ranking */}
       {Object.keys(teamStats).length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Estadísticas de Jugadores</h2>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Ranking de Victorias */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">🏆</span>
+              <h2 className="text-xl font-semibold text-gray-900">Top Ganadores</h2>
+            </div>
+            <div className="space-y-3">
+              {Object.entries(teamStats)
+                .sort(([,a], [,b]) => b.wins - a.wins)
+                .slice(0, 5)
+                .map(([playerId, stats], index) => (
+                  <div key={playerId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                        index === 1 ? 'bg-gray-100 text-gray-800' :
+                        index === 2 ? 'bg-orange-100 text-orange-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">{stats.player.nickname || stats.player.name}</p>
+                        <p className="text-xs text-gray-500">{stats.wins + stats.losses + stats.draws} partidos</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-green-600">{stats.wins}</p>
+                      <p className="text-xs text-gray-500">victorias</p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Mejores % de Victoria */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">📈</span>
+              <h2 className="text-xl font-semibold text-gray-900">Mejor Efectividad</h2>
+            </div>
+            <div className="space-y-3">
+              {Object.entries(teamStats)
+                .filter(([, stats]) => (stats.wins + stats.losses + stats.draws) >= 3) // Mínimo 3 partidos
+                .sort(([,a], [,b]) => {
+                  const totalA = a.wins + a.losses + a.draws;
+                  const totalB = b.wins + b.losses + b.draws;
+                  const winRateA = totalA > 0 ? a.wins / totalA : 0;
+                  const winRateB = totalB > 0 ? b.wins / totalB : 0;
+                  return winRateB - winRateA;
+                })
+                .slice(0, 5)
+                .map(([playerId, stats], index) => {
+                  const total = stats.wins + stats.losses + stats.draws;
+                  const winRate = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '0.0';
+                  
+                  return (
+                    <div key={playerId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                          index === 1 ? 'bg-gray-100 text-gray-800' :
+                          index === 2 ? 'bg-orange-100 text-orange-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium">{stats.player.nickname || stats.player.name}</p>
+                          <p className="text-xs text-gray-500">{stats.wins}V - {stats.losses}D - {stats.draws}E</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-blue-600">{winRate}%</p>
+                        <p className="text-xs text-gray-500">efectividad</p>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* Estadísticas Generales */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">📊</span>
+              <h2 className="text-xl font-semibold text-gray-900">Estadísticas</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-800">{completedGames.length}</p>
+                <p className="text-sm text-blue-600">Partidos completados</p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-800">
+                  {Object.values(teamStats).reduce((sum, stats) => sum + stats.goalsFor, 0)}
+                </p>
+                <p className="text-sm text-green-600">Goles totales</p>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <p className="text-2xl font-bold text-purple-800">
+                  {Math.round(Object.values(teamStats).reduce((sum, stats) => sum + stats.goalsFor, 0) / Math.max(completedGames.length, 1) * 10) / 10}
+                </p>
+                <p className="text-sm text-purple-600">Goles por partido</p>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-lg">
+                <p className="text-2xl font-bold text-orange-800">
+                  {Object.keys(teamStats).length}
+                </p>
+                <p className="text-sm text-orange-600">Jugadores activos</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla detallada */}
+      {Object.keys(teamStats).length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Estadísticas Detalladas</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Jugador</th>
-                  <th className="text-center py-2">Victorias</th>
-                  <th className="text-center py-2">Derrotas</th>
-                  <th className="text-center py-2">Empates</th>
-                  <th className="text-center py-2">Partidos</th>
-                  <th className="text-center py-2">% Victorias</th>
+                <tr className="border-b-2 border-gray-200">
+                  <th className="text-left py-3 px-2">Pos</th>
+                  <th className="text-left py-3 px-2">Jugador</th>
+                  <th className="text-center py-3 px-2">PJ</th>
+                  <th className="text-center py-3 px-2">V</th>
+                  <th className="text-center py-3 px-2">E</th>
+                  <th className="text-center py-3 px-2">D</th>
+                  <th className="text-center py-3 px-2">GF</th>
+                  <th className="text-center py-3 px-2">GC</th>
+                  <th className="text-center py-3 px-2">DG</th>
+                  <th className="text-center py-3 px-2">%</th>
                 </tr>
               </thead>
               <tbody>
@@ -337,25 +572,55 @@ export default function HistoryPage() {
                     const totalB = b.wins + b.losses + b.draws;
                     const winRateA = totalA > 0 ? a.wins / totalA : 0;
                     const winRateB = totalB > 0 ? b.wins / totalB : 0;
-                    return winRateB - winRateA;
+                    
+                    // First sort by win rate, then by total wins, then by goal difference
+                    if (winRateB !== winRateA) return winRateB - winRateA;
+                    if (b.wins !== a.wins) return b.wins - a.wins;
+                    return (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
                   })
-                  .map(([playerId, stats]) => {
+                  .map(([playerId, stats], index) => {
                     const total = stats.wins + stats.losses + stats.draws;
                     const winRate = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '0.0';
+                    const goalDiff = stats.goalsFor - stats.goalsAgainst;
                     
                     return (
-                      <tr key={playerId} className="border-b">
-                        <td className="py-2">{getPlayerName(playerId)}</td>
-                        <td className="text-center py-2 text-green-600">{stats.wins}</td>
-                        <td className="text-center py-2 text-red-600">{stats.losses}</td>
-                        <td className="text-center py-2 text-yellow-600">{stats.draws}</td>
-                        <td className="text-center py-2">{total}</td>
-                        <td className="text-center py-2">{winRate}%</td>
+                      <tr key={playerId} className={`border-b hover:bg-gray-50 ${
+                        index < 3 ? 'bg-yellow-50' : ''
+                      }`}>
+                        <td className="py-3 px-2 font-medium">{index + 1}</td>
+                        <td className="py-3 px-2">
+                          <div className="flex items-center gap-2">
+                            {stats.player.imageUrl && (
+                              <img 
+                                src={stats.player.imageUrl} 
+                                alt={stats.player.name} 
+                                className="w-6 h-6 rounded-full"
+                              />
+                            )}
+                            <span className="font-medium">{stats.player.nickname || stats.player.name}</span>
+                          </div>
+                        </td>
+                        <td className="text-center py-3 px-2">{total}</td>
+                        <td className="text-center py-3 px-2 text-green-600 font-semibold">{stats.wins}</td>
+                        <td className="text-center py-3 px-2 text-yellow-600">{stats.draws}</td>
+                        <td className="text-center py-3 px-2 text-red-600">{stats.losses}</td>
+                        <td className="text-center py-3 px-2">{stats.goalsFor}</td>
+                        <td className="text-center py-3 px-2">{stats.goalsAgainst}</td>
+                        <td className={`text-center py-3 px-2 font-medium ${
+                          goalDiff > 0 ? 'text-green-600' : goalDiff < 0 ? 'text-red-600' : 'text-gray-600'
+                        }`}>
+                          {goalDiff > 0 ? '+' : ''}{goalDiff}
+                        </td>
+                        <td className="text-center py-3 px-2 font-semibold text-blue-600">{winRate}%</td>
                       </tr>
                     );
                   })}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 text-xs text-gray-500">
+            <p><strong>PJ:</strong> Partidos Jugados, <strong>V:</strong> Victorias, <strong>E:</strong> Empates, <strong>D:</strong> Derrotas</p>
+            <p><strong>GF:</strong> Goles a Favor, <strong>GC:</strong> Goles en Contra, <strong>DG:</strong> Diferencia de Goles, <strong>%:</strong> Porcentaje de Victorias</p>
           </div>
         </div>
       )}

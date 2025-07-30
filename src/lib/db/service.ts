@@ -107,6 +107,18 @@ export class DatabaseService {
     }
   }
 
+  static async toggleAdminStatus(userId: string): Promise<void> {
+    const user = await this.getUserById(userId);
+    if (user) {
+      await db.update(users)
+        .set({ 
+          isAdmin: !user.isAdmin,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+    }
+  }
+
   static async getWhitelistedUsers(): Promise<User[]> {
     const result = await db.select()
       .from(users)
@@ -137,6 +149,9 @@ export class DatabaseService {
     // Check for confirmed games that would prevent availability
     const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays, month, year);
     
+    // Calculate voting status: user has voted if they have days selected OR marked as cannot play
+    const hasVoted = filteredSundays.length > 0 || cannotPlayAnyDay;
+    
     await db.insert(monthlyAvailability)
       .values({
         userId,
@@ -144,7 +159,7 @@ export class DatabaseService {
         year,
         availableSundays: filteredSundays,
         cannotPlayAnyDay,
-        hasVoted: true,
+        hasVoted,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -152,13 +167,15 @@ export class DatabaseService {
         set: {
           availableSundays: filteredSundays,
           cannotPlayAnyDay,
-          hasVoted: true,
+          hasVoted,
           updatedAt: new Date(),
         }
       });
 
-    // Stop reminders for this user/month when they vote
-    await this.deactivateReminders(userId, month, year);
+    // Stop or reactivate reminders based on voting status
+    if (hasVoted) {
+      await this.deactivateReminders(userId, month, year);
+    }
   }
 
   // Helper function to filter out Sundays that already have confirmed games

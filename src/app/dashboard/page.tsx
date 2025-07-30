@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, formatDate } from '@/lib/utils';
 import { User } from '@/types';
 import { useToast } from '@/components/ui/toast';
+import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -67,6 +68,8 @@ export default function Dashboard() {
   const { warning } = useToast();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [activeMonth, setActiveMonth] = useState<number>(new Date().getMonth() + 1);
+  const [activeYear, setActiveYear] = useState<number>(new Date().getFullYear());
   const [availableSundays, setAvailableSundays] = useState<number[]>([]);
   const [sundaysInMonth, setSundaysInMonth] = useState<number[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -83,9 +86,11 @@ export default function Dashboard() {
       setIsLoading(true);
       try {
         // Get active month from database
-        const activeMonth = await apiClient.getCurrentActiveMonth();
-        setSelectedMonth(activeMonth.month);
-        setSelectedYear(activeMonth.year);
+        const activeMonthData = await apiClient.getCurrentActiveMonth();
+        setActiveMonth(activeMonthData.month);
+        setActiveYear(activeMonthData.year);
+        setSelectedMonth(activeMonthData.month);
+        setSelectedYear(activeMonthData.year);
 
         // Check if user exists, create if not
         const existingUser = await apiClient.getUserById(user.id);
@@ -117,7 +122,7 @@ export default function Dashboard() {
         }
 
         // Load user's availability for the active month
-        await loadUserAvailability(user.id, activeMonth.month, activeMonth.year);
+        await loadUserAvailability(user.id, activeMonthData.month, activeMonthData.year);
         
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -165,6 +170,17 @@ export default function Dashboard() {
   const toggleSundayAvailability = async (sunday: number) => {
     if (!user || cannotPlayAnyDay) return;
 
+    // Check if this is a past month (before active month)
+    const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+    if (isPastMonth) {
+      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+      warning(
+        'Mes cerrado',
+        `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())}.`
+      );
+      return;
+    }
+
     // Check if this day is blocked (has confirmed game with 10 players)
     const isBlocked = blockedSundays.includes(sunday);
     
@@ -194,7 +210,8 @@ export default function Dashboard() {
 
     // Update UI immediately for better UX
     setAvailableSundays(newAvailability);
-    setHasVoted(true);
+    // Set hasVoted to false if user has no days selected and can't play any day is false
+    setHasVoted(newAvailability.length > 0 || cannotPlayAnyDay);
     setCannotPlayAnyDay(false);
     
     try {
@@ -219,14 +236,28 @@ export default function Dashboard() {
   const toggleCannotPlayAnyDay = async () => {
     if (!user) return;
 
+    // Check if this is a past month (before active month)
+    const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+    if (isPastMonth) {
+      const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+      warning(
+        'Mes cerrado',
+        `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())}.`
+      );
+      return;
+    }
+
     const newCannotPlayAnyDay = !cannotPlayAnyDay;
     
     // Update UI immediately
     setCannotPlayAnyDay(newCannotPlayAnyDay);
-    setHasVoted(true);
     
     if (newCannotPlayAnyDay) {
       setAvailableSundays([]);
+      setHasVoted(true); // Marking as "cannot play" is a vote
+    } else {
+      // If turning off "cannot play" and user has no selected days, they haven't voted
+      setHasVoted(availableSundays.length > 0);
     }
     
     try {
@@ -282,28 +313,31 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1">
-            ¡Hola, {currentUser.nickname || currentUser.name}! ⚽
-          </h1>
-          <p className="text-sm sm:text-base text-slate-600">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <UserIcon className="h-8 w-8 text-gray-600" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              Hola, {currentUser.nickname || currentUser.name}
+            </h1>
+          </div>
+          <p className="text-sm sm:text-base text-gray-600 ml-11">
             Marca los domingos que puedes jugar
           </p>
         </div>
 
         {/* Blocked Days Info */}
         {blockedSundays.length > 0 && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-orange-600">🚫</span>
-              <p className="text-orange-800 font-bold text-sm">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <Ban className="h-5 w-5 text-amber-600" />
+              <p className="text-amber-800 font-semibold text-sm">
                 Días completos en {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long' })}
               </p>
             </div>
-            <p className="text-orange-700 text-xs">
+            <p className="text-amber-700 text-sm ml-8">
               Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.map(sunday => {
                 const date = new Date(selectedYear, selectedMonth - 1, sunday);
                 return `${sunday} de ${date.toLocaleDateString('es-ES', { month: 'long' })}`;
@@ -313,48 +347,81 @@ export default function Dashboard() {
         )}
 
         {/* Month Navigation */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 p-4 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={prevMonth}
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-1"
-            >
-              <span className="text-lg">←</span>
-              <span className="hidden sm:inline text-sm font-medium text-slate-700">Anterior</span>
-            </button>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            {selectedYear > activeYear || (selectedYear === activeYear && selectedMonth > activeMonth) ? (
+              <button
+                onClick={prevMonth}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">Anterior</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2 opacity-0">
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">Anterior</span>
+              </div>
+            )}
             
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 text-center">
-              {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
-                month: 'long', 
-                year: 'numeric' 
-              }).replace(/^\w/, c => c.toUpperCase())}
-            </h2>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 text-center">
+                {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                }).replace(/^\w/, c => c.toUpperCase())}
+              </h2>
+            </div>
             
             <button
               onClick={nextMonth}
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors duration-200 flex items-center gap-1"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
             >
-              <span className="hidden sm:inline text-sm font-medium text-slate-700">Siguiente</span>
-              <span className="text-lg">→</span>
+              <span className="hidden sm:inline text-sm font-medium">Siguiente</span>
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
           {/* Cannot Play Toggle */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-slate-50 rounded-xl">
-            <span className="text-sm font-medium text-slate-700">
-              ¿No puedes jugar ningún domingo este mes?
-            </span>
-            <button
-              onClick={toggleCannotPlayAnyDay}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
-                cannotPlayAnyDay
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              }`}
-            >
-              {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
-            </button>
-          </div>
+          {(() => {
+            const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+            
+            if (isPastMonth) {
+              return (
+                <div className="flex flex-col items-center justify-center gap-4 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Lock className="h-5 w-5 text-amber-600" />
+                    <span className="text-sm font-semibold text-amber-800">
+                      Mes cerrado para votación
+                    </span>
+                  </div>
+                  <p className="text-sm text-amber-700 text-center">
+                    No puedes votar en meses anteriores al mes activo ({new Date(activeYear, activeMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase())})
+                  </p>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">
+                  ¿No puedes jugar ningún domingo este mes?
+                </span>
+                <button
+                  onClick={toggleCannotPlayAnyDay}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
+                    cannotPlayAnyDay
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  <Ban className="h-4 w-4" />
+                  {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Sundays Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
@@ -363,42 +430,56 @@ export default function Dashboard() {
               const isSelected = availableSundays.includes(sunday);
               const isDisabled = cannotPlayAnyDay;
               const isBlocked = blockedSundays.includes(sunday);
-              const shouldDisableClick = isDisabled || (!isSelected && isBlocked);
+              const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+              const shouldDisableClick = isDisabled || (!isSelected && isBlocked) || isPastMonth;
 
               return (
                 <div
                   key={sunday}
                   onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
                   className={`p-4 rounded-xl transition-all duration-200 hover:shadow-md ${
-                    isDisabled
-                      ? 'opacity-50 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
-                      : isBlocked && !isSelected
-                        ? 'opacity-75 cursor-not-allowed bg-orange-50 border-2 border-orange-200'
-                        : `cursor-pointer ${isSelected
-                            ? 'bg-emerald-50 border-2 border-emerald-200'
-                            : 'bg-white border-2 border-slate-200 hover:border-slate-300'
-                          }`
+                    isPastMonth
+                      ? 'opacity-40 cursor-not-allowed bg-gray-50 border-2 border-gray-100'
+                      : isDisabled
+                        ? 'opacity-50 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
+                        : isBlocked && !isSelected
+                          ? 'opacity-75 cursor-not-allowed bg-orange-50 border-2 border-orange-200'
+                          : `cursor-pointer ${isSelected
+                              ? 'bg-emerald-50 border-2 border-emerald-200'
+                              : 'bg-white border-2 border-slate-200 hover:border-slate-300'
+                            }`
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">
-                        {isSelected ? '✅' : isBlocked && !isSelected ? '🚫' : '⚽'}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {isPastMonth ? (
+                        <Lock className="h-6 w-6 text-gray-400" />
+                      ) : isSelected ? (
+                        <CheckCircle className="h-6 w-6 text-green-600" />
+                      ) : isBlocked && !isSelected ? (
+                        <Ban className="h-6 w-6 text-orange-600" />
+                      ) : (
+                        <Calendar className="h-6 w-6 text-blue-600" />
+                      )}
                       {isSelected && (
-                        <span className="text-emerald-600 font-bold text-xs bg-emerald-100 px-2 py-1 rounded-full">
+                        <span className="text-green-700 font-semibold text-xs bg-green-100 px-3 py-1 rounded-full">
                           DISPONIBLE
                         </span>
                       )}
                     </div>
-                    {isBlocked && !isSelected && (
-                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                    {isPastMonth ? (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-md font-medium">
+                        Cerrado
+                      </span>
+                    ) : isBlocked && !isSelected && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-md font-medium">
                         Completo
                       </span>
                     )}
                   </div>
                   
                   <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
+                    isPastMonth ? 'text-gray-500' :
                     isSelected ? 'text-emerald-900' :
                     isBlocked ? 'text-orange-900' : 'text-slate-900'
                   }`}>
@@ -406,17 +487,20 @@ export default function Dashboard() {
                   </h3>
                   
                   <p className={`text-sm font-medium mb-2 ${
+                    isPastMonth ? 'text-gray-500' :
                     isSelected ? 'text-emerald-700' :
                     isBlocked ? 'text-orange-700' : 'text-slate-600'
                   }`}>
-                    {isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
+                    {isPastMonth ? 'Mes cerrado' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
                   </p>
                   
                   <p className={`text-xs ${
+                    isPastMonth ? 'text-gray-400' :
                     isSelected ? 'text-emerald-600' :
                     isBlocked ? 'text-orange-600' : 'text-slate-500'
                   }`}>
-                    {isSelected ? 'Toca para desmarcar' : 
+                    {isPastMonth ? 'No se puede votar' :
+                     isSelected ? 'Toca para desmarcar' : 
                      isBlocked && !isSelected ? '10 jugadores confirmados' : 'Toca para marcar disponibilidad'}
                   </p>
                 </div>
@@ -426,21 +510,42 @@ export default function Dashboard() {
 
           {/* Status Message */}
           <div className="text-center">
-            {hasVoted ? (
-              <div className="flex items-center justify-center gap-2 text-emerald-600">
-                <span>✅</span>
-                <span className="font-semibold">
-                  {cannotPlayAnyDay 
-                    ? 'Marcado como no disponible para este mes'
-                    : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
-                  }
-                </span>
-              </div>
+            {selectedMonth === activeMonth && selectedYear === activeYear ? (
+              // Show voting status only for active month
+              (hasVoted || availableSundays.length > 0 || cannotPlayAnyDay) ? (
+                <div className="flex items-center justify-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {cannotPlayAnyDay 
+                      ? 'Marcado como no disponible para este mes'
+                      : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-amber-600 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                  <Clock className="h-5 w-5" />
+                  <span className="font-semibold">Aún no has votado para este mes</span>
+                </div>
+              )
             ) : (
-              <div className="flex items-center justify-center gap-2 text-amber-600">
-                <span>⏳</span>
-                <span className="font-semibold">Aún no has votado para este mes</span>
-              </div>
+              // For non-active months, show current selection status
+              (availableSundays.length > 0 || cannotPlayAnyDay) ? (
+                <div className="flex items-center justify-center gap-3 text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <CalendarCheck className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {cannotPlayAnyDay 
+                      ? 'Marcado como no disponible'
+                      : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <Calendar className="h-5 w-5" />
+                  <span className="font-semibold">Sin disponibilidad marcada</span>
+                </div>
+              )
             )}
           </div>
         </div>
