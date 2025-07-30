@@ -28,10 +28,7 @@ import {
 } from 'lucide-react';
 
 
-interface MockPlayer {
-  name: string;
-  email: string;
-}
+
 
 // API helper functions
 const apiClient = {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/db/service';
 import { auth } from '@clerk/nextjs/server';
 

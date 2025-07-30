@@ -146,7 +146,7 @@ export default function SetupNickname() {
             ¡Bienvenido! ⚽
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Configura tu apodo para comenzar
+            Configurá tu apodo para empezar
           </p>
         </div>
         
@@ -165,11 +165,11 @@ export default function SetupNickname() {
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   className="appearance-none relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:z-10 text-base"
-                  placeholder="Como te gusta que te llamen"
+                  placeholder="Tu apodo"
                   disabled={isLoading}
                 />
                 <p className="mt-2 text-xs text-slate-500">
-                  Este nombre aparecerá en los partidos y la lista de jugadores
+                  Así te van a ver en los partidos y la lista de jugadores
                 </p>
               </div>
             </div>

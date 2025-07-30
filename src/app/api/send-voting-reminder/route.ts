@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/db/service';
 import { emailService } from '@/lib/email';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Get current active month
     const { month, year } = await DatabaseService.getCurrentActiveMonth();

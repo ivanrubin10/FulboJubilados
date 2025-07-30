@@ -215,14 +215,15 @@ export default function HistoryPage() {
     <div className="max-w-6xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h1 className="text-2xl font-bold text-black mb-2">Historial de Partidos</h1>
-        <p className="text-black">Resultados y estadísticas de los partidos jugados</p>
+        <p className="text-black">Resultados y estadísticas de los partidos que jugaste</p>
+        <p className="text-sm text-slate-600 mt-1">📊 Los goles del equipo se les adjudican a todos los jugadores del equipo</p>
       </div>
 
       {/* Partidos pendientes de resultado */}
       {confirmedGames.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold text-black mb-4">
-            Partidos pendientes de resultado
+            Partidos que necesitan resultado
           </h2>
           <div className="space-y-4">
             {confirmedGames.map(game => (
@@ -342,7 +343,7 @@ export default function HistoryPage() {
       {/* Historial de partidos completados */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold text-black mb-4">
-          Partidos completados ({completedGames.length})
+          Partidos jugados ({completedGames.length})
         </h2>
         
         {completedGames.length > 0 ? (
@@ -423,7 +424,7 @@ export default function HistoryPage() {
           </div>
         ) : (
           <p className="text-black text-center py-8">
-            No hay partidos completados aún
+            Todavía no hay partidos jugados
           </p>
         )}
       </div>
@@ -522,7 +523,7 @@ export default function HistoryPage() {
             <div className="space-y-4">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-2xl font-bold text-blue-800">{completedGames.length}</p>
-                <p className="text-sm text-black">Partidos completados</p>
+                <p className="text-sm text-black">Partidos jugados</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg">
                 <p className="text-2xl font-bold text-green-800">
@@ -560,7 +561,8 @@ export default function HistoryPage() {
       {/* Tabla detallada */}
       {Object.keys(teamStats).length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          <h2 className="text-xl font-semibold text-black mb-4">Estadísticas Detalladas</h2>
+          <h2 className="text-xl font-semibold text-black mb-2">Estadísticas Detalladas</h2>
+          <p className="text-sm text-slate-600 mb-4">Los goles corresponden al equipo completo en cada partido</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -571,8 +573,8 @@ export default function HistoryPage() {
                   <th className="text-center py-3 px-2 text-black">V</th>
                   <th className="text-center py-3 px-2 text-black">E</th>
                   <th className="text-center py-3 px-2 text-black">D</th>
-                  <th className="text-center py-3 px-2 text-black">GF</th>
-                  <th className="text-center py-3 px-2 text-black">GC</th>
+                  <th className="text-center py-3 px-2 text-black" title="Goles a favor - Goles del equipo">GF</th>
+                  <th className="text-center py-3 px-2 text-black" title="Goles en contra - Goles del equipo rival">GC</th>
                   <th className="text-center py-3 px-2 text-black">DG</th>
                   <th className="text-center py-3 px-2 text-black">%</th>
                 </tr>
@@ -637,56 +639,53 @@ export default function HistoryPage() {
 
       {/* Hall of Shame - Jugadores con más ausencias */}
       {(() => {
-        // Calcular ausencias para cada jugador
-        const playerAbsences: Record<string, { player: User; attended: number; invited: number; absences: number }> = {};
+        // Calcular ausencias para cada jugador activo
+        const playerAbsences: Record<string, { player: User; attended: number; totalGames: number; absences: number }> = {};
         
-        // Contar invitaciones y asistencias para cada jugador
+        // Inicializar todos los jugadores activos (whitelisted, no admin)
+        users.forEach(user => {
+          if (user.isWhitelisted && !user.isAdmin) {
+            playerAbsences[user.id] = {
+              player: user,
+              attended: 0,
+              totalGames: completedGames.length,
+              absences: 0
+            };
+          }
+        });
+        
+        // Contar asistencias para cada jugador
         completedGames.forEach(game => {
-          if (game.participants && game.teams) {
-            // Todos los participantes fueron invitados
-            game.participants.forEach(playerId => {
-              const player = users.find(u => u.id === playerId);
-              if (player && player.isWhitelisted && !player.isAdmin) {
-                if (!playerAbsences[playerId]) {
-                  playerAbsences[playerId] = {
-                    player,
-                    attended: 0,
-                    invited: 0,
-                    absences: 0
-                  };
-                }
-                playerAbsences[playerId].invited++;
-                
-                // Verificar si asistió (está en algún equipo)
-                const attended = game.teams ? [...game.teams.team1, ...game.teams.team2].includes(playerId) : false;
-                if (attended) {
-                  playerAbsences[playerId].attended++;
-                }
+          if (game.teams) {
+            const playersWhoAttended = [...game.teams.team1, ...game.teams.team2];
+            playersWhoAttended.forEach(playerId => {
+              if (playerAbsences[playerId]) {
+                playerAbsences[playerId].attended++;
               }
             });
           }
         });
         
-        // Calcular ausencias y filtrar solo jugadores que NO fueron a todos los partidos
+        // Calcular ausencias y filtrar solo jugadores que faltaron al menos una vez
         const playersWithAbsences = Object.values(playerAbsences)
           .map(data => ({
             ...data,
-            absences: data.invited - data.attended
+            absences: data.totalGames - data.attended
           }))
-          .filter(data => data.absences > 0) // Solo jugadores que faltaron al menos una vez
+          .filter(data => data.absences > 0 && data.totalGames > 0) // Solo jugadores que faltaron al menos una vez
           .sort((a, b) => b.absences - a.absences) // Ordenar por más ausencias
           .slice(0, 5); // Top 5
         
         return playersWithAbsences.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6 mt-6">
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">😅</span>
+              <span className="text-2xl">💀</span>
               <h2 className="text-xl font-semibold text-black">Hall of Shame</h2>
               <span className="text-sm text-black opacity-70">(Jugadores con más ausencias)</span>
             </div>
             <div className="space-y-3">
               {playersWithAbsences.map((data, index) => {
-                const attendanceRate = data.invited > 0 ? ((data.attended / data.invited) * 100).toFixed(1) : '0.0';
+                const attendanceRate = data.totalGames > 0 ? ((data.attended / data.totalGames) * 100).toFixed(1) : '0.0';
                 
                 return (
                   <div key={data.player.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
@@ -705,7 +704,7 @@ export default function HistoryPage() {
                         <div>
                           <p className="font-medium text-black">{data.player.nickname || data.player.name}</p>
                           <p className="text-xs text-black">
-                            {data.attended}/{data.invited} partidos - {attendanceRate}% asistencia
+                            {data.attended}/{data.totalGames} partidos - {attendanceRate}% asistencia
                           </p>
                         </div>
                       </div>

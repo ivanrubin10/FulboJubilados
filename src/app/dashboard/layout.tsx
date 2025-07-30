@@ -4,7 +4,7 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Settings, BarChart3, Trophy, Menu, X, Lock } from 'lucide-react';
+import { Calendar, Settings, BarChart3, Trophy, Menu, X, Lock, User } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -15,7 +15,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+  const [, setIsCheckingAdmin] = useState(true);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -103,6 +103,13 @@ export default function DashboardLayout({
                   <BarChart3 className="h-4 w-4" />
                   Historial
                 </Link>
+                <Link 
+                  href="/dashboard/profile" 
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                >
+                  <User className="h-4 w-4" />
+                  Perfil
+                </Link>
                 {isAdmin && (
                   <Link 
                     href="/dashboard/admin" 
@@ -156,6 +163,14 @@ export default function DashboardLayout({
                 >
                   <BarChart3 className="h-4 w-4" />
                   Historial
+                </Link>
+                <Link 
+                  href="/dashboard/profile" 
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="h-4 w-4" />
+                  Perfil
                 </Link>
                 {isAdmin && (
                   <Link 

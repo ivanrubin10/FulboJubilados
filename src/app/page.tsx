@@ -38,12 +38,12 @@ export default function Home() {
           </div>
           
           <h2 className="text-4xl font-bold text-gray-900 mb-6 leading-tight">
-            Bienvenidos a Fulbo Jubilados
+            Bienvenidos
           </h2>
           
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Marca tu disponibilidad, 
-            forma equipos equilibrados y lleva un historial completo de todos tus partidos.
+            Marcá tu disponibilidad, 
+            armá equipos equilibrados y llevá el registro completo de todos tus partidos.
           </p>
           
           <div className="inline-flex items-center gap-3 bg-amber-50 border border-amber-200 px-6 py-3 rounded-full mb-12 shadow-sm">
@@ -85,9 +85,9 @@ export default function Home() {
             <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 mx-auto">
               <Calendar className="h-8 w-8 text-blue-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Gestiona tu disponibilidad</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Gestioná tu disponibilidad</h3>
             <p className="text-gray-600 leading-relaxed">
-              Marca fácilmente los domingos que puedes jugar y mantén actualizada tu disponibilidad mensual.
+              Marcá fácilmente los domingos que podés jugar y mantené actualizada tu disponibilidad mensual.
             </p>
           </div>
           
@@ -97,7 +97,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-4">Equipos equilibrados</h3>
             <p className="text-gray-600 leading-relaxed">
-              Con 10 jugadores confirmados, organizamos automáticamente equipos balanceados para partidos justos.
+              Con 10 jugadores confirmados, armamos automáticamente equipos balanceados para partidos parejos.
             </p>
           </div>
           
@@ -107,7 +107,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-4">Estadísticas completas</h3>
             <p className="text-gray-600 leading-relaxed">
-              Registra resultados y analiza tu rendimiento con estadísticas detalladas de todos los partidos.
+              Registrá resultados y analizá tu rendimiento con estadísticas detalladas de todos los partidos.
             </p>
           </div>
           
@@ -117,7 +117,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-4">Rankings y logros</h3>
             <p className="text-gray-600 leading-relaxed">
-              Compite sanamente con rankings de victorias, efectividad y el famoso &quot;Hall of Shame&quot;.
+              Competí sanamente con rankings de victorias, efectividad y el famoso &quot;Hall of Shame&quot;.
             </p>
           </div>
         </div>
