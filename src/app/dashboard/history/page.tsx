@@ -363,7 +363,7 @@ export default function HistoryPage() {
                     </div>
                     
                     {game.result && (
-                      <div className="text-center">
+                      <div className="text-right">
                         <div className="text-2xl font-bold text-black">
                           {game.result.team1Score} - {game.result.team2Score}
                         </div>

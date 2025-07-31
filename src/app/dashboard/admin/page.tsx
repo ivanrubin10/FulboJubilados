@@ -154,6 +154,8 @@ export default function AdminPage() {
   const [manualAdminMode, setManualAdminMode] = useState(false);
   const [pendingMonth, setPendingMonth] = useState<number | null>(null);
   const [pendingYear, setPendingYear] = useState<number | null>(null);
+  const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
+  const [showMatchConfirmModal, setShowMatchConfirmModal] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -331,7 +333,12 @@ export default function AdminPage() {
     }
   };
 
+  const handleVotingReminderClick = () => {
+    setShowVotingConfirmModal(true);
+  };
+
   const sendVotingReminder = async () => {
+    setShowVotingConfirmModal(false);
     setIsLoadingVotingReminder(true);
     try {
       console.log('[ADMIN] Sending voting reminders...');
@@ -362,7 +369,12 @@ export default function AdminPage() {
     }
   };
 
+  const handleMatchConfirmationClick = () => {
+    setShowMatchConfirmModal(true);
+  };
+
   const sendMatchConfirmation = async () => {
+    setShowMatchConfirmModal(false);
     setIsLoadingMatchConfirmation(true);
     try {
       const response = await fetch('/api/send-match-confirmation', {
@@ -483,9 +495,9 @@ export default function AdminPage() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <button
-              onClick={sendVotingReminder}
+              onClick={handleVotingReminderClick}
               disabled={isLoadingVotingReminder}
-              className="bg-blue-50 text-blue-700 border border-blue-200 px-6 py-4 rounded-lg font-medium hover:bg-blue-100 hover:border-blue-300 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 text-white border border-blue-600 px-6 py-4 rounded-lg font-medium hover:bg-blue-700 hover:border-blue-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Vote className="h-5 w-5" />
@@ -506,9 +518,9 @@ export default function AdminPage() {
             </button>
             
             <button
-              onClick={sendMatchConfirmation}
+              onClick={handleMatchConfirmationClick}
               disabled={isLoadingMatchConfirmation}
-              className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-6 py-4 rounded-lg font-medium hover:bg-emerald-100 hover:border-emerald-300 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-emerald-600 text-white border border-emerald-600 px-6 py-4 rounded-lg font-medium hover:bg-emerald-700 hover:border-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Trophy className="h-5 w-5" />
@@ -575,11 +587,11 @@ export default function AdminPage() {
             {/* Manual Selection */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <span className="text-sm font-medium text-gray-700 sm:min-w-[120px]">Selección manual:</span>
-              <div className="flex flex-col xs:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={pendingMonth || currentActiveMonth.month}
                   onChange={(e) => setPendingMonth(parseInt(e.target.value))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 xs:flex-none"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
                 >
                   {Array.from({ length: 12 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>
@@ -590,7 +602,7 @@ export default function AdminPage() {
                 <select
                   value={pendingYear || currentActiveMonth.year}
                   onChange={(e) => setPendingYear(parseInt(e.target.value))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 xs:flex-none"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
                 >
                   <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
                   <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
@@ -936,6 +948,76 @@ export default function AdminPage() {
             Ten cuidado al otorgar estos permisos ya que dan acceso completo al sistema.
           </p>
         </div>
+
+        {/* Voting Reminder Confirmation Modal */}
+        {showVotingConfirmModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Vote className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Envío</h3>
+                  <p className="text-sm text-gray-600">Recordatorios de votación</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                ¿Estás seguro que querés enviar recordatorios de votación a todos los usuarios que aún no han votado para el mes activo?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowVotingConfirmModal(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={sendVotingReminder}
+                  disabled={isLoadingVotingReminder}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  Enviar Recordatorios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Match Confirmation Modal */}
+        {showMatchConfirmModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <Trophy className="h-6 w-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Envío</h3>
+                  <p className="text-sm text-gray-600">Confirmaciones de partido</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                ¿Estás seguro que querés enviar confirmaciones de partido a todos los jugadores de los partidos listos?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowMatchConfirmModal(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={sendMatchConfirmation}
+                  disabled={isLoadingMatchConfirmation}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  Enviar Confirmaciones
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 }
