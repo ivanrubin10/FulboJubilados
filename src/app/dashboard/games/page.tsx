@@ -691,7 +691,7 @@ export default function GamesPage() {
                             key={player.id}
                             className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm border border-yellow-300"
                           >
-                            {player.nickname || player.name}
+                            {(player.nickname || player.name).substring(0, 10)}
                           </span>
                         ))}
                       </div>

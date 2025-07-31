@@ -163,13 +163,14 @@ export default function SetupNickname() {
                   type="text"
                   required
                   value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
+                  onChange={(e) => setNickname(e.target.value.substring(0, 10))}
                   className="appearance-none relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:z-10 text-base"
                   placeholder="Tu apodo"
+                  maxLength={10}
                   disabled={isLoading}
                 />
                 <p className="mt-2 text-xs text-slate-500">
-                  Así te van a ver en los partidos y la lista de jugadores
+                  Así te van a ver en los partidos y la lista de jugadores (máximo 10 caracteres)
                 </p>
               </div>
             </div>

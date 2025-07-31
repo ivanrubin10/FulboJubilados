@@ -271,9 +271,10 @@ export default function ProfilePage() {
                     <input
                       type="text"
                       value={newNickname}
-                      onChange={(e) => setNewNickname(e.target.value)}
+                      onChange={(e) => setNewNickname(e.target.value.substring(0, 10))}
                       className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900"
                       placeholder="Tu apodo"
+                      maxLength={10}
                       disabled={isSaving}
                     />
                     <div className="flex gap-2">
@@ -307,7 +308,7 @@ export default function ProfilePage() {
                 )}
                 
                 <p className="text-xs text-slate-500">
-                  Así te van a ver en los partidos y la lista de jugadores
+                  Así te van a ver en los partidos y la lista de jugadores (máximo 10 caracteres)
                 </p>
               </div>
 
