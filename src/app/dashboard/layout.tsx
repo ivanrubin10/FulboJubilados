@@ -53,9 +53,9 @@ export default function DashboardLayout({
     );
   }
 
-  // Redirect to sign-in if not authenticated
+  // Redirect to home page if not authenticated
   if (!isSignedIn) {
-    router.push('/sign-in');
+    router.push('/');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50 flex items-center justify-center">
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 text-center">
@@ -63,7 +63,7 @@ export default function DashboardLayout({
             <Lock className="h-8 w-8 text-red-600" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-2">Acceso Requerido</h2>
-          <p className="text-slate-600 font-medium mb-4">Redirigiendo al login...</p>
+          <p className="text-slate-600 font-medium mb-4">Redirigiendo a la página principal...</p>
         </div>
       </div>
     );

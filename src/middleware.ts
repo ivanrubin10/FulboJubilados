@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // Define which routes require authentication
 const isProtectedRoute = createRouteMatcher([
@@ -9,7 +10,12 @@ const isProtectedRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   // Protect dashboard and setup-nickname routes
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    const { userId } = await auth();
+    
+    // If user is not authenticated, redirect to home page
+    if (!userId) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
   }
 });
 
