@@ -695,9 +695,6 @@ export default function GamesPage() {
                           </span>
                         ))}
                       </div>
-                      <p className="text-xs text-yellow-700 mt-2">
-                        Estos jugadores necesitan votar su disponibilidad para aparecer en los partidos del mes.
-                      </p>
                     </div>
                   )}
                 </div>
