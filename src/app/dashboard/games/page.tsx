@@ -567,6 +567,26 @@ export default function GamesPage() {
     return allSundays.sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
+  const getActivePlayersWhoHaventVoted = (year: number, month: number): User[] => {
+    // Get all active (whitelisted) users who are not admins and exclude mock players
+    const activePlayers = users.filter(user => 
+      user.isWhitelisted && 
+      !user.isAdmin && 
+      !user.id.startsWith('mock_player_')
+    );
+    
+    // Filter players who haven't voted for this month
+    return activePlayers.filter(user => {
+      // Check if user has voted for this specific month
+      const userAvailability = availability.find(
+        a => a.userId === user.id && a.month === month && a.year === year
+      );
+      
+      // Return true if no availability found (hasn't voted)
+      return !userAvailability;
+    });
+  };
+
   const organizeTeams = async (gameId: string) => {
     const game = games.find(g => g.id === gameId);
     if (!game || game.participants.length !== 10) return;
@@ -645,6 +665,7 @@ export default function GamesPage() {
         {upcomingSundays.map(({ date, sunday, month, year, availablePlayers, existingGame }, index) => {
           // Show month header for first item or when month changes
           const showMonthHeader = index === 0 || upcomingSundays[index - 1].month !== month;
+          const playersWhoHaventVoted = getActivePlayersWhoHaventVoted(year, month);
           
           return (
             <div key={`${year}-${month}-${sunday}`}>
@@ -654,6 +675,31 @@ export default function GamesPage() {
                     <Calendar className="h-5 w-5" />
                     {getCapitalizedMonthYear(year, month)}
                   </h2>
+                  
+                  {/* Players who haven't voted section */}
+                  {playersWhoHaventVoted.length > 0 && (
+                    <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">⚠️</span>
+                        <h3 className="text-sm font-semibold text-yellow-800">
+                          Jugadores que aún no votaron para {getCapitalizedMonthYear(year, month)}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {playersWhoHaventVoted.map(player => (
+                          <span
+                            key={player.id}
+                            className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm border border-yellow-300"
+                          >
+                            {player.nickname || player.name}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-yellow-700 mt-2">
+                        Estos jugadores necesitan votar su disponibilidad para aparecer en los partidos del mes.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -662,9 +708,13 @@ export default function GamesPage() {
                 <h3 className="text-lg font-semibold text-gray-900">
                   {formatDate(date)}
                 </h3>
-                <p className="text-sm text-gray-600">
-                  {availablePlayers.length} jugadores disponibles
-                </p>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-gray-600" />
+                  <span className="text-xl font-bold text-gray-900">
+                    {availablePlayers.length}/10
+                  </span>
+                  <span className="text-sm text-gray-600">jugadores</span>
+                </div>
               </div>
               
               {!existingGame && availablePlayers.length >= 10 && (
