@@ -102,24 +102,24 @@ function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-md w-full mx-4 p-6">
+      <div className="bg-card rounded-lg max-w-md w-full mx-4 p-6">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">
             {getIcon(options.type || 'info')}
           </span>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-foreground">
             {options.title}
           </h3>
         </div>
         
-        <p className="text-gray-700 mb-6">
+        <p className="text-muted-foreground mb-6">
           {options.message}
         </p>
         
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-accent"
           >
             {options.cancelText || 'Cancelar'}
           </button>

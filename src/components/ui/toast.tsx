@@ -100,15 +100,15 @@ function ToastComponent({ toast, onRemove }: { toast: Toast; onRemove: (id: stri
   const getToastStyles = (type: ToastType) => {
     switch (type) {
       case 'success':
-        return 'bg-green-50 border-green-200 text-green-800';
+        return 'bg-green-900/20 border-green-500/30 text-green-300';
       case 'error':
-        return 'bg-red-50 border-red-200 text-red-800';
+        return 'bg-red-900/20 border-red-500/30 text-red-300';
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+        return 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300';
       case 'info':
-        return 'bg-blue-50 border-blue-200 text-blue-800';
+        return 'bg-blue-900/20 border-blue-500/30 text-blue-300';
       default:
-        return 'bg-gray-50 border-gray-200 text-gray-800';
+        return 'bg-card border-border text-foreground';
     }
   };
 
@@ -149,7 +149,7 @@ function ToastComponent({ toast, onRemove }: { toast: Toast; onRemove: (id: stri
         </div>
         <button
           onClick={() => onRemove(toast.id)}
-          className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+          className="text-muted-foreground hover:text-foreground flex-shrink-0"
         >
           ×
         </button>

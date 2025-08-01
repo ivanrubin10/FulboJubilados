@@ -124,7 +124,7 @@ export default function SetupNickname() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
@@ -133,28 +133,28 @@ export default function SetupNickname() {
   if (!user) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <p className="text-gray-600">No se pudo cargar el usuario</p>
+        <p className="text-muted-foreground">No se pudo cargar el usuario</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-slate-900">
+          <h2 className="mt-6 text-3xl font-bold text-foreground">
             ¡Bienvenido! ⚽
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Configurá tu apodo para empezar
           </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8">
+          <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8">
             <div className="space-y-6">
               <div>
-                <label htmlFor="nickname" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="nickname" className="block text-sm font-medium text-muted-foreground mb-2">
                   Tu apodo
                 </label>
                 <input
@@ -164,12 +164,12 @@ export default function SetupNickname() {
                   required
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value.substring(0, 10))}
-                  className="appearance-none relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:z-10 text-base"
+                  className="appearance-none relative block w-full px-4 py-3 border border-border placeholder-muted-foreground text-foreground bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:z-10 text-base"
                   placeholder="Tu apodo"
                   maxLength={10}
                   disabled={isLoading}
                 />
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   Así te van a ver en los partidos y la lista de jugadores (máximo 10 caracteres)
                 </p>
               </div>

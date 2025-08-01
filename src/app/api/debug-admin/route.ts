@@ -60,9 +60,8 @@ export async function GET() {
     }
 
     // Step 5: Try to import DatabaseService
-    let dbService;
     try {
-      dbService = await import('@/lib/db/service');
+      await import('@/lib/db/service');
       console.log('✅ DatabaseService imported successfully');
     } catch (serviceError) {
       console.error('❌ Failed to import DatabaseService:', serviceError);

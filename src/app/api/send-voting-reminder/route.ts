@@ -29,7 +29,7 @@ export async function POST() {
         } else {
           console.log(`✅ User ${user.email} has already voted`);
         }
-      } catch (error) {
+      } catch {
         // User hasn't voted if no record exists
         console.log(`❌ No voting record for ${user.email}, adding to reminder list`);
         usersNeedingReminder.push(user);

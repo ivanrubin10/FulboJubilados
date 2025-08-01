@@ -6,6 +6,7 @@ import { User } from '@/types';
 import { getNextAvailableMonth, getCapitalizedMonthYear, getCapitalizedMonthName } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useTheme } from '@/contexts/theme-context';
 import { 
   Settings, 
   Mail, 
@@ -146,6 +147,7 @@ export default function AdminPage() {
   const { user, isLoaded } = useUser();
   const { success, error, info } = useToast();
   const { confirm } = useConfirm();
+  const { theme } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -153,7 +155,7 @@ export default function AdminPage() {
   const [isLoadingVotingReminder, setIsLoadingVotingReminder] = useState(false);
   const [isLoadingMatchConfirmation, setIsLoadingMatchConfirmation] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [manualAdminMode, setManualAdminMode] = useState(false);
+  const [manualAdminMode] = useState(false);
   const [pendingMonth, setPendingMonth] = useState<number | null>(null);
   const [pendingYear, setPendingYear] = useState<number | null>(null);
   const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
@@ -225,40 +227,6 @@ export default function AdminPage() {
 
 
 
-  const clearAllData = async () => {
-    const confirmed = await confirm({
-      title: 'Eliminar todos los datos',
-      message: '¿Estás seguro de que quieres eliminar TODOS los datos? Esta acción no se puede deshacer.',
-      type: 'danger',
-      confirmText: 'Eliminar',
-      cancelText: 'Cancelar'
-    });
-    
-    if (!confirmed) return;
-    
-    try {
-      // Clear browser localStorage as fallback (for any old data)
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('futbol-users');
-        localStorage.removeItem('futbol-games');
-        localStorage.removeItem('futbol-monthly-availability');
-        localStorage.removeItem('futbol-reminder-status');
-        localStorage.removeItem('futbol-settings');
-      }
-      
-      // Note: In a real implementation, you would need to add database clear methods
-      // For now, we just keep the current user and refresh
-      if (currentUser) {
-        await apiClient.addUser(currentUser);
-      }
-      
-      await refreshUsers();
-      success('Datos eliminados', 'Datos de LocalStorage eliminados. Para limpiar completamente la base de datos, contacta al administrador del sistema.');
-    } catch (err) {
-      console.error('Error clearing data:', err);
-      error('Error al limpiar los datos', 'No se pudieron eliminar los datos correctamente');
-    }
-  };
 
   const toggleAdminStatus = async (userId: string) => {
     try {
@@ -401,23 +369,6 @@ export default function AdminPage() {
     }
   };
 
-  const checkAdminStatus = async () => {
-    try {
-      const result = await apiClient.checkAdminStatus();
-      const status = `User ID de Clerk: ${result.userId || 'No disponible'}\nUsuario existe en DB: ${result.userExists ? 'Sí' : 'No'}\nEs Admin: ${result.isAdmin ? 'Sí' : 'No'}\n\n` +
-        (result.user ? 
-          `Datos del usuario:\n• Nombre: ${result.user.name}\n• Email: ${result.user.email}\n• ID: ${result.user.id}\n• Admin: ${result.user.isAdmin}\n• Habilitado: ${result.user.isWhitelisted}` 
-          : 
-          `Error: ${result.error || 'Usuario no encontrado'}\n` +
-          (result.details ? `Detalles: ${result.details}` : ''));
-      
-      info('Debug de Estado Admin', status);
-    } catch (err) {
-      console.error('Error checking admin status:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      error('Error de verificación', `No se pudo verificar el estado de admin: ${errorMessage}`);
-    }
-  };
 
   const testConnection = async () => {
     try {
@@ -572,9 +523,17 @@ export default function AdminPage() {
   if (!manualAdminMode && (!currentUser || !isAdmin)) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h1 className="text-xl font-semibold text-red-800 mb-2">Acceso Denegado</h1>
-          <p className="text-red-600 mb-4">
+        <div className={`rounded-lg p-6 text-center ${
+          theme === 'dark' 
+            ? 'bg-red-950/40 border border-red-600/30' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          <h1 className={`text-xl font-semibold mb-2 ${
+            theme === 'dark' ? 'text-red-300' : 'text-red-800'
+          }`}>Acceso Denegado</h1>
+          <p className={`mb-4 ${
+            theme === 'dark' ? 'text-red-400' : 'text-red-700'
+          }`}>
             No tienes permisos de administrador para acceder a esta página.
           </p>
         </div>
@@ -583,28 +542,36 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-gray-50">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-background">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Settings className="h-6 w-6 text-blue-600" />
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+            }`}>
+              <Settings className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+              }`} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
-              <p className="text-gray-600">Gestiona usuarios, permisos y configuración del sistema</p>
+              <h1 className="text-2xl font-bold text-foreground">Panel de Administración</h1>
+              <p className="text-muted-foreground">Gestiona usuarios, permisos y configuración del sistema</p>
             </div>
           </div>
         </div>
 
         {/* Admin Notifications */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Mail className="h-6 w-6 text-purple-600" />
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+            }`}>
+              <Mail className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+              }`} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Notificaciones de Jugadores</h2>
-              <p className="text-gray-600 text-sm">Envía recordatorios y confirmaciones a los jugadores</p>
+              <h2 className="text-xl font-bold text-foreground">Notificaciones de Jugadores</h2>
+              <p className="text-muted-foreground text-sm">Envía recordatorios y confirmaciones a los jugadores</p>
             </div>
           </div>
 
@@ -659,27 +626,41 @@ export default function AdminPage() {
 
 
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-emerald-600" />
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-emerald-900/40' : 'bg-emerald-100'
+            }`}>
+              <Calendar className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600'
+              }`} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Gestión de Mes Activo</h2>
-              <p className="text-gray-600 text-sm">Controla qué mes ven los usuarios por defecto</p>
+              <h2 className="text-xl font-bold text-foreground">Gestión de Mes Activo</h2>
+              <p className="text-muted-foreground text-sm">Controla qué mes ven los usuarios por defecto</p>
             </div>
           </div>
           
-          <div className="bg-emerald-50 rounded-lg p-4 mb-6 border border-emerald-200">
+          <div className={`rounded-lg p-4 mb-6 ${
+            theme === 'dark' 
+              ? 'bg-emerald-950/40 border border-emerald-600/30' 
+              : 'bg-emerald-50 border border-emerald-200'
+          }`}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-emerald-800 font-medium mb-1">
+                <p className={`font-medium mb-1 ${
+                  theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700'
+                }`}>
                   Mes activo actual:
                 </p>
-                <p className="text-xl font-bold text-emerald-900">
+                <p className={`text-xl font-bold ${
+                  theme === 'dark' ? 'text-emerald-200' : 'text-emerald-800'
+                }`}>
                   {getCapitalizedMonthYear(currentActiveMonth.year, currentActiveMonth.month)}
                 </p>
-                <p className="text-sm text-emerald-700 mt-1">
+                <p className={`text-sm mt-1 ${
+                  theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
+                }`}>
                   Este es el mes que se muestra por defecto a todos los usuarios
                 </p>
               </div>
@@ -689,7 +670,7 @@ export default function AdminPage() {
           <div className="space-y-4">
             {/* Quick Actions */}
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700 min-w-[120px]">Acciones rápidas:</span>
+              <span className="text-sm font-medium text-muted-foreground min-w-[120px]">Acciones rápidas:</span>
               <button
                 onClick={handleAdvanceToNextMonth}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors duration-200 flex items-center gap-2"
@@ -701,12 +682,12 @@ export default function AdminPage() {
             
             {/* Manual Selection */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <span className="text-sm font-medium text-gray-700 sm:min-w-[120px]">Selección manual:</span>
+              <span className="text-sm font-medium text-muted-foreground sm:min-w-[120px]">Selección manual:</span>
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={pendingMonth || currentActiveMonth.month}
                   onChange={(e) => setPendingMonth(parseInt(e.target.value))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
                 >
                   {Array.from({ length: 12 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>
@@ -717,7 +698,7 @@ export default function AdminPage() {
                 <select
                   value={pendingYear || currentActiveMonth.year}
                   onChange={(e) => setPendingYear(parseInt(e.target.value))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent flex-1 sm:flex-none"
                 >
                   <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
                   <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
@@ -725,7 +706,7 @@ export default function AdminPage() {
                 <button
                   onClick={handleSetCustomMonth}
                   disabled={!pendingMonth && !pendingYear}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed flex-1 xs:flex-none"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200 disabled:bg-accent disabled:cursor-not-allowed flex-1 xs:flex-none"
                 >
                   Aplicar
                 </button>
@@ -735,41 +716,67 @@ export default function AdminPage() {
         </div>
 
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-4 flex-1">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              }`}>
+                <Users className={`h-6 w-6 ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                }`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-foreground">
                   Usuarios Registrados ({users.length})
                 </h2>
-                <p className="text-gray-600 text-sm">Gestiona permisos y usuarios del sistema</p>
+                <p className="text-muted-foreground text-sm">Gestiona permisos y usuarios del sistema</p>
               </div>
             </div>
             <div className="flex gap-3 sm:gap-4 justify-center sm:justify-end">
               <div className="text-center">
-                <div className="text-lg font-bold text-green-700">{users.filter(u => u.isWhitelisted).length}</div>
-                <div className="text-xs text-green-600">Jugadores Activos</div>
+                <div className={`text-lg font-bold ${
+                  theme === 'dark' ? 'text-green-300' : 'text-green-600'
+                }`}>{users.filter(u => u.isWhitelisted).length}</div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-green-400' : 'text-green-500'
+                }`}>Jugadores Activos</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-red-700">{users.filter(u => !u.isWhitelisted).length}</div>
-                <div className="text-xs text-red-600">Deshabilitados</div>
+                <div className={`text-lg font-bold ${
+                  theme === 'dark' ? 'text-red-300' : 'text-red-600'
+                }`}>{users.filter(u => !u.isWhitelisted).length}</div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-red-400' : 'text-red-500'
+                }`}>Deshabilitados</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-blue-700">{users.filter(u => u.isAdmin).length}</div>
-                <div className="text-xs text-blue-600">Administradores</div>
+                <div className={`text-lg font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                }`}>{users.filter(u => u.isAdmin).length}</div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-500'
+                }`}>Administradores</div>
               </div>
             </div>
           </div>
 
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className={`mb-6 p-4 rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-blue-950/40 border border-blue-600/30' 
+              : 'bg-blue-50 border border-blue-200'
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-blue-600" />
-              <h3 className="font-bold text-blue-800 text-sm">Control de Usuarios para Partidos</h3>
+              <AlertTriangle className={`h-4 w-4 ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+              }`} />
+              <h3 className={`font-bold text-sm ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+              }`}>Control de Usuarios para Partidos</h3>
             </div>
-            <p className="text-blue-700 text-xs leading-relaxed">
+            <p className={`text-xs leading-relaxed ${
+              theme === 'dark' ? 'text-blue-400' : 'text-blue-700'
+            }`}>
               Solo los usuarios <strong>habilitados</strong> serán contados para la organización de partidos y recibirán recordatorios.
               Usa esto para excluir usuarios de prueba o cuentas temporales.
             </p>
@@ -778,23 +785,23 @@ export default function AdminPage() {
           {users.length > 0 ? (
             <>
               {/* Desktop Table */}
-              <div className="hidden lg:block bg-white rounded-lg overflow-hidden border border-gray-200">
+              <div className="hidden lg:block bg-card rounded-lg overflow-hidden border border-border">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-background">
                       <tr>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Foto</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Nombre</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Email</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Admin</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Habilitado</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Registro</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Acciones</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Foto</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Nombre</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Email</th>
+                        <th className="text-center py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Admin</th>
+                        <th className="text-center py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Habilitado</th>
+                        <th className="text-center py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Registro</th>
+                        <th className="text-center py-3 px-4 font-semibold text-foreground text-sm whitespace-nowrap">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {users.map(userData => (
-                        <tr key={userData.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <tr key={userData.id} className="border-b border-border hover:bg-background transition-colors">
                           <td className="py-3 px-4">
                             {userData.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -804,8 +811,8 @@ export default function AdminPage() {
                                 className="w-8 h-8 rounded-full border-2 border-slate-200"
                               />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
-                                <span className="text-gray-700 text-xs font-bold">
+                              <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center border-2 border-border">
+                                <span className="text-muted-foreground text-xs font-bold">
                                   {userData.name.charAt(0).toUpperCase()}
                                 </span>
                               </div>
@@ -813,18 +820,18 @@ export default function AdminPage() {
                       </td>
                           <td className="py-3 px-4">
                             <div>
-                              <p className="font-semibold text-gray-900 text-sm">{userData.name}</p>
+                              <p className="font-semibold text-foreground text-sm">{userData.name}</p>
                               {userData.nickname && (
-                                <p className="text-xs text-gray-500">@{userData.nickname}</p>
+                                <p className="text-xs text-muted-foreground">@{userData.nickname}</p>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{userData.email}</td>
+                          <td className="py-3 px-4 text-muted-foreground text-sm">{userData.email}</td>
                           <td className="py-3 px-4 text-center">
                             <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                               userData.isAdmin 
-                                ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                ? (theme === 'dark' ? 'bg-blue-900/40 text-blue-300 border border-blue-600/30' : 'bg-blue-100 text-blue-700 border border-blue-200')
+                                : 'bg-accent/20 text-muted-foreground border border-border'
                             }`}>
                               {userData.isAdmin ? (
                                 <>
@@ -842,8 +849,8 @@ export default function AdminPage() {
                           <td className="py-3 px-4 text-center">
                             <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                               userData.isWhitelisted 
-                                ? 'bg-green-100 text-green-800 border border-green-200' 
-                                : 'bg-red-100 text-red-800 border border-red-200'
+                                ? (theme === 'dark' ? 'bg-green-900/40 text-green-300 border border-green-600/30' : 'bg-green-100 text-green-700 border border-green-200') 
+                                : (theme === 'dark' ? 'bg-red-900/40 text-red-300 border border-red-600/30' : 'bg-red-100 text-red-700 border border-red-200')
                             }`}>
                               {userData.isWhitelisted ? (
                                 <>
@@ -858,7 +865,7 @@ export default function AdminPage() {
                               )}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center text-gray-600 font-medium text-sm">
+                          <td className="py-3 px-4 text-center text-muted-foreground font-medium text-sm">
                             {new Date(userData.createdAt).toLocaleDateString('es-ES')}
                           </td>
                           <td className="py-3 px-4 text-center">
@@ -867,8 +874,8 @@ export default function AdminPage() {
                                 onClick={() => toggleAdminStatus(userData.id)}
                                 className={`flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all w-[100px] whitespace-nowrap ${
                                   userData.isAdmin
-                                    ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
+                                    ? (theme === 'dark' ? 'bg-red-900/40 text-red-300 hover:bg-red-800/40 border border-red-600/30' : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 hover:border-red-300')
+                                    : (theme === 'dark' ? 'bg-blue-950/40 text-blue-300 hover:bg-blue-900/60 border border-blue-600/30 hover:border-blue-500/50' : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 hover:border-blue-300')
                                 }`}
                               >
                                 {userData.isAdmin ? (
@@ -888,8 +895,8 @@ export default function AdminPage() {
                                 onClick={() => toggleUserWhitelist(userData.id)}
                                 className={`flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all w-[100px] whitespace-nowrap ${
                                   userData.isWhitelisted
-                                    ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
+                                    ? (theme === 'dark' ? 'bg-red-900/40 text-red-300 hover:bg-red-800/40 border border-red-600/30' : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 hover:border-red-300')
+                                    : (theme === 'dark' ? 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-600/30 hover:border-emerald-500/50' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200 hover:border-emerald-300')
                                 }`}
                               >
                                 {userData.isWhitelisted ? (
@@ -916,7 +923,7 @@ export default function AdminPage() {
               {/* Mobile/Tablet Cards */}
               <div className="lg:hidden space-y-4">
                 {users.map(userData => (
-                  <div key={userData.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div key={userData.id} className="bg-card rounded-lg border border-border p-4">
                     <div className="flex items-start gap-3 mb-3">
                       {userData.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -926,28 +933,28 @@ export default function AdminPage() {
                           className="w-10 h-10 rounded-full border-2 border-slate-200 flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
-                          <span className="text-gray-700 text-sm font-bold">
+                        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center border-2 border-border flex-shrink-0">
+                          <span className="text-muted-foreground text-sm font-bold">
                             {userData.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-sm truncate">{userData.name}</h3>
+                        <h3 className="font-semibold text-foreground text-sm truncate">{userData.name}</h3>
                         {userData.nickname && (
-                          <p className="text-xs text-gray-500">@{userData.nickname}</p>
+                          <p className="text-xs text-muted-foreground">@{userData.nickname}</p>
                         )}
-                        <p className="text-xs text-gray-600 truncate">{userData.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{userData.email}</p>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="text-center">
-                        <p className="text-xs text-gray-500 mb-1">Estado Admin</p>
+                        <p className="text-xs text-muted-foreground mb-1">Estado Admin</p>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
                           userData.isAdmin 
-                            ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                            ? (theme === 'dark' ? 'bg-blue-900/40 text-blue-300 border border-blue-600/30' : 'bg-blue-100 text-blue-700 border border-blue-200')
+                            : 'bg-accent/20 text-muted-foreground border border-border'
                         }`}>
                           {userData.isAdmin ? (
                             <>
@@ -964,11 +971,11 @@ export default function AdminPage() {
                       </div>
                       
                       <div className="text-center">
-                        <p className="text-xs text-gray-500 mb-1">Estado Usuario</p>
+                        <p className="text-xs text-muted-foreground mb-1">Estado Usuario</p>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
                           userData.isWhitelisted 
-                            ? 'bg-green-100 text-green-800 border border-green-200' 
-                            : 'bg-red-100 text-red-800 border border-red-200'
+                            ? (theme === 'dark' ? 'bg-green-900/40 text-green-300 border border-green-600/30' : 'bg-green-100 text-green-700 border border-green-200')
+                            : (theme === 'dark' ? 'bg-red-900/40 text-red-300 border border-red-600/30' : 'bg-red-100 text-red-700 border border-red-200')
                         }`}>
                           {userData.isWhitelisted ? (
                             <>
@@ -986,8 +993,8 @@ export default function AdminPage() {
                     </div>
                     
                     <div className="text-center mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Fecha de Registro</p>
-                      <p className="text-sm text-gray-600 font-medium">
+                      <p className="text-xs text-muted-foreground mb-1">Fecha de Registro</p>
+                      <p className="text-sm text-muted-foreground font-medium">
                         {new Date(userData.createdAt).toLocaleDateString('es-ES')}
                       </p>
                     </div>
@@ -997,8 +1004,8 @@ export default function AdminPage() {
                         onClick={() => toggleAdminStatus(userData.id)}
                         className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 whitespace-nowrap min-w-0 ${
                           userData.isAdmin
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
+                            ? (theme === 'dark' ? 'bg-red-900/40 text-red-300 hover:bg-red-800/40 border border-red-600/30' : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 hover:border-red-300')
+                            : (theme === 'dark' ? 'bg-blue-950/40 text-blue-300 hover:bg-blue-900/60 border border-blue-600/30 hover:border-blue-500/50' : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 hover:border-blue-300')
                         }`}
                       >
                         {userData.isAdmin ? (
@@ -1018,7 +1025,7 @@ export default function AdminPage() {
                         onClick={() => toggleUserWhitelist(userData.id)}
                         className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 whitespace-nowrap min-w-0 ${
                           userData.isWhitelisted
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                            ? 'bg-red-900/40 text-red-300 hover:bg-red-800/40 border border-red-600/30'
                             : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
                         }`}
                       >
@@ -1041,10 +1048,10 @@ export default function AdminPage() {
             </>
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-gray-500" />
+              <div className="w-16 h-16 bg-accent/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="text-gray-500 text-base font-medium">
+              <p className="text-muted-foreground text-base font-medium">
                 No hay usuarios registrados
               </p>
             </div>
@@ -1052,20 +1059,28 @@ export default function AdminPage() {
         </div>
 
         {/* Email Previews Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <Eye className="h-6 w-6 text-indigo-600" />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                theme === 'dark' ? 'bg-indigo-900/40' : 'bg-indigo-100'
+              }`}>
+                <Eye className={`h-6 w-6 ${
+                  theme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
+                }`} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Vista Previa de Emails</h2>
-                <p className="text-gray-600">Mira cómo se ven los 3 tipos de emails del sistema</p>
+                <h2 className="text-xl font-bold text-foreground">Vista Previa de Emails</h2>
+                <p className="text-muted-foreground">Mira cómo se ven los 3 tipos de emails del sistema</p>
               </div>
             </div>
             <button
               onClick={() => setShowEmailPreviews(!showEmailPreviews)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                theme === 'dark' 
+                  ? 'bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/60 border border-indigo-600/30' 
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+              }`}
             >
               {showEmailPreviews ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               {showEmailPreviews ? 'Ocultar' : 'Ver Previews'}
@@ -1075,26 +1090,30 @@ export default function AdminPage() {
           {showEmailPreviews && (
             <div className="space-y-4">
               {/* Voting Reminder Email */}
-              <div className="border border-gray-200 rounded-lg">
+              <div className="border border-border rounded-lg">
                 <button
                   onClick={() => setExpandedEmail(expandedEmail === 'voting' ? null : 'voting')}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-background transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Vote className="h-4 w-4 text-blue-600" />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+                    }`}>
+                      <Vote className={`h-4 w-4 ${
+                        theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                      }`} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">🗳️ Recordatorio de Votación</h3>
-                      <p className="text-sm text-gray-600">Email enviado manualmente a usuarios que no han votado</p>
+                      <h3 className="font-semibold text-foreground">🗳️ Recordatorio de Votación</h3>
+                      <p className="text-sm text-muted-foreground">Email enviado manualmente a usuarios que no han votado</p>
                     </div>
                   </div>
                   {expandedEmail === 'voting' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
                 {expandedEmail === 'voting' && (
-                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="border-t border-border p-4 bg-background">
                     <div 
-                      className="border border-gray-300 rounded-lg bg-white"
+                      className="border border-border rounded-lg bg-card"
                       dangerouslySetInnerHTML={{ __html: generateVotingReminderPreview() }}
                     />
                   </div>
@@ -1102,26 +1121,30 @@ export default function AdminPage() {
               </div>
 
               {/* Admin Match Ready Email */}
-              <div className="border border-gray-200 rounded-lg">
+              <div className="border border-border rounded-lg">
                 <button
                   onClick={() => setExpandedEmail(expandedEmail === 'admin' ? null : 'admin')}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-background transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      theme === 'dark' ? 'bg-red-900/40' : 'bg-red-100'
+                    }`}>
+                      <AlertTriangle className={`h-4 w-4 ${
+                        theme === 'dark' ? 'text-red-300' : 'text-red-600'
+                      }`} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">🚨 Alerta para Admins</h3>
-                      <p className="text-sm text-gray-600">Email automático cuando un partido alcanza 10 jugadores</p>
+                      <h3 className="font-semibold text-foreground">🚨 Alerta para Admins</h3>
+                      <p className="text-sm text-muted-foreground">Email automático cuando un partido alcanza 10 jugadores</p>
                     </div>
                   </div>
                   {expandedEmail === 'admin' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
                 {expandedEmail === 'admin' && (
-                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="border-t border-border p-4 bg-background">
                     <div 
-                      className="border border-gray-300 rounded-lg bg-white"
+                      className="border border-border rounded-lg bg-card"
                       dangerouslySetInnerHTML={{ __html: generateAdminMatchReadyPreview() }}
                     />
                   </div>
@@ -1129,40 +1152,56 @@ export default function AdminPage() {
               </div>
 
               {/* Match Confirmation Email */}
-              <div className="border border-gray-200 rounded-lg">
+              <div className="border border-border rounded-lg">
                 <button
                   onClick={() => setExpandedEmail(expandedEmail === 'match' ? null : 'match')}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-background transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                      <Trophy className="h-4 w-4 text-emerald-600" />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      theme === 'dark' ? 'bg-emerald-900/40' : 'bg-emerald-100'
+                    }`}>
+                      <Trophy className={`h-4 w-4 ${
+                        theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600'
+                      }`} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">⚽ Confirmación de Partido</h3>
-                      <p className="text-sm text-gray-600">Email enviado manualmente a jugadores confirmados</p>
+                      <h3 className="font-semibold text-foreground">⚽ Confirmación de Partido</h3>
+                      <p className="text-sm text-muted-foreground">Email enviado manualmente a jugadores confirmados</p>
                     </div>
                   </div>
                   {expandedEmail === 'match' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
                 {expandedEmail === 'match' && (
-                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="border-t border-border p-4 bg-background">
                     <div 
-                      className="border border-gray-300 rounded-lg bg-white"
+                      className="border border-border rounded-lg bg-card"
                       dangerouslySetInnerHTML={{ __html: generateMatchConfirmationPreview() }}
                     />
                   </div>
                 )}
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <div className={`rounded-lg p-4 mt-4 ${
+                theme === 'dark' 
+                  ? 'bg-blue-950/40 border border-blue-600/30' 
+                  : 'bg-blue-50 border border-blue-200'
+              }`}>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Mail className="h-4 w-4 text-blue-600" />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+                  }`}>
+                    <Mail className={`h-4 w-4 ${
+                      theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                    }`} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-blue-800 mb-1">Sobre los Emails</h4>
-                    <div className="text-sm text-blue-700 space-y-1">
+                    <h4 className={`font-semibold mb-1 ${
+                      theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                    }`}>Sobre los Emails</h4>
+                    <div className={`text-sm space-y-1 ${
+                      theme === 'dark' ? 'text-blue-400' : 'text-blue-700'
+                    }`}>
                       <p>• <strong>Recordatorio de Votación:</strong> Enviado manualmente desde este panel a usuarios específicos</p>
                       <p>• <strong>Alerta para Admins:</strong> Enviado automáticamente cuando un partido alcanza 10 jugadores</p>
                       <p>• <strong>Confirmación de Partido:</strong> Enviado manualmente desde este panel a jugadores confirmados</p>
@@ -1175,14 +1214,18 @@ export default function AdminPage() {
         </div>
 
         {/* Admin Tools */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <Settings className="h-6 w-6 text-indigo-600" />
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-indigo-900/40' : 'bg-indigo-100'
+            }`}>
+              <Settings className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
+              }`} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Herramientas de Administración</h2>
-              <p className="text-gray-600 text-sm">Utilidades para mantener el sistema</p>
+              <h2 className="text-xl font-bold text-foreground">Herramientas de Administración</h2>
+              <p className="text-muted-foreground text-sm">Utilidades para mantener el sistema</p>
             </div>
           </div>
 
@@ -1217,14 +1260,26 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mt-8">
+        <div className={`rounded-lg p-6 mt-8 ${
+          theme === 'dark' 
+            ? 'bg-orange-950/40 border border-orange-600/30' 
+            : 'bg-orange-50 border border-orange-200'
+        }`}>
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-orange-600" />
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-orange-900/40' : 'bg-orange-100'
+            }`}>
+              <AlertTriangle className={`h-5 w-5 ${
+                theme === 'dark' ? 'text-orange-300' : 'text-orange-600'
+              }`} />
             </div>
-            <h3 className="font-bold text-orange-800">Nota Importante</h3>
+            <h3 className={`font-bold ${
+              theme === 'dark' ? 'text-orange-300' : 'text-orange-800'
+            }`}>Nota Importante</h3>
           </div>
-          <p className="text-orange-700 leading-relaxed">
+          <p className={`leading-relaxed ${
+            theme === 'dark' ? 'text-orange-400' : 'text-orange-700'
+          }`}>
             Los permisos de administrador permiten gestionar usuarios, crear partidos, organizar equipos y registrar resultados. 
             Ten cuidado al otorgar estos permisos ya que dan acceso completo al sistema.
           </p>
@@ -1233,23 +1288,27 @@ export default function AdminPage() {
         {/* Voting Reminder Confirmation Modal */}
         {showVotingConfirmModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Vote className="h-6 w-6 text-blue-600" />
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+                }`}>
+                  <Vote className={`h-6 w-6 ${
+                    theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                  }`} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Envío</h3>
-                  <p className="text-sm text-gray-600">Recordatorios de votación</p>
+                  <h3 className="text-lg font-semibold text-foreground">Confirmar Envío</h3>
+                  <p className="text-sm text-muted-foreground">Recordatorios de votación</p>
                 </div>
               </div>
-              <p className="text-gray-700 mb-6">
+              <p className="text-muted-foreground mb-6">
                 ¿Estás seguro que querés enviar recordatorios de votación a todos los usuarios que aún no han votado para el mes activo?
               </p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowVotingConfirmModal(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1268,23 +1327,27 @@ export default function AdminPage() {
         {/* Match Confirmation Modal */}
         {showMatchConfirmModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                  <Trophy className="h-6 w-6 text-emerald-600" />
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  theme === 'dark' ? 'bg-emerald-900/40' : 'bg-emerald-100'
+                }`}>
+                  <Trophy className={`h-6 w-6 ${
+                    theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600'
+                  }`} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Confirmar Envío</h3>
-                  <p className="text-sm text-gray-600">Confirmaciones de partido</p>
+                  <h3 className="text-lg font-semibold text-foreground">Confirmar Envío</h3>
+                  <p className="text-sm text-muted-foreground">Confirmaciones de partido</p>
                 </div>
               </div>
-              <p className="text-gray-700 mb-6">
+              <p className="text-muted-foreground mb-6">
                 ¿Estás seguro que querés enviar confirmaciones de partido a todos los jugadores de los partidos listos?
               </p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowMatchConfirmModal(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background transition-colors"
                 >
                   Cancelar
                 </button>

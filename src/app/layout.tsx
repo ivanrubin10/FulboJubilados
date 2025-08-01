@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ToastProvider } from "@/components/ui/toast";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
+import { ThemeProvider } from "@/contexts/theme-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,11 +37,13 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <ToastProvider>
-            <ConfirmProvider>
-              {children}
-            </ConfirmProvider>
-          </ToastProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                {children}
+              </ConfirmProvider>
+            </ToastProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

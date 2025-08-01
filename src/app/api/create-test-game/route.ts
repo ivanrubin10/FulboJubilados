@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         } else {
           console.log(`❌ ${user.name} is NOT available on ${selectedSunday}`);
         }
-      } catch (error) {
+      } catch {
         // If we can't get availability, include them anyway (might be the admin user)
         console.log(`Couldn't get availability for ${user.name}, including anyway`);
         usersAvailableOnDate.push(user);

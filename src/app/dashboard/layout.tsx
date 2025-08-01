@@ -42,12 +42,12 @@ export default function DashboardLayout({
   // Show loading while checking authentication
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50 flex items-center justify-center">
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center">
+        <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8 text-center">
           <div className="w-16 h-16 bg-gradient-to-r from-emerald-100 to-sky-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl animate-spin">⚽</span>
           </div>
-          <p className="text-slate-600 font-medium">Cargando...</p>
+          <p className="text-muted-foreground font-medium">Cargando...</p>
         </div>
       </div>
     );
@@ -57,20 +57,20 @@ export default function DashboardLayout({
   if (!isSignedIn) {
     router.push('/');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50 flex items-center justify-center">
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center">
+        <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8 text-center">
           <div className="w-16 h-16 bg-gradient-to-r from-red-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Lock className="h-8 w-8 text-red-600" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Acceso Requerido</h2>
-          <p className="text-slate-600 font-medium mb-4">Redirigiendo a la página principal...</p>
+          <h2 className="text-xl font-bold text-foreground mb-2">Acceso Requerido</h2>
+          <p className="text-muted-foreground font-medium mb-4">Redirigiendo a la página principal...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary">
       <nav className="glass-morphism border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-5">
           <div className="flex justify-between items-center">
@@ -79,33 +79,33 @@ export default function DashboardLayout({
                 <div className="w-11 h-11 flex items-center justify-center bouncing-ball group-hover:scale-110 transition-transform duration-300">
                   <span className="text-2xl">⚽</span>
                 </div>
-                <h1 className="text-lg sm:text-xl font-bold text-slate-800 text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-foreground text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
               </Link>
               <div className="hidden md:flex space-x-2">
                 <Link 
                   href="/dashboard" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <Calendar className="h-4 w-4" />
                   Mi Disponibilidad
                 </Link>
                 <Link 
                   href="/dashboard/games" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <Trophy className="h-4 w-4" />
                   Partidos
                 </Link>
                 <Link 
                   href="/dashboard/history" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <BarChart3 className="h-4 w-4" />
                   Historial
                 </Link>
                 <Link 
                   href="/dashboard/profile" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <User className="h-4 w-4" />
                   Perfil
@@ -113,7 +113,7 @@ export default function DashboardLayout({
                 {isAdmin && (
                   <Link 
                     href="/dashboard/admin" 
-                    className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                   >
                     <Settings className="h-4 w-4" />
                     Admin
@@ -124,7 +124,7 @@ export default function DashboardLayout({
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-xl bg-white/60 backdrop-blur-sm text-slate-600 hover:text-slate-900 transition-all duration-300"
+                className="md:hidden p-2 rounded-xl bg-card/60 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-all duration-300"
               >
                 {mobileMenuOpen ? (
                   <X className="h-6 w-6" />
@@ -138,11 +138,11 @@ export default function DashboardLayout({
           
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden mt-4 pb-4 border-t border-white/20">
+            <div className="md:hidden mt-4 pb-4 border-t border-border/20">
               <div className="flex flex-col space-y-2 pt-4">
                 <Link 
                   href="/dashboard" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Calendar className="h-4 w-4" />
@@ -150,7 +150,7 @@ export default function DashboardLayout({
                 </Link>
                 <Link 
                   href="/dashboard/games" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Trophy className="h-4 w-4" />
@@ -158,7 +158,7 @@ export default function DashboardLayout({
                 </Link>
                 <Link 
                   href="/dashboard/history" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <BarChart3 className="h-4 w-4" />
@@ -166,7 +166,7 @@ export default function DashboardLayout({
                 </Link>
                 <Link 
                   href="/dashboard/profile" 
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <User className="h-4 w-4" />
@@ -175,7 +175,7 @@ export default function DashboardLayout({
                 {isAdmin && (
                   <Link 
                     href="/dashboard/admin" 
-                    className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Settings className="h-4 w-4" />

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, formatDate, getCapitalizedMonthName, getCapitalizedMonthYear } from '@/lib/utils';
 import { User } from '@/types';
 import { useToast } from '@/components/ui/toast';
+import { useTheme } from '@/contexts/theme-context';
 import { Calendar, ChevronLeft, ChevronRight, Clock, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
 
 // API helper functions
@@ -66,6 +67,7 @@ export default function Dashboard() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const { warning } = useToast();
+  const { theme } = useTheme();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [activeMonth, setActiveMonth] = useState<number>(new Date().getMonth() + 1);
@@ -313,7 +315,7 @@ export default function Dashboard() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
@@ -322,7 +324,7 @@ export default function Dashboard() {
   if (!user || !currentUser) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <p className="text-gray-600">No se pudo cargar el usuario</p>
+        <p className="text-muted-foreground">No se pudo cargar el usuario</p>
       </div>
     );
   }
@@ -361,17 +363,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <UserIcon className="h-8 w-8 text-gray-600" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <UserIcon className="h-8 w-8 text-muted-foreground" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Hola, {currentUser.nickname || currentUser.name}
             </h1>
           </div>
-          <p className="text-sm sm:text-base text-gray-600 ml-11">
+          <p className="text-sm sm:text-base text-muted-foreground ml-11">
             Marca los domingos que puedes jugar
           </p>
         </div>
@@ -379,14 +381,24 @@ export default function Dashboard() {
 
         {/* Non-whitelisted User Warning */}
         {!currentUser.isWhitelisted && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className={`mb-6 p-4 rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-red-950/40 border border-red-600/30' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
             <div className="flex items-center gap-3 mb-2">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-              <p className="text-red-800 font-semibold text-sm">
+              <AlertCircle className={`h-5 w-5 ${
+                theme === 'dark' ? 'text-red-400' : 'text-red-600'
+              }`} />
+              <p className={`font-semibold text-sm ${
+                theme === 'dark' ? 'text-red-300' : 'text-red-800'
+              }`}>
                 Usuario no habilitado
               </p>
             </div>
-            <p className="text-red-700 text-sm ml-8">
+            <p className={`text-sm ml-8 ${
+              theme === 'dark' ? 'text-red-400' : 'text-red-700'
+            }`}>
               Tu voto no está siendo contado para la creación de partidos. Necesitas ser habilitado por un administrador primero. 
               Los votos de usuarios no habilitados no contribuyen al sistema de organización de partidos.
             </p>
@@ -395,14 +407,24 @@ export default function Dashboard() {
 
         {/* Blocked Days Info */}
         {blockedSundays.length > 0 && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className={`mb-6 p-4 rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-amber-950/40 border border-amber-600/30' 
+              : 'bg-amber-50 border border-amber-200'
+          }`}>
             <div className="flex items-center gap-3 mb-2">
-              <Ban className="h-5 w-5 text-amber-600" />
-              <p className="text-amber-800 font-semibold text-sm">
+              <Ban className={`h-5 w-5 ${
+                theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+              }`} />
+              <p className={`font-semibold text-sm ${
+                theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+              }`}>
                 Días completos en {getCapitalizedMonthName(selectedYear, selectedMonth)}
               </p>
             </div>
-            <p className="text-amber-700 text-sm ml-8">
+            <p className={`text-sm ml-8 ${
+              theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
+            }`}>
               Los siguientes domingos ya tienen partidos confirmados con 10 jugadores: {blockedSundays.map(sunday => {
                 return `${sunday} de ${getCapitalizedMonthName(selectedYear, selectedMonth)}`;
               }).join(', ')}
@@ -411,12 +433,12 @@ export default function Dashboard() {
         )}
 
         {/* Month Navigation */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             {selectedYear > activeYear || (selectedYear === activeYear && selectedMonth > activeMonth) ? (
               <button
                 onClick={prevMonth}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-muted-foreground rounded-lg transition-colors duration-200"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="hidden sm:inline text-sm font-medium">Anterior</span>
@@ -429,8 +451,8 @@ export default function Dashboard() {
             )}
             
             <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-gray-600" />
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 text-center">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-lg sm:text-xl font-bold text-foreground text-center">
                 {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
                   month: 'long', 
                   year: 'numeric' 
@@ -440,7 +462,7 @@ export default function Dashboard() {
             
             <button
               onClick={nextMonth}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-muted-foreground rounded-lg transition-colors duration-200"
             >
               <span className="hidden sm:inline text-sm font-medium">Siguiente</span>
               <ChevronRight className="h-4 w-4" />
@@ -453,14 +475,24 @@ export default function Dashboard() {
             
             if (isPastMonth) {
               return (
-                <div className="flex flex-col items-center justify-center gap-4 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className={`flex flex-col items-center justify-center gap-4 mb-6 p-4 rounded-lg ${
+                  theme === 'dark' 
+                    ? 'bg-amber-950/40 border border-amber-600/30'
+                    : 'bg-amber-50 border border-amber-200'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-amber-600" />
-                    <span className="text-sm font-semibold text-amber-800">
+                    <Lock className={`h-5 w-5 ${
+                      theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+                    }`} />
+                    <span className={`text-sm font-semibold ${
+                      theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+                    }`}>
                       Mes cerrado para votación
                     </span>
                   </div>
-                  <p className="text-sm text-amber-700 text-center">
+                  <p className={`text-sm text-center ${
+                    theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
+                  }`}>
                     No puedes votar en meses anteriores al mes activo ({getCapitalizedMonthYear(activeYear, activeMonth)})
                   </p>
                 </div>
@@ -468,8 +500,8 @@ export default function Dashboard() {
             }
             
             return (
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium text-gray-700">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-accent/20 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">
                   ¿No puedes jugar ningún domingo este mes?
                 </span>
                 <button
@@ -477,7 +509,7 @@ export default function Dashboard() {
                   className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
                     cannotPlayAnyDay
                       ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-accent text-muted-foreground hover:bg-accent/80'
                   }`}
                 >
                   <Ban className="h-4 w-4" />
@@ -503,65 +535,81 @@ export default function Dashboard() {
                   onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
                   className={`p-4 rounded-xl transition-all duration-200 hover:shadow-md ${
                     isPastMonth
-                      ? 'opacity-40 cursor-not-allowed bg-gray-50 border-2 border-gray-100'
+                      ? 'opacity-40 cursor-not-allowed bg-accent/20 border-2 border-border'
                       : isDisabled
-                        ? 'opacity-50 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
+                        ? 'opacity-50 cursor-not-allowed bg-accent border-2 border-border'
                         : isBlocked && !isSelected
-                          ? 'opacity-75 cursor-not-allowed bg-orange-50 border-2 border-orange-200'
+                          ? `opacity-75 cursor-not-allowed ${
+                            theme === 'dark' 
+                              ? 'bg-orange-950/40 border-2 border-orange-600/30'
+                              : 'bg-orange-50 border-2 border-orange-200'
+                          }`
                           : `cursor-pointer ${isSelected
-                              ? 'bg-emerald-50 border-2 border-emerald-200'
-                              : 'bg-white border-2 border-slate-200 hover:border-slate-300'
+                              ? `${
+                                theme === 'dark' 
+                                  ? 'bg-emerald-950/40 border-2 border-emerald-600/30'
+                                  : 'bg-emerald-50 border-2 border-emerald-200'
+                              }`
+                              : 'bg-card border-2 border-border hover:border-muted-foreground'
                             }`
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       {isPastMonth ? (
-                        <Lock className="h-6 w-6 text-gray-400" />
+                        <Lock className="h-6 w-6 text-muted-foreground" />
                       ) : isSelected ? (
-                        <CheckCircle className="h-6 w-6 text-green-600" />
+                        <CheckCircle className="h-6 w-6 text-green-400" />
                       ) : isBlocked && !isSelected ? (
-                        <Ban className="h-6 w-6 text-orange-600" />
+                        <Ban className="h-6 w-6 text-orange-400" />
                       ) : (
-                        <Calendar className="h-6 w-6 text-blue-600" />
+                        <Calendar className="h-6 w-6 text-blue-400" />
                       )}
                       {isSelected && (
-                        <span className="text-green-700 font-semibold text-xs bg-green-100 px-3 py-1 rounded-full">
+                        <span className={`font-semibold text-xs px-3 py-1 rounded-full ${
+                          theme === 'dark' 
+                            ? 'text-green-200 bg-green-900/40'
+                            : 'text-green-700 bg-green-100'
+                        }`}>
                           DISPONIBLE
                         </span>
                       )}
                     </div>
                     {isPastMonth ? (
-                      <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-md font-medium">
+                      <span className="text-xs bg-accent text-muted-foreground px-3 py-1 rounded-md font-medium">
                         Cerrado
                       </span>
                     ) : isBlocked && !isSelected && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-md font-medium">
+                      <span className={`text-xs px-3 py-1 rounded-md font-medium ${
+                        theme === 'dark' 
+                          ? 'bg-orange-900/40 text-orange-300'
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
                         Completo
                       </span>
                     )}
                   </div>
                   
                   <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
-                    isPastMonth ? 'text-gray-500' :
-                    isSelected ? 'text-emerald-900' :
-                    isBlocked ? 'text-orange-900' : 'text-slate-900'
+                    isPastMonth ? 'text-muted-foreground' :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-200' : 'text-emerald-700') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-300' : 'text-orange-700') : 'text-foreground'
                   }`}>
                     {sunday}
                   </h3>
                   
                   <p className={`text-sm font-medium mb-2 ${
-                    isPastMonth ? 'text-gray-500' :
-                    isSelected ? 'text-emerald-700' :
-                    isBlocked ? 'text-orange-700' : 'text-slate-600'
+                    isPastMonth ? 'text-muted-foreground' :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-600') : 'text-muted-foreground'
                   }`}>
                     {isPastMonth ? 'Mes cerrado' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
                   </p>
                   
                   <p className={`text-xs ${
-                    isPastMonth ? 'text-gray-400' :
-                    isSelected ? 'text-emerald-600' :
-                    isBlocked ? 'text-orange-600' : 'text-slate-500'
+                    isPastMonth ? 'text-muted-foreground/60' :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-500') : 'text-muted-foreground'
                   }`}>
                     {isPastMonth ? 'No se puede votar' :
                      isSelected ? 'Toca para desmarcar' : 
@@ -577,7 +625,11 @@ export default function Dashboard() {
             {selectedMonth === activeMonth && selectedYear === activeYear ? (
               // Show voting status only for active month
               (hasVoted || availableSundays.length > 0 || cannotPlayAnyDay) ? (
-                <div className="flex items-center justify-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                <div className={`flex items-center justify-center gap-3 p-4 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-600/30'
+                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                }`}>
                   <CheckCircle className="h-5 w-5" />
                   <span className="font-semibold">
                     {cannotPlayAnyDay 
@@ -587,7 +639,11 @@ export default function Dashboard() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3 text-amber-600 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <div className={`flex items-center justify-center gap-3 p-4 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'text-amber-300 bg-amber-950/40 border border-amber-600/30'
+                    : 'text-amber-700 bg-amber-50 border border-amber-200'
+                }`}>
                   <Clock className="h-5 w-5" />
                   <span className="font-semibold">Aún no has votado para este mes</span>
                 </div>
@@ -595,7 +651,7 @@ export default function Dashboard() {
             ) : (
               // For non-active months, show current selection status
               (availableSundays.length > 0 || cannotPlayAnyDay) ? (
-                <div className="flex items-center justify-center gap-3 text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-center gap-3 text-muted-foreground bg-accent/20 p-4 rounded-xl border border-border">
                   <CalendarCheck className="h-5 w-5" />
                   <span className="font-semibold">
                     {cannotPlayAnyDay 
@@ -605,7 +661,7 @@ export default function Dashboard() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3 text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-center gap-3 text-muted-foreground bg-accent/20 p-4 rounded-xl border border-border">
                   <Calendar className="h-5 w-5" />
                   <span className="font-semibold">Sin disponibilidad marcada</span>
                 </div>

@@ -1,6 +1,6 @@
 import { db } from './connection';
 import { users, monthlyAvailability, reminderStatus, settings, games, adminNotifications } from './schema';
-import { eq, and, desc, gte } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import type { User } from '@/types';
 import type { Game, AdminNotification, NewGame, NewAdminNotification } from './schema';
 import { calendarService } from '../calendar';
@@ -149,7 +149,7 @@ export class DatabaseService {
     cannotPlayAnyDay: boolean = false
   ): Promise<void> {
     // Check for confirmed games that would prevent availability
-    const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays, month, year);
+    const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays);
     
     // Calculate voting status: user has voted if they have days selected OR marked as cannot play
     const hasVoted = filteredSundays.length > 0 || cannotPlayAnyDay;
@@ -181,7 +181,7 @@ export class DatabaseService {
   }
 
   // Helper function to filter out Sundays that already have confirmed games
-  static async filterAvailableSundays(requestedSundays: number[], month: number, year: number): Promise<number[]> {
+  static async filterAvailableSundays(requestedSundays: number[]): Promise<number[]> {
     // TODO: Implement games filtering for database version
     // For now, return all requested Sundays since games management is not yet implemented in database
     return requestedSundays;

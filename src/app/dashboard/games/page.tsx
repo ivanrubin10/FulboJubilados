@@ -6,6 +6,7 @@ import { getSundaysInMonth, formatDate, generateTeams, getCapitalizedMonthYear }
 import { Game, User, MonthlyAvailability } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useTheme } from '@/contexts/theme-context';
 import { Calendar, Ban, Trophy, Users, Edit3 } from 'lucide-react';
 
 // API helper functions
@@ -96,13 +97,13 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Editar Partido</h2>
+            <h2 className="text-2xl font-bold text-foreground">Editar Partido</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-muted-foreground hover:text-foreground text-2xl"
             >
               ×
             </button>
@@ -110,11 +111,11 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
           {/* Game Status */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Estado del Partido</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">Estado del Partido</label>
             <select
               value={editedGame.status}
               onChange={(e) => setEditedGame(prev => ({ ...prev, status: e.target.value as Game['status'] }))}
-              className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+              className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
             >
               <option value="scheduled">Programado</option>
               <option value="confirmed">Confirmado</option>
@@ -125,65 +126,65 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
           {/* Reservation Information */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Información de Reserva</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-3">Información de Reserva</h3>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Lugar</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Lugar</label>
                 <input
                   type="text"
                   value={reservationInfo.location}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, location: e.target.value }))}
                   placeholder="Ej: Cancha Municipal"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Hora</label>
                 <input
                   type="time"
                   value={reservationInfo.time}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, time: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Costo ARS (opcional)</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Costo ARS (opcional)</label>
                 <input
                   type="number"
                   value={reservationInfo.cost}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, cost: e.target.value }))}
                   placeholder="0"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reservado por</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Reservado por</label>
                 <input
                   type="text"
                   value={reservationInfo.reservedBy}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, reservedBy: e.target.value }))}
                   placeholder="Nombre de quien reservó"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Google Maps (opcional)</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Google Maps (opcional)</label>
                 <input
                   type="url"
                   value={reservationInfo.mapsLink}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, mapsLink: e.target.value }))}
                   placeholder="https://maps.google.com/..."
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Alias para Transferencia (opcional)</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Alias para Transferencia (opcional)</label>
                 <input
                   type="text"
                   value={reservationInfo.paymentAlias}
                   onChange={(e) => setReservationInfo(prev => ({ ...prev, paymentAlias: e.target.value }))}
                   placeholder="Ej: fulbo.admin"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                 />
               </div>
             </div>
@@ -192,7 +193,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
           {/* Team Organization */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-foreground">
                 Organización de Equipos ({game.participants.length} jugadores)
               </h3>
               <button
@@ -253,11 +254,11 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                 </div>
               </>
             ) : (
-              <div className="bg-gray-50 p-6 rounded-lg text-center">
-                <p className="text-gray-600 mb-4">
+              <div className="bg-accent/20 p-6 rounded-lg text-center">
+                <p className="text-muted-foreground mb-4">
                   ⚽ Los equipos aún no han sido generados
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Haz clic en &quot;🎲 Regenerar Equipos (Aleatorio)&quot; para crear equipos balanceados automáticamente
                 </p>
               </div>
@@ -267,11 +268,11 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
           {/* Match Result Section */}
           {editedGame.status === 'completed' && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Resultado del Partido</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold text-foreground mb-3">Resultado del Partido</h3>
+              <div className="bg-accent/20 p-4 rounded-lg">
                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       Goles Equipo 1 {editedGame.teams && `(${editedGame.teams.team1.map(id => users.find(u => u.id === id)?.nickname || users.find(u => u.id === id)?.name).join(', ')})`}
                     </label>
                     <input
@@ -288,11 +289,11 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                         }
                       }))}
                       placeholder="0"
-                      className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                      className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       Goles Equipo 2 {editedGame.teams && `(${editedGame.teams.team2.map(id => users.find(u => u.id === id)?.nickname || users.find(u => u.id === id)?.name).join(', ')})`}
                     </label>
                     <input
@@ -309,22 +310,22 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                         }
                       }))}
                       placeholder="0"
-                      className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                      className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                     />
                   </div>
                   <div className="flex items-end">
                     {editedGame.result && (
-                      <div className="text-center p-2 bg-white rounded-lg border">
-                        <div className="text-2xl font-bold text-slate-900">
+                      <div className="text-center p-2 bg-card rounded-lg border border-border">
+                        <div className="text-2xl font-bold text-foreground">
                           {editedGame.result.team1Score} - {editedGame.result.team2Score}
                         </div>
-                        <div className="text-xs text-slate-600">Resultado</div>
+                        <div className="text-xs text-muted-foreground">Resultado</div>
                       </div>
                     )}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notas (opcional)</label>
                   <textarea
                     value={editedGame.result?.notes ?? ''}
                     onChange={(e) => setEditedGame(prev => ({
@@ -338,7 +339,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                     }))}
                     placeholder="Ej: Partido muy reñido, gran actuación de Juan..."
                     rows={3}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
                   />
                 </div>
               </div>
@@ -349,7 +350,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-accent/20"
             >
               Cancelar
             </button>
@@ -369,7 +370,8 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 export default function GamesPage() {
   const { user, isLoaded } = useUser();
   const { success, error } = useToast();
-  const { confirm } = useConfirm();
+  const { theme } = useTheme();
+  useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -512,15 +514,6 @@ export default function GamesPage() {
     }
   };
 
-  const updateGame = async (gameId: string, updatedGame: Game) => {
-    try {
-    const updatedGames = games.map(g => g.id === gameId ? updatedGame : g);
-      setGames(updatedGames);
-      await apiClient.saveGames(updatedGames);
-    } catch (error) {
-      console.error('Error updating game:', error);
-    }
-  };
 
 
   const handleEditGame = async (updatedGame: Game) => {
@@ -659,7 +652,7 @@ export default function GamesPage() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
@@ -672,12 +665,12 @@ export default function GamesPage() {
   const upcomingSundays = getCurrentMonthSundays();
 
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-gray-50">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-background">
+      <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
         <div className="flex justify-between items-center">
           <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Partidos Programados</h1>
-            <p className="text-gray-600">Gestiona partidos y organiza equipos automáticamente</p>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Partidos Programados</h1>
+            <p className="text-muted-foreground">Gestiona partidos y organiza equipos automáticamente</p>
           </div>
 
         </div>
@@ -693,17 +686,23 @@ export default function GamesPage() {
             <div key={`${year}-${month}-${sunday}`}>
               {showMonthHeader && (
                 <div className="mb-4">
-                  <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg">
+                  <h2 className="flex items-center gap-3 text-lg font-semibold text-foreground bg-accent px-4 py-2 rounded-lg">
                     <Calendar className="h-5 w-5" />
                     {getCapitalizedMonthYear(year, month)}
                   </h2>
                   
                   {/* Players who haven't voted section */}
                   {playersWhoHaventVoted.length > 0 && (
-                    <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className={`mt-3 rounded-lg p-4 ${
+                      theme === 'dark' 
+                        ? 'bg-amber-950/40 border border-amber-600/30' 
+                        : 'bg-amber-50 border border-amber-200'
+                    }`}>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg">⚠️</span>
-                        <h3 className="text-sm font-semibold text-yellow-800">
+                        <h3 className={`text-sm font-semibold ${
+                          theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+                        }`}>
                           Jugadores que aún no votaron para {getCapitalizedMonthYear(year, month)}
                         </h3>
                       </div>
@@ -711,7 +710,11 @@ export default function GamesPage() {
                         {playersWhoHaventVoted.map(player => (
                           <span
                             key={player.id}
-                            className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm border border-yellow-300"
+                            className={`px-3 py-1 rounded-full text-sm ${
+                              theme === 'dark' 
+                                ? 'bg-amber-900/40 text-amber-200 border border-amber-600/40'
+                                : 'bg-amber-100 text-amber-700 border border-amber-300'
+                            }`}
                           >
                             {(player.nickname || player.name).substring(0, 10)}
                           </span>
@@ -721,18 +724,18 @@ export default function GamesPage() {
                   )}
                 </div>
               )}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-card rounded-lg shadow-sm border border-border p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-foreground">
                   {formatDate(date)}
                 </h3>
                 <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-gray-600" />
-                  <span className="text-xl font-bold text-gray-900">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-xl font-bold text-foreground">
                     {availablePlayers.length}/10
                   </span>
-                  <span className="text-sm text-gray-600">jugadores</span>
+                  <span className="text-sm text-muted-foreground">jugadores</span>
                 </div>
               </div>
               
@@ -746,7 +749,11 @@ export default function GamesPage() {
               )}
               
               {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
-                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                  theme === 'dark' 
+                    ? 'text-orange-300 bg-orange-950/40 border border-orange-600/30'
+                    : 'text-orange-700 bg-orange-50 border border-orange-200'
+                }`}>
                   <Ban className="h-4 w-4" />
                   <span className="text-sm font-medium">Día completo (10 jugadores)</span>
                 </div>
@@ -755,12 +762,16 @@ export default function GamesPage() {
 
             {availablePlayers.length > 0 && (
               <div className="mb-4">
-                <h4 className="font-medium text-gray-700 mb-2">Jugadores disponibles:</h4>
+                <h4 className="font-medium text-muted-foreground mb-2">Jugadores disponibles:</h4>
                 <div className="flex flex-wrap gap-2">
                   {availablePlayers.map(player => (
                     <span
                       key={player.id}
-                      className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        theme === 'dark' 
+                          ? 'bg-blue-950/40 text-blue-300 border border-blue-600/30' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
                     >
                       {player.nickname || player.name}
                     </span>
@@ -880,7 +891,7 @@ export default function GamesPage() {
                       )}
                     </div>
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-slate-900 mb-2">
+                      <div className="text-3xl font-bold text-foreground mb-2">
                         {existingGame.result.team1Score} - {existingGame.result.team2Score}
                       </div>
                       {existingGame.teams && (
@@ -889,7 +900,7 @@ export default function GamesPage() {
                         </div>
                       )}
                       {existingGame.result.notes && (
-                        <div className="text-sm text-slate-700 italic bg-white p-2 rounded border">
+                        <div className="text-sm text-muted-foreground italic bg-card p-2 rounded border">
                           &quot;{existingGame.result.notes}&quot;
                         </div>
                       )}
@@ -898,11 +909,11 @@ export default function GamesPage() {
                 )}
 
                 {existingGame.reservationInfo && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h5 className="font-semibold text-gray-800 mb-2">Información de Reserva</h5>
-                    <p className="text-gray-900"><strong>Lugar:</strong> {existingGame.reservationInfo.location}</p>
+                  <div className="bg-accent/20 p-4 rounded-lg">
+                    <h5 className="font-semibold text-foreground mb-2">Información de Reserva</h5>
+                    <p className="text-foreground"><strong>Lugar:</strong> {existingGame.reservationInfo.location}</p>
                     {existingGame.reservationInfo.mapsLink && (
-                      <p className="text-gray-900">
+                      <p className="text-foreground">
                         <strong>Dirección:</strong> 
                         <a 
                           href={existingGame.reservationInfo.mapsLink} 
@@ -914,15 +925,15 @@ export default function GamesPage() {
                         </a>
                       </p>
                     )}
-                    <p className="text-gray-900"><strong>Hora:</strong> {existingGame.reservationInfo.time}</p>
+                    <p className="text-foreground"><strong>Hora:</strong> {existingGame.reservationInfo.time}</p>
                     {existingGame.reservationInfo.cost && (
-                      <p className="text-gray-900"><strong>Costo:</strong> ARS ${existingGame.reservationInfo.cost}</p>
+                      <p className="text-foreground"><strong>Costo:</strong> ARS ${existingGame.reservationInfo.cost}</p>
                     )}
                     {existingGame.reservationInfo.reservedBy && (
-                      <p className="text-gray-900"><strong>Reservado por:</strong> {existingGame.reservationInfo.reservedBy}</p>
+                      <p className="text-foreground"><strong>Reservado por:</strong> {existingGame.reservationInfo.reservedBy}</p>
                     )}
                     {existingGame.reservationInfo.paymentAlias && (
-                      <p className="text-gray-900">
+                      <p className="text-foreground">
                         <strong>Alias para transferir:</strong> {existingGame.reservationInfo.paymentAlias}
                         {existingGame.reservationInfo.cost && (
                           <span className="text-green-700 font-semibold ml-2">
@@ -941,8 +952,8 @@ export default function GamesPage() {
         })}
 
         {upcomingSundays.length === 0 && (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500 mb-4">No hay domingos disponibles</p>
+          <div className="bg-card rounded-lg shadow-md p-8 text-center">
+            <p className="text-muted-foreground mb-4">No hay domingos disponibles</p>
             <p className="text-sm text-gray-400">
               Tip: Crea usuarios de prueba para ver domingos con jugadores disponibles
             </p>
@@ -998,16 +1009,16 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full">
+      <div className="bg-card rounded-lg max-w-md w-full">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <Trophy className="h-6 w-6 text-green-600" />
               {game.result ? 'Editar Resultado' : 'Agregar Resultado'}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-muted-foreground hover:text-muted-foreground text-2xl"
             >
               ×
             </button>
@@ -1015,7 +1026,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
 
           <div className="space-y-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 {formatDate(game.date)}
               </p>
             </div>
@@ -1026,7 +1037,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
                   Equipo 1
                 </label>
                 {game.teams && (
-                  <p className="text-xs text-gray-500 mb-2">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {getTeamName(game.teams.team1)}
                   </p>
                 )}
@@ -1035,13 +1046,13 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
                   min="0"
                   value={team1Score}
                   onChange={(e) => setTeam1Score(parseInt(e.target.value) || 0)}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-center text-xl font-bold"
+                  className="w-full p-3 border border-border rounded-lg text-center text-xl font-bold"
                 />
               </div>
 
               <div className="text-center">
-                <div className="text-2xl font-bold text-slate-500 mb-4">VS</div>
-                <div className="text-3xl font-bold text-slate-900">
+                <div className="text-2xl font-bold text-muted-foreground mb-4">VS</div>
+                <div className="text-3xl font-bold text-foreground">
                   {team1Score} - {team2Score}
                 </div>
               </div>
@@ -1051,7 +1062,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
                   Equipo 2
                 </label>
                 {game.teams && (
-                  <p className="text-xs text-gray-500 mb-2">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {getTeamName(game.teams.team2)}
                   </p>
                 )}
@@ -1060,13 +1071,13 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
                   min="0"
                   value={team2Score}
                   onChange={(e) => setTeam2Score(parseInt(e.target.value) || 0)}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-center text-xl font-bold"
+                  className="w-full p-3 border border-border rounded-lg text-center text-xl font-bold"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
                 Notas del partido (opcional)
               </label>
               <textarea
@@ -1074,7 +1085,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ej: Partido muy reñido, gran actuación de Juan..."
                 rows={3}
-                className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
               />
             </div>
           </div>
@@ -1082,7 +1093,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-accent/20"
             >
               Cancelar
             </button>

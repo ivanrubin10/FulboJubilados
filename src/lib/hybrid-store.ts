@@ -86,6 +86,7 @@ export class HybridStore {
     return [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async saveGames(games: Game[]): Promise<void> {
     // TODO: Implement games in DatabaseService
     return;
@@ -98,6 +99,7 @@ export class HybridStore {
   }
 
   // Get blocked Sundays (days with confirmed games)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async getBlockedSundays(month: number, year: number): Promise<number[]> {
     // TODO: Implement in DatabaseService using games data
     return [];

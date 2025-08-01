@@ -1,23 +1,76 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-:root {
+/* Light theme variables */
+.light {
   --background: #ffffff;
   --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border: #e2e8f0;
+  --input: #ffffff;
+  --ring: #10b981;
+  --radius: 0.5rem;
+}
+
+/* Dark theme variables */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #111111;
+  --card-foreground: #ededed;
+  --popover: #111111;
+  --popover-foreground: #ededed;
+  --primary: #10b981;
+  --primary-foreground: #000000;
+  --secondary: #1f2937;
+  --secondary-foreground: #f9fafb;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --accent: #1f2937;
+  --accent-foreground: #f9fafb;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border: #374151;
+  --input: #1f2937;
+  --ring: #10b981;
+  --radius: 0.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: 'Inter', var(--font-geist-sans);
   --font-mono: 'JetBrains Mono', var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -31,15 +84,28 @@ body {
 }
 
 /* Advanced CSS Tricks */
-.glass-morphism {
+/* Glassmorphism for light theme */
+.light .glass-morphism {
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   background-color: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.125);
+  border: 1px solid rgba(226, 232, 240, 0.3);
   box-shadow: 
-    0 8px 32px 0 rgba(31, 38, 135, 0.37),
+    0 8px 32px 0 rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Glassmorphism for dark theme */
+.dark .glass-morphism {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background-color: rgba(17, 17, 17, 0.75);
+  border: 1px solid rgba(55, 65, 81, 0.3);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .floating-animation {
@@ -93,7 +159,7 @@ body {
   position: absolute;
   inset: 2px;
   border-radius: inherit;
-  background: white;
+  background: var(--background);
   z-index: -1;
 }
 
@@ -121,8 +187,8 @@ body {
 .card-hover:hover {
   transform: translateY(-8px) scale(1.02);
   box-shadow: 
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(55, 65, 81, 0.3);
 }
 
 .button-glow {
@@ -155,7 +221,7 @@ body {
 
 .nested-border {
   border: 2px solid transparent;
-  background: linear-gradient(white, white) padding-box,
+  background: linear-gradient(var(--background), var(--background)) padding-box,
               linear-gradient(45deg, #10b981, #3b82f6) border-box;
 }
 
@@ -165,8 +231,15 @@ body {
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(148, 163, 184, 0.1);
+/* Light theme scrollbar */
+.light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.3);
+  border-radius: 4px;
+}
+
+/* Dark theme scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.3);
   border-radius: 4px;
 }
 
@@ -181,11 +254,11 @@ body {
 
 /* Selection styling */
 ::selection {
-  background: rgba(16, 185, 129, 0.2);
-  color: #064e3b;
+  background: rgba(16, 185, 129, 0.3);
+  color: #ededed;
 }
 
 ::-moz-selection {
-  background: rgba(16, 185, 129, 0.2);
-  color: #064e3b;
+  background: rgba(16, 185, 129, 0.3);
+  color: #ededed;
 }

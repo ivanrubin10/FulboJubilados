@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { formatDate } from '@/lib/utils';
 import { Game, User } from '@/types';
 import { useToast } from '@/components/ui/toast';
+import { useTheme } from '@/contexts/theme-context';
 
 // API helper functions
 const apiClient = {
@@ -34,6 +35,7 @@ const apiClient = {
 export default function HistoryPage() {
   const { user, isLoaded } = useUser();
   const { success, error } = useToast();
+  const { theme } = useTheme();
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -199,7 +201,7 @@ export default function HistoryPage() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-black">Cargando historial...</p>
+          <p className="text-foreground">Cargando historial...</p>
         </div>
       </div>
     );
@@ -213,26 +215,26 @@ export default function HistoryPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h1 className="text-2xl font-bold text-black mb-2">Historial de Partidos</h1>
-        <p className="text-black">Resultados y estadísticas de los partidos que jugaste</p>
-        <p className="text-sm text-slate-600 mt-1">📊 Los goles del equipo se les adjudican a todos los jugadores del equipo</p>
+      <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Historial de Partidos</h1>
+        <p className="text-foreground">Resultados y estadísticas de los partidos que jugaste</p>
+        <p className="text-sm text-muted-foreground mt-1">📊 Los goles del equipo se les adjudican a todos los jugadores del equipo</p>
       </div>
 
       {/* Partidos pendientes de resultado */}
       {confirmedGames.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-black mb-4">
+        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
             Partidos que necesitan resultado
           </h2>
           <div className="space-y-4">
             {confirmedGames.map(game => (
-              <div key={game.id} className="border border-gray-200 rounded-lg p-4">
+              <div key={game.id} className="border border-border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="font-semibold text-black">{formatDate(new Date(game.date))}</h3>
+                    <h3 className="font-semibold text-foreground">{formatDate(new Date(game.date))}</h3>
                     {game.reservationInfo && (
-                      <p className="text-sm text-black">
+                      <p className="text-sm text-foreground">
                         {game.reservationInfo.location} - {game.reservationInfo.time}
                       </p>
                     )}
@@ -250,17 +252,25 @@ export default function HistoryPage() {
 
                 {game.teams && (
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="bg-red-50 p-3 rounded">
-                      <h4 className="font-medium text-red-800 mb-2">Equipo 1</h4>
-                      <ul className="text-sm text-black">
+                    <div className={`p-3 rounded ${
+                      theme === 'dark' ? 'bg-red-950/40 border border-red-600/30' : 'bg-red-50'
+                    }`}>
+                      <h4 className={`font-medium mb-2 ${
+                        theme === 'dark' ? 'text-red-300' : 'text-red-800'
+                      }`}>Equipo 1</h4>
+                      <ul className="text-sm text-foreground">
                         {game.teams.team1.map(playerId => (
                           <li key={playerId}>{getPlayerName(playerId)}</li>
                         ))}
                       </ul>
                     </div>
-                    <div className="bg-blue-50 p-3 rounded">
-                      <h4 className="font-medium text-blue-800 mb-2">Equipo 2</h4>
-                      <ul className="text-sm text-black">
+                    <div className={`p-3 rounded ${
+                      theme === 'dark' ? 'bg-blue-950/40 border border-blue-600/30' : 'bg-blue-50'
+                    }`}>
+                      <h4 className={`font-medium mb-2 ${
+                        theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                      }`}>Equipo 2</h4>
+                      <ul className="text-sm text-foreground">
                         {game.teams.team2.map(playerId => (
                           <li key={playerId}>{getPlayerName(playerId)}</li>
                         ))}
@@ -271,10 +281,10 @@ export default function HistoryPage() {
 
                 {selectedGame === game.id && (
                   <div className="mt-4 border-t pt-4">
-                    <h4 className="font-medium mb-3 text-black">Agregar resultado</h4>
+                    <h4 className="font-medium mb-3 text-foreground">Agregar resultado</h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-medium text-black mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Goles Equipo 1
                         </label>
                         <input
@@ -286,11 +296,11 @@ export default function HistoryPage() {
                             team1Score: parseInt(e.target.value) || 0 
                           }))}
                           placeholder="0"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-black placeholder:text-gray-600"
+                          className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-black mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Goles Equipo 2
                         </label>
                         <input
@@ -302,18 +312,18 @@ export default function HistoryPage() {
                             team2Score: parseInt(e.target.value) || 0 
                           }))}
                           placeholder="0"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-black placeholder:text-gray-600"
+                          className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
                         />
                       </div>
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-black mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Notas (opcional)
                       </label>
                       <textarea
                         value={resultForm.notes}
                         onChange={(e) => setResultForm(prev => ({ ...prev, notes: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 placeholder:text-gray-600"
+                        className="w-full border border-border rounded-md px-3 py-2 placeholder:text-muted-foreground"
                         rows={3}
                         placeholder="Comentarios sobre el partido..."
                       />
@@ -327,7 +337,7 @@ export default function HistoryPage() {
                       </button>
                       <button
                         onClick={() => setSelectedGame(null)}
-                        className="bg-gray-300 text-black px-4 py-2 rounded-lg hover:bg-gray-400"
+                        className="bg-accent text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent/80"
                       >
                         Cancelar
                       </button>
@@ -341,8 +351,8 @@ export default function HistoryPage() {
       )}
 
       {/* Historial de partidos completados */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-black mb-4">
+      <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold text-foreground mb-4">
           Partidos jugados ({completedGames.length})
         </h2>
         
@@ -351,12 +361,12 @@ export default function HistoryPage() {
             {completedGames
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map(game => (
-                <div key={game.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={game.id} className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-semibold text-black">{formatDate(new Date(game.date))}</h3>
+                      <h3 className="font-semibold text-foreground">{formatDate(new Date(game.date))}</h3>
                       {game.reservationInfo && (
-                        <p className="text-sm text-black">
+                        <p className="text-sm text-foreground">
                           {game.reservationInfo.location} - {game.reservationInfo.time}
                         </p>
                       )}
@@ -364,10 +374,10 @@ export default function HistoryPage() {
                     
                     {game.result && (
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-black">
+                        <div className="text-2xl font-bold text-foreground">
                           {game.result.team1Score} - {game.result.team2Score}
                         </div>
-                        <div className="text-sm text-black">
+                        <div className="text-sm text-foreground">
                           {game.result.team1Score > game.result.team2Score 
                             ? 'Victoria Equipo 1' 
                             : game.result.team2Score > game.result.team1Score 
@@ -383,13 +393,15 @@ export default function HistoryPage() {
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div className={`p-3 rounded ${
                         game.result && game.result.team1Score > game.result.team2Score 
-                          ? 'bg-green-50 border border-green-200' 
-                          : 'bg-red-50'
+                          ? (theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200')
+                          : (theme === 'dark' ? 'bg-red-900/20 border border-red-500/30' : 'bg-red-50 border border-red-200')
                       }`}>
-                        <h4 className="font-medium text-red-800 mb-2">
+                        <h4 className={`font-medium mb-2 ${
+                          theme === 'dark' ? 'text-red-300' : 'text-red-700'
+                        }`}>
                           Equipo 1 {game.result && `(${game.result.team1Score})`}
                         </h4>
-                        <ul className="text-sm text-black">
+                        <ul className="text-sm text-foreground">
                           {game.teams.team1.map(playerId => (
                             <li key={playerId}>{getPlayerName(playerId)}</li>
                           ))}
@@ -397,13 +409,15 @@ export default function HistoryPage() {
                       </div>
                       <div className={`p-3 rounded ${
                         game.result && game.result.team2Score > game.result.team1Score 
-                          ? 'bg-green-50 border border-green-200' 
-                          : 'bg-blue-50'
+                          ? (theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200')
+                          : (theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200')
                       }`}>
-                        <h4 className="font-medium text-blue-800 mb-2">
+                        <h4 className={`font-medium mb-2 ${
+                          theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                        }`}>
                           Equipo 2 {game.result && `(${game.result.team2Score})`}
                         </h4>
-                        <ul className="text-sm text-black">
+                        <ul className="text-sm text-foreground">
                           {game.teams.team2.map(playerId => (
                             <li key={playerId}>{getPlayerName(playerId)}</li>
                           ))}
@@ -413,8 +427,8 @@ export default function HistoryPage() {
                   )}
 
                   {game.result?.notes && (
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="text-sm text-black">
+                    <div className="bg-accent/20 p-3 rounded">
+                      <p className="text-sm text-foreground">
                         <strong>Notas:</strong> {game.result.notes}
                       </p>
                     </div>
@@ -423,7 +437,7 @@ export default function HistoryPage() {
               ))}
           </div>
         ) : (
-          <p className="text-black text-center py-8">
+          <p className="text-foreground text-center py-8">
             Todavía no hay partidos jugados
           </p>
         )}
@@ -433,34 +447,34 @@ export default function HistoryPage() {
       {Object.keys(teamStats).length > 0 && (
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Ranking de Victorias */}
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-card rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">🏆</span>
-              <h2 className="text-xl font-semibold text-black">Top Ganadores</h2>
+              <h2 className="text-xl font-semibold text-foreground">Top Ganadores</h2>
             </div>
             <div className="space-y-3">
               {Object.entries(teamStats)
                 .sort(([,a], [,b]) => b.wins - a.wins)
                 .slice(0, 5)
                 .map(([playerId, stats], index) => (
-                  <div key={playerId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={playerId} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                        index === 1 ? 'bg-gray-100 text-black' :
-                        index === 2 ? 'bg-orange-100 text-orange-800' :
-                        'bg-blue-100 text-blue-800'
+                        index === 0 ? 'bg-yellow-600 text-yellow-100' :
+                        index === 1 ? 'bg-accent text-foreground' :
+                        index === 2 ? 'bg-orange-600 text-orange-100' :
+                        'bg-blue-600 text-blue-100'
                       }`}>
                         {index + 1}
                       </div>
                       <div>
-                        <p className="font-medium text-black">{stats.player.nickname || stats.player.name}</p>
-                        <p className="text-xs text-black">{stats.wins + stats.losses + stats.draws} partidos</p>
+                        <p className="font-medium text-foreground">{stats.player.nickname || stats.player.name}</p>
+                        <p className="text-xs text-foreground">{stats.wins + stats.losses + stats.draws} partidos</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-black">{stats.wins}</p>
-                      <p className="text-xs text-black">victorias</p>
+                      <p className="font-bold text-foreground">{stats.wins}</p>
+                      <p className="text-xs text-foreground">victorias</p>
                     </div>
                   </div>
                 ))}
@@ -468,10 +482,10 @@ export default function HistoryPage() {
           </div>
 
           {/* Mejores % de Victoria */}
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-card rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">📈</span>
-              <h2 className="text-xl font-semibold text-black">Mejor Efectividad</h2>
+              <h2 className="text-xl font-semibold text-foreground">Mejor Efectividad</h2>
             </div>
             <div className="space-y-3">
               {Object.entries(teamStats)
@@ -489,24 +503,24 @@ export default function HistoryPage() {
                   const winRate = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '0.0';
                   
                   return (
-                    <div key={playerId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={playerId} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                          index === 1 ? 'bg-gray-100 text-black' :
-                          index === 2 ? 'bg-orange-100 text-orange-800' :
-                          'bg-blue-100 text-blue-800'
+                          index === 0 ? 'bg-yellow-600 text-yellow-100' :
+                          index === 1 ? 'bg-accent text-foreground' :
+                          index === 2 ? 'bg-orange-600 text-orange-100' :
+                          'bg-blue-600 text-blue-100'
                         }`}>
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-medium text-black">{stats.player.nickname || stats.player.name}</p>
-                          <p className="text-xs text-black">{stats.wins}V - {stats.losses}D - {stats.draws}E</p>
+                          <p className="font-medium text-foreground">{stats.player.nickname || stats.player.name}</p>
+                          <p className="text-xs text-foreground">{stats.wins}V - {stats.losses}D - {stats.draws}E</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-black">{winRate}%</p>
-                        <p className="text-xs text-black">efectividad</p>
+                        <p className="font-bold text-foreground">{winRate}%</p>
+                        <p className="text-xs text-foreground">efectividad</p>
                       </div>
                     </div>
                   );
@@ -515,18 +529,30 @@ export default function HistoryPage() {
           </div>
 
           {/* Estadísticas Generales */}
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-card rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">📊</span>
-              <h2 className="text-xl font-semibold text-black">Estadísticas</h2>
+              <h2 className="text-xl font-semibold text-foreground">Estadísticas</h2>
             </div>
             <div className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-800">{completedGames.length}</p>
-                <p className="text-sm text-black">Partidos jugados</p>
+              <div className={`p-3 rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-blue-900/20 border border-blue-500/30' 
+                  : 'bg-blue-50 border border-blue-200'
+              }`}>
+                <p className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>{completedGames.length}</p>
+                <p className="text-sm text-foreground">Partidos jugados</p>
               </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-800">
+              <div className={`p-3 rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-green-900/20 border border-green-500/30' 
+                  : 'bg-green-50 border border-green-200'
+              }`}>
+                <p className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-green-300' : 'text-green-700'
+                }`}>
                   {completedGames.reduce((sum, game) => {
                     if (game.result) {
                       return sum + game.result.team1Score + game.result.team2Score;
@@ -534,10 +560,16 @@ export default function HistoryPage() {
                     return sum;
                   }, 0)}
                 </p>
-                <p className="text-sm text-black">Goles totales</p>
+                <p className="text-sm text-foreground">Goles totales</p>
               </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-800">
+              <div className={`p-3 rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-purple-900/20 border border-purple-500/30' 
+                  : 'bg-purple-50 border border-purple-200'
+              }`}>
+                <p className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
+                }`}>
                   {Math.round(completedGames.reduce((sum, game) => {
                     if (game.result) {
                       return sum + game.result.team1Score + game.result.team2Score;
@@ -545,13 +577,19 @@ export default function HistoryPage() {
                     return sum;
                   }, 0) / Math.max(completedGames.length, 1) * 10) / 10}
                 </p>
-                <p className="text-sm text-black">Goles por partido</p>
+                <p className="text-sm text-foreground">Goles por partido</p>
               </div>
-              <div className="p-3 bg-orange-50 rounded-lg">
-                <p className="text-2xl font-bold text-orange-800">
+              <div className={`p-3 rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-orange-900/20 border border-orange-500/30' 
+                  : 'bg-orange-50 border border-orange-200'
+              }`}>
+                <p className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-orange-300' : 'text-orange-700'
+                }`}>
                   {Object.keys(teamStats).length}
                 </p>
-                <p className="text-sm text-black">Jugadores activos</p>
+                <p className="text-sm text-foreground">Jugadores activos</p>
               </div>
             </div>
           </div>
@@ -560,23 +598,23 @@ export default function HistoryPage() {
 
       {/* Tabla detallada */}
       {Object.keys(teamStats).length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          <h2 className="text-xl font-semibold text-black mb-2">Estadísticas Detalladas</h2>
-          <p className="text-sm text-slate-600 mb-4">Los goles corresponden al equipo completo en cada partido</p>
+        <div className="bg-card rounded-lg shadow-md p-6 mt-6">
+          <h2 className="text-xl font-semibold text-foreground mb-2">Estadísticas Detalladas</h2>
+          <p className="text-sm text-muted-foreground mb-4">Los goles corresponden al equipo completo en cada partido</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b-2 border-gray-200">
-                  <th className="text-left py-3 px-2 text-black">Pos</th>
-                  <th className="text-left py-3 px-2 text-black">Jugador</th>
-                  <th className="text-center py-3 px-2 text-black">PJ</th>
-                  <th className="text-center py-3 px-2 text-black">V</th>
-                  <th className="text-center py-3 px-2 text-black">E</th>
-                  <th className="text-center py-3 px-2 text-black">D</th>
-                  <th className="text-center py-3 px-2 text-black" title="Goles a favor - Goles del equipo">GF</th>
-                  <th className="text-center py-3 px-2 text-black" title="Goles en contra - Goles del equipo rival">GC</th>
-                  <th className="text-center py-3 px-2 text-black">DG</th>
-                  <th className="text-center py-3 px-2 text-black">%</th>
+                <tr className="border-b-2 border-border">
+                  <th className="text-left py-3 px-2 text-foreground">Pos</th>
+                  <th className="text-left py-3 px-2 text-foreground">Jugador</th>
+                  <th className="text-center py-3 px-2 text-foreground">PJ</th>
+                  <th className="text-center py-3 px-2 text-foreground">V</th>
+                  <th className="text-center py-3 px-2 text-foreground">E</th>
+                  <th className="text-center py-3 px-2 text-foreground">D</th>
+                  <th className="text-center py-3 px-2 text-foreground" title="Goles a favor - Goles del equipo">GF</th>
+                  <th className="text-center py-3 px-2 text-foreground" title="Goles en contra - Goles del equipo rival">GC</th>
+                  <th className="text-center py-3 px-2 text-foreground">DG</th>
+                  <th className="text-center py-3 px-2 text-foreground">%</th>
                 </tr>
               </thead>
               <tbody>
@@ -598,11 +636,14 @@ export default function HistoryPage() {
                     const goalDiff = stats.goalsFor - stats.goalsAgainst;
                     
                     return (
-                      <tr key={playerId} className={`border-b hover:bg-gray-50 ${
-                        index < 3 ? 'bg-amber-50' : ''
+                      <tr key={playerId} className={`border-b hover:bg-accent/20 ${
+                        index < 3 ? (theme === 'dark' 
+                          ? 'bg-amber-900/20 border-l-4 border-l-amber-500' 
+                          : 'bg-amber-50 border-l-4 border-l-amber-400'
+                        ) : ''
                       }`}>
-                        <td className="py-3 px-2 font-medium text-black">{index + 1}</td>
-                        <td className="py-3 px-2 text-black">
+                        <td className="py-3 px-2 font-medium text-foreground">{index + 1}</td>
+                        <td className="py-3 px-2 text-foreground">
                           <div className="flex items-center gap-2">
                             {stats.player.imageUrl && (
                               <img 
@@ -611,26 +652,26 @@ export default function HistoryPage() {
                                 className="w-6 h-6 rounded-full"
                               />
                             )}
-                            <span className="font-medium text-black">{stats.player.nickname || stats.player.name}</span>
+                            <span className="font-medium text-foreground">{stats.player.nickname || stats.player.name}</span>
                           </div>
                         </td>
-                        <td className="text-center py-3 px-2 text-black">{total}</td>
-                        <td className="text-center py-3 px-2 text-black font-semibold">{stats.wins}</td>
-                        <td className="text-center py-3 px-2 text-black">{stats.draws}</td>
-                        <td className="text-center py-3 px-2 text-black">{stats.losses}</td>
-                        <td className="text-center py-3 px-2 text-black">{stats.goalsFor}</td>
-                        <td className="text-center py-3 px-2 text-black">{stats.goalsAgainst}</td>
-                        <td className="text-center py-3 px-2 font-medium text-black">
+                        <td className="text-center py-3 px-2 text-foreground">{total}</td>
+                        <td className="text-center py-3 px-2 text-foreground font-semibold">{stats.wins}</td>
+                        <td className="text-center py-3 px-2 text-foreground">{stats.draws}</td>
+                        <td className="text-center py-3 px-2 text-foreground">{stats.losses}</td>
+                        <td className="text-center py-3 px-2 text-foreground">{stats.goalsFor}</td>
+                        <td className="text-center py-3 px-2 text-foreground">{stats.goalsAgainst}</td>
+                        <td className="text-center py-3 px-2 font-medium text-foreground">
                           {goalDiff > 0 ? '+' : ''}{goalDiff}
                         </td>
-                        <td className="text-center py-3 px-2 font-semibold text-black">{winRate}%</td>
+                        <td className="text-center py-3 px-2 font-semibold text-foreground">{winRate}%</td>
                       </tr>
                     );
                   })}
               </tbody>
             </table>
           </div>
-          <div className="mt-4 text-xs text-black">
+          <div className="mt-4 text-xs text-foreground">
             <p><strong>PJ:</strong> Partidos Jugados, <strong>V:</strong> Victorias, <strong>E:</strong> Empates, <strong>D:</strong> Derrotas</p>
             <p><strong>GF:</strong> Goles a Favor, <strong>GC:</strong> Goles en Contra, <strong>DG:</strong> Diferencia de Goles, <strong>%:</strong> Porcentaje de Victorias</p>
           </div>
@@ -677,20 +718,26 @@ export default function HistoryPage() {
           .slice(0, 5); // Top 5
         
         return playersWithAbsences.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+          <div className="bg-card rounded-lg shadow-md p-6 mt-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">💀</span>
-              <h2 className="text-xl font-semibold text-black">Hall of Shame</h2>
-              <span className="text-sm text-black opacity-70">(Jugadores con más ausencias)</span>
+              <h2 className="text-xl font-semibold text-foreground">Hall of Shame</h2>
+              <span className="text-sm text-foreground opacity-70">(Jugadores con más ausencias)</span>
             </div>
             <div className="space-y-3">
               {playersWithAbsences.map((data, index) => {
                 const attendanceRate = data.totalGames > 0 ? ((data.attended / data.totalGames) * 100).toFixed(1) : '0.0';
                 
                 return (
-                  <div key={data.player.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                  <div key={data.player.id} className={`flex items-center justify-between p-3 rounded-lg ${
+                    theme === 'dark' 
+                      ? 'bg-red-900/20 border border-red-500/30' 
+                      : 'bg-red-50 border border-red-200'
+                  }`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-red-100 text-red-800">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        theme === 'dark' ? 'bg-red-600 text-red-100' : 'bg-red-500 text-red-50'
+                      }`}>
                         {index + 1}
                       </div>
                       <div className="flex items-center gap-2">
@@ -702,16 +749,18 @@ export default function HistoryPage() {
                           />
                         )}
                         <div>
-                          <p className="font-medium text-black">{data.player.nickname || data.player.name}</p>
-                          <p className="text-xs text-black">
+                          <p className="font-medium text-foreground">{data.player.nickname || data.player.name}</p>
+                          <p className="text-xs text-foreground">
                             {data.attended}/{data.totalGames} partidos - {attendanceRate}% asistencia
                           </p>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-red-700">{data.absences}</p>
-                      <p className="text-xs text-black">ausencias</p>
+                      <p className={`font-bold ${
+                        theme === 'dark' ? 'text-red-300' : 'text-red-600'
+                      }`}>{data.absences}</p>
+                      <p className="text-xs text-foreground">ausencias</p>
                     </div>
                   </div>
                 );

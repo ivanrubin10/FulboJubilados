@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
             hasVoted: votingStatus.hasVoted
           });
         }
-      } catch (error) {
+      } catch {
         // Skip users without availability
       }
     }

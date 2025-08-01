@@ -1,44 +1,16 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
-import { useState, useEffect, useCallback } from 'react';
-import { User as UserIcon, Edit2, Save, X, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
-import { User, Game } from '@/types';
+import { useState, useEffect } from 'react';
+import { Edit2, Save, X, Sun, Moon, User as UserIcon, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
+import { useTheme } from '@/contexts/theme-context';
 import { useToast } from '@/components/ui/toast';
+import { User, Game } from '@/types';
 
-const apiClient = {
-  async getUserById(id: string) {
-    const res = await fetch(`/api/users/${id}`);
-    if (!res.ok) throw new Error('Failed to fetch user');
-    const user = await res.json();
-    return user === null ? undefined : user;
-  },
-  
-  async updateUser(user: User) {
-    const res = await fetch('/api/users', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(user)
-    });
-    if (!res.ok) throw new Error('Failed to update user');
-    return res.json();
-  },
-
-  async getGames() {
-    const res = await fetch('/api/games');
-    if (!res.ok) throw new Error('Failed to fetch games');
-    return res.json();
-  },
-
-  async getUsers() {
-    const res = await fetch('/api/users');
-    if (!res.ok) throw new Error('Failed to fetch users');
-    return res.json();
-  }
-};
-
-export default function ProfilePage() {
+const ProfilePage = () => {
   const { user, isLoaded } = useUser();
+  const { theme, toggleTheme } = useTheme();
   const { success, error } = useToast();
   const [dbUser, setDbUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,34 +18,40 @@ export default function ProfilePage() {
   const [newNickname, setNewNickname] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [playerStats, setPlayerStats] = useState<{
-    wins: number;
-    losses: number;
-    draws: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    totalGames: number;
-    winRate: number;
-    goalDifference: number;
-  } | null>(null);
+  const [playerStats, setPlayerStats] = useState({
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    totalGames: 0,
+    winRate: 0,
+    goalDifference: 0
+  });
 
+
+  // Fetch user data and games
   useEffect(() => {
     const fetchData = async () => {
       if (!isLoaded || !user) return;
       
       setIsLoading(true);
       try {
-        const [userData, gamesData, usersData] = await Promise.all([
-          apiClient.getUserById(user.id),
-          apiClient.getGames(),
-          apiClient.getUsers()
+        const [userRes, gamesRes] = await Promise.all([
+          fetch(`/api/users/${user.id}`),
+          fetch('/api/games')
         ]);
         
-        setDbUser(userData);
-        setNewNickname(userData?.nickname || '');
-        setGames(gamesData);
-        setUsers(usersData);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setDbUser(userData);
+          setNewNickname(userData?.nickname || '');
+        }
+        
+        if (gamesRes.ok) {
+          const gamesData = await gamesRes.json();
+          setGames(gamesData);
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
         error('Error al cargar tu perfil');
@@ -85,8 +63,9 @@ export default function ProfilePage() {
     fetchData();
   }, [isLoaded, user, error]);
 
-  const calculatePlayerStats = useCallback(() => {
-    if (!user) return;
+  // Calculate player statistics - simple approach without useCallback
+  useEffect(() => {
+    if (!user || !games.length) return;
 
     const completedGames = games.filter(game => 
       game.status === 'completed' && 
@@ -95,16 +74,11 @@ export default function ProfilePage() {
       (game.teams.team1.includes(user.id) || game.teams.team2.includes(user.id))
     );
 
-    const stats = {
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      goalsFor: 0,
-      goalsAgainst: 0,
-      totalGames: 0,
-      winRate: 0,
-      goalDifference: 0
-    };
+    let wins = 0;
+    let losses = 0;
+    let draws = 0;
+    let goalsFor = 0;
+    let goalsAgainst = 0;
 
     completedGames.forEach(game => {
       if (!game.teams || !game.result) return;
@@ -116,46 +90,48 @@ export default function ProfilePage() {
       
       if (!isInTeam1 && !isInTeam2) return;
 
-      stats.totalGames++;
-      
       if (team1Score > team2Score) {
         if (isInTeam1) {
-          stats.wins++;
-          stats.goalsFor += team1Score;
-          stats.goalsAgainst += team2Score;
+          wins++;
+          goalsFor += team1Score;
+          goalsAgainst += team2Score;
         } else {
-          stats.losses++;
-          stats.goalsFor += team2Score;
-          stats.goalsAgainst += team1Score;
+          losses++;
+          goalsFor += team2Score;
+          goalsAgainst += team1Score;
         }
       } else if (team2Score > team1Score) {
         if (isInTeam2) {
-          stats.wins++;
-          stats.goalsFor += team2Score;
-          stats.goalsAgainst += team1Score;
+          wins++;
+          goalsFor += team2Score;
+          goalsAgainst += team1Score;
         } else {
-          stats.losses++;
-          stats.goalsFor += team1Score;
-          stats.goalsAgainst += team2Score;
+          losses++;
+          goalsFor += team1Score;
+          goalsAgainst += team2Score;
         }
       } else {
-        stats.draws++;
-        stats.goalsFor += isInTeam1 ? team1Score : team2Score;
-        stats.goalsAgainst += isInTeam1 ? team2Score : team1Score;
+        draws++;
+        goalsFor += isInTeam1 ? team1Score : team2Score;
+        goalsAgainst += isInTeam1 ? team2Score : team1Score;
       }
     });
 
-    stats.winRate = stats.totalGames > 0 ? (stats.wins / stats.totalGames) * 100 : 0;
-    stats.goalDifference = stats.goalsFor - stats.goalsAgainst;
+    const totalGames = completedGames.length;
+    const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
+    const goalDifference = goalsFor - goalsAgainst;
 
-    setPlayerStats(stats);
+    setPlayerStats({
+      wins,
+      losses,
+      draws,
+      goalsFor,
+      goalsAgainst,
+      totalGames,
+      winRate,
+      goalDifference
+    });
   }, [user, games]);
-
-  useEffect(() => {
-    if (user && games.length > 0 && users.length > 0) {
-      calculatePlayerStats();
-    }
-  }, [user, games, users, calculatePlayerStats]);
 
   const handleSave = async () => {
     if (!dbUser || !newNickname.trim()) return;
@@ -163,10 +139,19 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       const updatedUser = { ...dbUser, nickname: newNickname.trim() };
-      await apiClient.updateUser(updatedUser);
-      setDbUser(updatedUser);
-      setIsEditing(false);
-      success('Apodo actualizado correctamente');
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser)
+      });
+      
+      if (res.ok) {
+        setDbUser(updatedUser);
+        setIsEditing(false);
+        success('Apodo actualizado correctamente');
+      } else {
+        throw new Error('Failed to update');
+      }
     } catch (err) {
       console.error('Error updating nickname:', err);
       error('Error al actualizar tu apodo');
@@ -180,12 +165,14 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
+
+
   if (!isLoaded || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando tu perfil...</p>
+          <p className="text-muted-foreground">Cargando tu perfil...</p>
         </div>
       </div>
     );
@@ -194,22 +181,22 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <p className="text-gray-600">No se pudo cargar tu usuario</p>
+        <p className="text-muted-foreground">No se pudo cargar tu usuario</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-500 to-sky-500 px-8 py-6">
+      <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
+        <div className={`px-8 py-6 ${theme === 'dark' ? 'bg-gradient-to-r from-emerald-900 to-sky-900' : 'bg-gradient-to-r from-emerald-500 to-sky-500'}`}>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+            <div className="w-16 h-16 bg-card/20 rounded-2xl flex items-center justify-center">
               <UserIcon className="h-8 w-8 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Tu Perfil</h1>
-              <p className="text-emerald-100">Acá podés gestionar tu información</p>
+              <p className={theme === 'dark' ? 'text-emerald-200' : 'text-emerald-100'}>Acá podés gestionar tu información</p>
             </div>
           </div>
         </div>
@@ -222,7 +209,7 @@ export default function ProfilePage() {
                 <img
                   src={user.imageUrl}
                   alt="Foto de perfil"
-                  className="w-24 h-24 rounded-full border-4 border-emerald-200"
+                  className={`w-24 h-24 rounded-full border-4 ${theme === 'dark' ? 'border-emerald-600' : 'border-emerald-300'}`}
                 />
               </div>
             )}
@@ -230,37 +217,41 @@ export default function ProfilePage() {
             {/* User Info */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-muted-foreground">
                   Tu nombre completo
                 </label>
-                <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900">
+                <div className="px-4 py-3 bg-accent/20 border border-border rounded-xl text-foreground">
                   {user.fullName || user.firstName || 'Sin nombre'}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-muted-foreground">
                   Tu email
                 </label>
-                <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900">
+                <div className="px-4 py-3 bg-accent/20 border border-border rounded-xl text-foreground">
                   {user.emailAddresses[0]?.emailAddress || 'Sin email'}
                 </div>
               </div>
 
               {/* Nickname - Editable */}
               <div className="md:col-span-2 space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-muted-foreground">
                   Tu apodo
                 </label>
                 
                 {!isEditing ? (
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="text-slate-900 font-medium">
+                  <div className="flex items-center justify-between px-4 py-3 bg-accent/20 border border-border rounded-xl">
+                    <span className="text-foreground font-medium">
                       {dbUser?.nickname || 'Sin apodo'}
                     </span>
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className={`flex items-center gap-2 px-3 py-1 text-sm rounded-lg transition-colors ${
+                        theme === 'dark' 
+                          ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20' 
+                          : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
+                      }`}
                     >
                       <Edit2 className="h-4 w-4" />
                       Editar
@@ -272,7 +263,7 @@ export default function ProfilePage() {
                       type="text"
                       value={newNickname}
                       onChange={(e) => setNewNickname(e.target.value.substring(0, 10))}
-                      className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900"
+                      className="flex-1 px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-foreground bg-background"
                       placeholder="Tu apodo"
                       maxLength={10}
                       disabled={isSaving}
@@ -298,7 +289,7 @@ export default function ProfilePage() {
                       <button
                         onClick={handleCancel}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-accent text-muted-foreground rounded-lg hover:bg-accent/80 disabled:opacity-50 transition-colors"
                       >
                         <X className="h-4 w-4" />
                         Cancelar
@@ -307,26 +298,30 @@ export default function ProfilePage() {
                   </div>
                 )}
                 
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Así te van a ver en los partidos y la lista de jugadores (máximo 10 caracteres)
                 </p>
               </div>
 
               {/* Account Status */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-muted-foreground">
                   Estado de tu cuenta
                 </label>
                 <div className="flex gap-2">
                   {dbUser?.isAdmin && (
-                    <span className="px-3 py-1 bg-red-100 text-red-700 text-sm rounded-full font-medium">
+                    <span className={`px-3 py-1 text-sm rounded-full font-medium ${
+                      theme === 'dark' 
+                        ? 'bg-red-900/40 text-red-300' 
+                        : 'bg-red-100 text-red-700'
+                    }`}>
                       Administrador
                     </span>
                   )}
                   <span className={`px-3 py-1 text-sm rounded-full font-medium ${
                     dbUser?.isWhitelisted 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-yellow-100 text-yellow-700'
+                      ? (theme === 'dark' ? 'bg-green-900/40 text-green-300' : 'bg-green-100 text-green-700')
+                      : (theme === 'dark' ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-100 text-yellow-700')
                   }`}>
                     {dbUser?.isWhitelisted ? 'Autorizado' : 'Esperando autorización'}
                   </span>
@@ -334,10 +329,10 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-muted-foreground">
                   Jugando desde
                 </label>
-                <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900">
+                <div className="px-4 py-3 bg-accent/20 border border-border rounded-xl text-foreground">
                   {dbUser?.createdAt 
                     ? new Date(dbUser.createdAt).toLocaleDateString('es-ES', {
                         year: 'numeric',
@@ -353,17 +348,82 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Player Statistics */}
-      {playerStats && (
-        <div className="mt-8 bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-8 py-6">
+      {/* Theme Settings */}
+      <div className="mt-8 bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
+        <div className={`px-8 py-6 ${theme === 'dark' ? 'bg-gradient-to-r from-purple-900 to-indigo-900' : 'bg-gradient-to-r from-purple-500 to-indigo-500'}`}>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-card/20 rounded-2xl flex items-center justify-center">
+              {theme === 'dark' ? (
+                <Moon className="h-8 w-8 text-white" />
+              ) : (
+                <Sun className="h-8 w-8 text-white" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Configuración de Tema</h2>
+              <p className={theme === 'dark' ? 'text-purple-200' : 'text-purple-100'}>Personaliza la apariencia de la aplicación</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8">
+          <div className="flex items-center justify-between p-6 bg-accent/20 rounded-xl border border-border">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                theme === 'dark' ? 'bg-slate-700' : 'bg-amber-100'
+              }`}>
+                {theme === 'dark' ? (
+                  <Moon className="h-6 w-6 text-slate-300" />
+                ) : (
+                  <Sun className="h-6 w-6 text-amber-600" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">
+                  Modo {theme === 'dark' ? 'Oscuro' : 'Claro'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {theme === 'dark' 
+                    ? 'Interfaz oscura para reducir la fatiga visual' 
+                    : 'Interfaz clara y brillante'
+                  }
+                </p>
+              </div>
+            </div>
+            
+            <button
+              onClick={toggleTheme}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${
+                theme === 'dark' ? 'bg-primary' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          
+          <div className="mt-4 p-4 bg-muted/20 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              💡 <strong>Tip:</strong> El modo oscuro puede ayudar a reducir la fatiga visual durante sesiones largas y ahorra batería en pantallas OLED.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Player Statistics */}
+      {playerStats.totalGames > 0 && (
+        <div className="mt-8 bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
+          <div className={`px-8 py-6 ${theme === 'dark' ? 'bg-gradient-to-r from-slate-700 to-slate-800' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`}>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-card/10 rounded-2xl flex items-center justify-center">
                 <Trophy className="h-8 w-8 text-white" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white">Tus Estadísticas</h2>
-                <p className="text-slate-300">Tu rendimiento en los partidos • Los goles del equipo se adjudican a todos</p>
+                <p className={theme === 'dark' ? 'text-slate-300' : 'text-slate-100'}>Tu rendimiento en los partidos • Los goles del equipo se adjudican a todos</p>
               </div>
             </div>
           </div>
@@ -371,122 +431,153 @@ export default function ProfilePage() {
           <div className="p-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
               {/* Total Games */}
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <Calendar className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-slate-800">{playerStats.totalGames}</div>
-                <div className="text-sm text-slate-600 font-medium">Partidos</div>
+              <div className="text-center p-4 bg-accent/20 rounded-xl border border-border">
+                <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <div className="text-2xl font-bold text-foreground">{playerStats.totalGames}</div>
+                <div className="text-sm text-muted-foreground font-medium">Partidos</div>
               </div>
 
               {/* Win Rate */}
-              <div className="text-center p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <TrendingUp className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-emerald-700">{playerStats.winRate.toFixed(1)}%</div>
-                <div className="text-sm text-emerald-600 font-medium">% Victoria</div>
+              <div className={`text-center p-4 rounded-xl ${
+                theme === 'dark' 
+                  ? 'bg-emerald-950/40 border border-emerald-600/30' 
+                  : 'bg-emerald-50 border border-emerald-200'
+              }`}>
+                <TrendingUp className={`h-8 w-8 mx-auto mb-2 ${
+                  theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600'
+                }`} />
+                <div className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-emerald-200' : 'text-emerald-700'
+                }`}>{playerStats.winRate.toFixed(1)}%</div>
+                <div className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600'
+                }`}>% Victoria</div>
               </div>
 
               {/* Goal Difference */}
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <Target className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                <div className={`text-2xl font-bold ${playerStats.goalDifference >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+              <div className="text-center p-4 bg-accent/20 rounded-xl border border-border">
+                <Target className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <div className={`text-2xl font-bold ${playerStats.goalDifference >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
                   {playerStats.goalDifference >= 0 ? '+' : ''}{playerStats.goalDifference}
                 </div>
-                <div className="text-sm text-slate-600 font-medium">Diferencia</div>
+                <div className="text-sm text-muted-foreground font-medium">Diferencia</div>
               </div>
 
               {/* Goals */}
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <Trophy className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-slate-800">{playerStats.goalsFor}</div>
-                <div className="text-sm text-slate-600 font-medium">Goles</div>
+              <div className="text-center p-4 bg-accent/20 rounded-xl border border-border">
+                <Trophy className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <div className="text-2xl font-bold text-foreground">{playerStats.goalsFor}</div>
+                <div className="text-sm text-muted-foreground font-medium">Goles</div>
               </div>
             </div>
 
             {/* Detailed Stats */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Tu Récord</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Tu Récord</h3>
                 
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-                      <span className="font-medium text-slate-800">Victorias</span>
+                      <span className="font-medium text-foreground">Victorias</span>
                     </div>
-                    <span className="text-xl font-bold text-emerald-600">{playerStats.wins}</span>
+                    <span className="text-xl font-bold text-emerald-400">{playerStats.wins}</span>
                   </div>
 
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-slate-400 rounded-full"></div>
-                      <span className="font-medium text-slate-800">Empates</span>
+                      <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
+                      <span className="font-medium text-foreground">Empates</span>
                     </div>
-                    <span className="text-xl font-bold text-slate-600">{playerStats.draws}</span>
+                    <span className="text-xl font-bold text-muted-foreground">{playerStats.draws}</span>
                   </div>
 
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                      <span className="font-medium text-slate-800">Derrotas</span>
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="font-medium text-foreground">Derrotas</span>
                     </div>
-                    <span className="text-xl font-bold text-red-500">{playerStats.losses}</span>
+                    <span className="text-xl font-bold text-red-400">{playerStats.losses}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Estadísticas de Goles</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Estadísticas de Goles</h3>
                 
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-slate-600 rounded-full"></div>
-                      <div>
-                        <span className="font-medium text-slate-800">Goles a favor</span>
-                        <p className="text-xs text-slate-500">Goles que hizo tu equipo</p>
-                      </div>
-                    </div>
-                    <span className="text-xl font-bold text-slate-700">{playerStats.goalsFor}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-slate-400 rounded-full"></div>
                       <div>
-                        <span className="font-medium text-slate-800">Goles en contra</span>
-                        <p className="text-xs text-slate-500">Goles que te hicieron</p>
+                        <span className="font-medium text-foreground">Goles a favor</span>
+                        <p className="text-xs text-muted-foreground">Goles que hizo tu equipo</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold text-slate-600">{playerStats.goalsAgainst}</span>
+                    <span className="text-xl font-bold text-muted-foreground">{playerStats.goalsFor}</span>
                   </div>
 
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
+                      <div>
+                        <span className="font-medium text-foreground">Goles en contra</span>
+                        <p className="text-xs text-muted-foreground">Goles que te hicieron</p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-bold text-muted-foreground">{playerStats.goalsAgainst}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
                       <div>
-                        <span className="font-medium text-slate-800">Promedio por partido</span>
-                        <p className="text-xs text-slate-500">Goles que hizo tu equipo por partido</p>
+                        <span className="font-medium text-foreground">Promedio por partido</span>
+                        <p className="text-xs text-muted-foreground">Goles que hizo tu equipo por partido</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold text-emerald-600">
+                    <span className="text-xl font-bold text-emerald-400">
                       {playerStats.totalGames > 0 ? (playerStats.goalsFor / playerStats.totalGames).toFixed(1) : '0.0'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            {playerStats.totalGames === 0 && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Trophy className="h-8 w-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-600 mb-2">Todavía no tenés estadísticas</h3>
-                <p className="text-slate-500">Metete en algunos partidos para ver tu rendimiento acá</p>
+      {/* No Stats Message */}
+      {playerStats.totalGames === 0 && (
+        <div className="mt-8 bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
+          <div className={`px-8 py-6 ${theme === 'dark' ? 'bg-gradient-to-r from-slate-700 to-slate-800' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`}>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-card/10 rounded-2xl flex items-center justify-center">
+                <Trophy className="h-8 w-8 text-white" />
               </div>
-            )}
+              <div>
+                <h2 className="text-2xl font-bold text-white">Tus Estadísticas</h2>
+                <p className={theme === 'dark' ? 'text-slate-300' : 'text-slate-100'}>Tu rendimiento en los partidos</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Trophy className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-muted-foreground mb-2">Todavía no tenés estadísticas</h3>
+              <p className="text-muted-foreground">Metete en algunos partidos para ver tu rendimiento acá</p>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-}
+};
+
+export default dynamic(() => Promise.resolve(ProfilePage), {
+  ssr: false,
+});

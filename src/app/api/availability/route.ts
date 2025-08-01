@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
                 hasVoted: votingStatus.hasVoted
               });
             }
-          } catch (error) {
+          } catch {
             // Skip users without availability
           }
         }
@@ -188,7 +188,7 @@ async function checkAndCreateGamesForFullSundays(month: number, year: number, ne
             hasVoted: votingStatus.hasVoted
           });
         }
-      } catch (error) {
+      } catch {
         // User doesn't have availability in DB, skip
       }
     }
