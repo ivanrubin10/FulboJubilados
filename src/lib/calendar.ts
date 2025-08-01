@@ -24,7 +24,8 @@ export class CalendarService {
     gameDate: Date,
     participants: User[],
     customTime: string = '10:00',
-    location?: string
+    location?: string,
+    mapsLink?: string
   ): Promise<string | null> {
     try {
       // Parse custom time
@@ -42,7 +43,7 @@ export class CalendarService {
         description: `Partido organizado automáticamente con ${participants.length} jugadores.\n\nParticipantes:\n${participants.map(p => `• ${p.name} (${p.email})`).join('\n')}`,
         startTime,
         endTime,
-        location: location || 'Cancha por definir',
+        location: mapsLink ? `${location || 'Cancha por definir'} - ${mapsLink}` : (location || 'Cancha por definir'),
         attendees: participants.map(p => p.email)
       };
 

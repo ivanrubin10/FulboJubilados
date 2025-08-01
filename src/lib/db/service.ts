@@ -4,7 +4,6 @@ import { eq, and, desc, gte } from 'drizzle-orm';
 import type { User } from '@/types';
 import type { Game, AdminNotification, NewGame, NewAdminNotification } from './schema';
 import { calendarService } from '../calendar';
-import { notificationService } from '../notifications';
 import { emailService } from '../email';
 import { getCapitalizedMonthYear } from '../utils';
 
@@ -14,6 +13,8 @@ interface ReservationInfo {
   time: string;
   cost?: number;
   reservedBy: string;
+  mapsLink?: string;
+  paymentAlias?: string;
 }
 
 export class DatabaseService {
@@ -491,7 +492,8 @@ export class DatabaseService {
       game.date,
       participants,
       customTime,
-      reservationInfo?.location
+      reservationInfo?.location,
+      reservationInfo?.mapsLink
     );
     console.log('📅 Calendar event ID:', calendarEventId);
 
@@ -516,21 +518,8 @@ export class DatabaseService {
     await this.updateGame(gameId, updateData);
     console.log('✅ Game updated successfully');
 
-    // Notify all participants about the confirmed match
-    console.log('📧 Sending match confirmation notifications...');
-    try {
-      await notificationService.notifyMatchConfirmed(
-        game.date,
-        participants,
-        customTime,
-        reservationInfo,
-        calendarEventId || undefined
-      );
-      console.log('✅ Notifications sent successfully');
-    } catch (notificationError) {
-      console.error('❌ Error sending notifications:', notificationError);
-      // Don't fail the confirmation if notifications fail
-    }
+    // Note: Match confirmation emails are now sent manually through the admin panel via /api/send-match-confirmation
+    console.log('✅ Game confirmed successfully. Admins can now send match confirmation emails manually.');
     
     console.log('🎉 Game confirmation completed successfully');
   }
@@ -595,6 +584,126 @@ export class DatabaseService {
     }
   }
 
+  static async checkAndNotifyAdminsForSpecificGame(gameId: string): Promise<void> {
+    try {
+      console.log(`🔔 checkAndNotifyAdminsForSpecificGame called for game ${gameId}`);
+      
+      // Get the specific game
+      const game = await this.getGame(gameId);
+      if (!game) {
+        console.log(`❌ Game ${gameId} not found`);
+        return;
+      }
+      
+      console.log(`🎮 Processing game ${game.id} with ${game.participants.length} participants`);
+      
+      // Check if we should send notification (not sent yet or timeout has passed)
+      const adminNotificationSent = game.adminNotificationSent || false;
+      const shouldNotify = !adminNotificationSent || 
+        (game.adminNotificationTimeout && new Date() > new Date(game.adminNotificationTimeout));
+      
+      console.log(`📋 Should notify: ${shouldNotify} (notification sent: ${adminNotificationSent})`);
+      
+      if (shouldNotify && game.participants.length >= 10) {
+        console.log(`📧 Creating admin notification for game ${game.id}`);
+        // Create admin notification in database
+        await this.createAdminNotification({
+          type: 'match_ready',
+          gameId: game.id,
+          message: `Match ready with ${game.participants.length} players on ${new Date(game.date).toLocaleDateString('es-ES')}`,
+          actionRequired: true,
+          isRead: false
+        });
+
+        // Send email to all admin users
+        try {
+          console.log('🔍 Starting email sending process...');
+          const adminUsers = await db.select().from(users).where(eq(users.isAdmin, true));
+          console.log(`📊 Found ${adminUsers.length} admin users in database`);
+          console.log(`👥 Admin users:`, adminUsers.map(u => ({ id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin })));
+          
+          const adminEmails = adminUsers.map(admin => admin.email);
+          
+          if (adminEmails.length > 0) {
+            console.log(`📧 Attempting to send admin emails to: ${adminEmails.join(', ')}`);
+            
+            // Check if RESEND_API_KEY is available
+            const hasApiKey = !!process.env.RESEND_API_KEY;
+            console.log(`🔑 RESEND_API_KEY configured: ${hasApiKey}`);
+            console.log(`📮 FROM_EMAIL configured: ${process.env.FROM_EMAIL || 'not set'}`);
+            
+            const emailSent = await emailService.sendAdminMatchReadyNotification(
+              adminEmails,
+              game.date,
+              game.participants.length
+            );
+
+            if (emailSent) {
+              console.log('✅ Admin emails sent successfully');
+            } else {
+              console.error('❌ Failed to send admin emails - check email service logs');
+            }
+          } else {
+            console.log('⚠️ No admin users found to notify');
+          }
+        } catch (emailError) {
+          console.error('❌ Error sending admin emails:', emailError);
+          console.error('❌ Email error stack:', emailError instanceof Error ? emailError.stack : 'No stack trace');
+        }
+
+        // Update game to mark notification as sent and set timeout (24 hours)
+        const timeout = new Date();
+        timeout.setHours(timeout.getHours() + 24);
+        
+        await this.updateGame(game.id, {
+          adminNotificationSent: true,
+          adminNotificationTimeout: timeout
+        });
+      }
+    } catch (error) {
+      console.error('Error checking and notifying admins for specific game:', error);
+    }
+  }
+
+  static async cleanUpGamesWithNonWhitelistedUsers(): Promise<{ updated: number, details: string[] }> {
+    try {
+      console.log('🧹 Checking for games with non-whitelisted participants...');
+      
+      const allGames = await this.getAllGames();
+      const allUsers = await this.getUsers();
+      const whitelistedUserIds = new Set(allUsers.filter(u => u.isWhitelisted).map(u => u.id));
+      
+      let updatedCount = 0;
+      const details: string[] = [];
+      
+      for (const game of allGames) {
+        const originalParticipantCount = game.participants.length;
+        const cleanedParticipants = game.participants.filter(participantId => 
+          whitelistedUserIds.has(participantId)
+        );
+        
+        if (cleanedParticipants.length !== originalParticipantCount) {
+          const removedCount = originalParticipantCount - cleanedParticipants.length;
+          console.log(`🎮 Game ${game.id}: Removing ${removedCount} non-whitelisted participants`);
+          
+          await this.updateGame(game.id, {
+            participants: cleanedParticipants,
+            updatedAt: new Date()
+          });
+          
+          updatedCount++;
+          details.push(`Game ${game.id} (${new Date(game.date).toLocaleDateString()}): ${removedCount} participants removed`);
+        }
+      }
+      
+      console.log(`✅ Cleanup completed: ${updatedCount} games updated`);
+      return { updated: updatedCount, details };
+    } catch (error) {
+      console.error('Error cleaning up games:', error);
+      throw error;
+    }
+  }
+
   static async checkAndNotifyAdminsForFullGames(): Promise<void> {
     try {
       console.log('🔔 checkAndNotifyAdminsForFullGames called');
@@ -604,72 +713,7 @@ export class DatabaseService {
       console.log(`📊 Found ${fullGames.length} games with full participants`);
       
       for (const game of fullGames) {
-        console.log(`🎮 Processing game ${game.id} with ${game.participants.length} participants`);
-        
-        // Check if we should send notification (not sent yet or timeout has passed)
-        // Handle missing columns gracefully
-        const adminNotificationSent = game.adminNotificationSent || false;
-        const shouldNotify = !adminNotificationSent || 
-          (game.adminNotificationTimeout && new Date() > new Date(game.adminNotificationTimeout));
-        
-        console.log(`📋 Should notify: ${shouldNotify} (notification sent: ${adminNotificationSent})`);
-        
-        if (shouldNotify && game.participants.length >= 10) {
-          console.log(`📧 Creating admin notification for game ${game.id}`);
-          // Create admin notification in database
-          await this.createAdminNotification({
-            type: 'match_ready',
-            gameId: game.id,
-            message: `Match ready with ${game.participants.length} players on ${new Date(game.date).toLocaleDateString('es-ES')}`,
-            actionRequired: true,
-            isRead: false
-          });
-
-          // Send email to all admin users
-          try {
-            console.log('🔍 Starting email sending process...');
-            const adminUsers = await db.select().from(users).where(eq(users.isAdmin, true));
-            console.log(`📊 Found ${adminUsers.length} admin users in database`);
-            console.log(`👥 Admin users:`, adminUsers.map(u => ({ id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin })));
-            
-            const adminEmails = adminUsers.map(admin => admin.email);
-            
-            if (adminEmails.length > 0) {
-              console.log(`📧 Attempting to send admin emails to: ${adminEmails.join(', ')}`);
-              
-              // Check if RESEND_API_KEY is available
-              const hasApiKey = !!process.env.RESEND_API_KEY;
-              console.log(`🔑 RESEND_API_KEY configured: ${hasApiKey}`);
-              console.log(`📮 FROM_EMAIL configured: ${process.env.FROM_EMAIL || 'not set'}`);
-              
-              const emailSent = await emailService.sendAdminMatchReadyNotification(
-                adminEmails,
-                game.date,
-                game.participants.length
-              );
-
-              if (emailSent) {
-                console.log('✅ Admin emails sent successfully');
-              } else {
-                console.error('❌ Failed to send admin emails - check email service logs');
-              }
-            } else {
-              console.log('⚠️ No admin users found to notify');
-            }
-          } catch (emailError) {
-            console.error('❌ Error sending admin emails:', emailError);
-            console.error('❌ Email error stack:', emailError instanceof Error ? emailError.stack : 'No stack trace');
-          }
-
-          // Update game to mark notification as sent and set timeout (24 hours)
-          const timeout = new Date();
-          timeout.setHours(timeout.getHours() + 24);
-          
-          await this.updateGame(game.id, {
-            adminNotificationSent: true,
-            adminNotificationTimeout: timeout
-          });
-        }
+        await this.checkAndNotifyAdminsForSpecificGame(game.id);
       }
     } catch (error) {
       console.error('Error checking and notifying admins for full games:', error);

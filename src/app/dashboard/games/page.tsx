@@ -6,7 +6,7 @@ import { getSundaysInMonth, formatDate, generateTeams, getCapitalizedMonthYear }
 import { Game, User, MonthlyAvailability } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Calendar, Ban, Trophy, Users, MapPin, Clock, Edit3, Plus } from 'lucide-react';
+import { Calendar, Ban, Trophy, Users, Edit3 } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -52,7 +52,9 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
     location: game.reservationInfo?.location || '',
     time: game.reservationInfo?.time || '10:00',
     cost: game.reservationInfo?.cost?.toString() || '',
-    reservedBy: game.reservationInfo?.reservedBy || ''
+    reservedBy: game.reservationInfo?.reservedBy || '',
+    mapsLink: game.reservationInfo?.mapsLink || '',
+    paymentAlias: game.reservationInfo?.paymentAlias || ''
   });
 
   const handleSave = () => {
@@ -63,7 +65,9 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
         location: reservationInfo.location,
         time: reservationInfo.time,
         cost: reservationInfo.cost ? parseFloat(reservationInfo.cost) : undefined,
-        reservedBy: reservationInfo.reservedBy
+        reservedBy: reservationInfo.reservedBy,
+        mapsLink: reservationInfo.mapsLink || undefined,
+        paymentAlias: reservationInfo.paymentAlias || undefined
       } : undefined,
       updatedAt: new Date()
     };
@@ -143,7 +147,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Costo (opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Costo ARS (opcional)</label>
                 <input
                   type="number"
                   value={reservationInfo.cost}
@@ -162,85 +166,103 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                   className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Google Maps (opcional)</label>
+                <input
+                  type="url"
+                  value={reservationInfo.mapsLink}
+                  onChange={(e) => setReservationInfo(prev => ({ ...prev, mapsLink: e.target.value }))}
+                  placeholder="https://maps.google.com/..."
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Alias para Transferencia (opcional)</label>
+                <input
+                  type="text"
+                  value={reservationInfo.paymentAlias}
+                  onChange={(e) => setReservationInfo(prev => ({ ...prev, paymentAlias: e.target.value }))}
+                  placeholder="Ej: fulbo.admin"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Participants Display - No selection needed, all available players assumed */}
+          {/* Team Organization */}
           <div className="mb-6">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                Participantes Confirmados ({game.participants.length})
+                Organización de Equipos ({game.participants.length} jugadores)
               </h3>
               <button
                 onClick={regenerateTeams}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
               >
-                Regenerar Equipos
+                🎲 Regenerar Equipos (Aleatorio)
               </button>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid md:grid-cols-3 gap-2">
-                {game.participants.map(participantId => {
-                  const player = users.find(u => u.id === participantId);
-                  return (
-                    <div
-                      key={participantId}
-                      className="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-medium"
-                    >
-                      {player?.nickname || player?.name || 'Jugador desconocido'}
-                    </div>
-                  );
-                })}
+            
+            {editedGame.teams ? (
+              <>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <h4 className="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                      🔴 Equipo 1 ({editedGame.teams.team1.length} jugadores)
+                    </h4>
+                    {editedGame.teams.team1.map(playerId => {
+                      const player = users.find(u => u.id === playerId);
+                      return (
+                        <div key={playerId} className="flex justify-between items-center py-1">
+                          <span className="text-red-700">{player?.nickname || player?.name}</span>
+                          <button
+                            onClick={() => swapPlayerBetweenTeams(playerId)}
+                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                          >
+                            →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                      🔵 Equipo 2 ({editedGame.teams.team2.length} jugadores)
+                    </h4>
+                    {editedGame.teams.team2.map(playerId => {
+                      const player = users.find(u => u.id === playerId);
+                      return (
+                        <div key={playerId} className="flex justify-between items-center py-1">
+                          <span className="text-blue-700">{player?.nickname || player?.name}</span>
+                          <button
+                            onClick={() => swapPlayerBetweenTeams(playerId)}
+                            className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            ←
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="mt-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-700 flex items-center gap-2">
+                    💡 <strong>Tip:</strong> Usa las flechas (→ ←) para intercambiar jugadores entre equipos
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="bg-gray-50 p-6 rounded-lg text-center">
+                <p className="text-gray-600 mb-4">
+                  ⚽ Los equipos aún no han sido generados
+                </p>
+                <p className="text-sm text-gray-500">
+                  Haz clic en &quot;🎲 Regenerar Equipos (Aleatorio)&quot; para crear equipos balanceados automáticamente
+                </p>
               </div>
-              <p className="text-sm text-gray-600 mt-3">
-                💡 Los participantes se confirman automáticamente según disponibilidad. No es necesario seleccionar manualmente.
-              </p>
-            </div>
+            )}
           </div>
-
-          {/* Teams Display and Edit */}
-          {editedGame.teams && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Equipos</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-red-800 mb-2">Equipo 1 ({editedGame.teams.team1.length})</h4>
-                  {editedGame.teams.team1.map(playerId => {
-                    const player = users.find(u => u.id === playerId);
-                    return (
-                      <div key={playerId} className="flex justify-between items-center py-1">
-                        <span className="text-red-700">{player?.nickname || player?.name}</span>
-                        <button
-                          onClick={() => swapPlayerBetweenTeams(playerId)}
-                          className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                        >
-                          →
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-blue-800 mb-2">Equipo 2 ({editedGame.teams.team2.length})</h4>
-                  {editedGame.teams.team2.map(playerId => {
-                    const player = users.find(u => u.id === playerId);
-                    return (
-                      <div key={playerId} className="flex justify-between items-center py-1">
-                        <span className="text-blue-700">{player?.nickname || player?.name}</span>
-                        <button
-                          onClick={() => swapPlayerBetweenTeams(playerId)}
-                          className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                        >
-                          ←
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Match Result Section */}
           {editedGame.status === 'completed' && (
@@ -879,12 +901,35 @@ export default function GamesPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h5 className="font-semibold text-gray-800 mb-2">Información de Reserva</h5>
                     <p className="text-gray-900"><strong>Lugar:</strong> {existingGame.reservationInfo.location}</p>
+                    {existingGame.reservationInfo.mapsLink && (
+                      <p className="text-gray-900">
+                        <strong>Dirección:</strong> 
+                        <a 
+                          href={existingGame.reservationInfo.mapsLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 ml-2"
+                        >
+                          🗺️ Ver en Google Maps
+                        </a>
+                      </p>
+                    )}
                     <p className="text-gray-900"><strong>Hora:</strong> {existingGame.reservationInfo.time}</p>
                     {existingGame.reservationInfo.cost && (
-                      <p className="text-gray-900"><strong>Costo:</strong> ${existingGame.reservationInfo.cost}</p>
+                      <p className="text-gray-900"><strong>Costo:</strong> ARS ${existingGame.reservationInfo.cost}</p>
                     )}
                     {existingGame.reservationInfo.reservedBy && (
                       <p className="text-gray-900"><strong>Reservado por:</strong> {existingGame.reservationInfo.reservedBy}</p>
+                    )}
+                    {existingGame.reservationInfo.paymentAlias && (
+                      <p className="text-gray-900">
+                        <strong>Alias para transferir:</strong> {existingGame.reservationInfo.paymentAlias}
+                        {existingGame.reservationInfo.cost && (
+                          <span className="text-green-700 font-semibold ml-2">
+                            (ARS ${(existingGame.reservationInfo.cost / 10).toFixed(0)} por persona)
+                          </span>
+                        )}
+                      </p>
                     )}
                   </div>
                 )}

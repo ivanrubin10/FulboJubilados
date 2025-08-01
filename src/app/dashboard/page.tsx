@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, formatDate, getCapitalizedMonthName, getCapitalizedMonthYear } from '@/lib/utils';
 import { User } from '@/types';
 import { useToast } from '@/components/ui/toast';
-import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
 
 // API helper functions
 const apiClient = {

@@ -44,7 +44,9 @@ export async function POST() {
             location: game.reservationInfo?.location || 'Ubicación por confirmar',
             time: game.reservationInfo?.time || '10:00',
             cost: game.reservationInfo?.cost,
-            reservedBy: game.reservationInfo?.reservedBy || 'Administrador'
+            reservedBy: game.reservationInfo?.reservedBy || 'Administrador',
+            mapsLink: game.reservationInfo?.mapsLink,
+            paymentAlias: game.reservationInfo?.paymentAlias
           });
           
           if (success) {

@@ -29,6 +29,8 @@ export interface Game {
     time: string;
     cost?: number;
     reservedBy: string;
+    mapsLink?: string;
+    paymentAlias?: string;
   };
   createdAt: Date;
   updatedAt: Date;

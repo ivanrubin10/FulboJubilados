@@ -15,16 +15,15 @@ import {
   ChevronRight, 
   Users, 
   User as UserIcon,
-  UserPlus, 
   Shield, 
   ShieldOff, 
-  Trash, 
-  Database, 
-  TestTube,
   Clock,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 
@@ -133,9 +132,12 @@ const apiClient = {
     return res.json();
   },
 
-  async debugAdmin() {
-    const res = await fetch('/api/debug-admin');
-    if (!res.ok) throw new Error('Failed to debug admin');
+  async sendTestEmail() {
+    const res = await fetch('/api/send-test-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Failed to send test email');
     return res.json();
   }
 };
@@ -156,6 +158,8 @@ export default function AdminPage() {
   const [pendingYear, setPendingYear] = useState<number | null>(null);
   const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
   const [showMatchConfirmModal, setShowMatchConfirmModal] = useState(false);
+  const [showEmailPreviews, setShowEmailPreviews] = useState(false);
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -429,26 +433,137 @@ export default function AdminPage() {
     }
   };
 
-  const debugAdmin = async () => {
+  const sendTestEmail = async () => {
     try {
-      const result = await apiClient.debugAdmin();
-      const status = `Estado: ${result.success ? 'SUCCESS' : 'ERROR'}\nUser ID: ${result.userId || 'No disponible'}\n\n` +
-        (result.steps ? 
-          `Pasos completados:\n${result.steps.join('\n')}\n\n` : '') +
-        (result.error ? 
-          `❌ Error en paso: ${result.step || 'unknown'}\nError: ${result.error}\nDetalles: ${result.details || 'No details'}` : 
-          result.message || '');
+      const result = await apiClient.sendTestEmail();
+      const message = `Emails enviados: ${result.count || 0}\n` +
+        `Admins contactados: ${result.adminEmails?.length || 0}\n` +
+        (result.adminEmails?.length > 0 ? `Emails: ${result.adminEmails.join(', ')}` : '') +
+        (result.errors?.length > 0 ? `\n\nErrores: ${result.errors.join(', ')}` : '');
       
-      info('Debug Detallado', status);
+      if (result.success) {
+        success('Test Email Enviado', message);
+      } else {
+        error('Error en Test Email', result.error || 'No se pudo enviar el email de prueba');
+      }
     } catch (err) {
-      console.error('Error in debug admin:', err);
+      console.error('Error sending test email:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      error('Error de debug', `No se pudo ejecutar el debug detallado: ${errorMessage}`);
+      error('Error de email', `No se pudo enviar el email de prueba: ${errorMessage}`);
     }
   };
 
 
+  // Email preview generators
+  const generateVotingReminderPreview = () => {
+    const monthName = getCapitalizedMonthName(currentActiveMonth.year, currentActiveMonth.month);
+    return `
+      <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 30px; border-radius: 12px; text-align: center;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">🗳️ ¡Hola Juan!</h1>
+          <p style="margin: 0; opacity: 0.9;">Recordatorio de disponibilidad para ${monthName}</p>
+        </div>
+        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
+          <div style="background: #dbeafe; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #1e40af;">📅 Marca tu disponibilidad para ${monthName} ${currentActiveMonth.year}</h2>
+            <p style="margin-bottom: 0;">Aún no has marcado qué domingos puedes jugar este mes. ¡Tu participación es importante para organizar los partidos!</p>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0;">
+            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">✅ Marcar Disponibilidad</a>
+            <a href="#" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">❌ No Puedo Ningún Día</a>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
+          <p>Fulbo Jubilados - Organizando tu diversión dominical</p>
+        </div>
+      </div>
+    `;
+  };
 
+  const generateAdminMatchReadyPreview = () => {
+    const today = new Date();
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + (7 - today.getDay()));
+    
+    return `
+      <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; border-radius: 12px; text-align: center;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">🚨 ACCIÓN REQUERIDA</h1>
+          <p style="margin: 0; opacity: 0.9;">Un partido ha alcanzado 10 jugadores</p>
+        </div>
+        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
+          <div style="background: #fee2e2; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #dc2626;">⚽ ¡Partido Listo para Confirmación!</h2>
+            <p style="margin-bottom: 0;">Un partido para el <strong>${nextSunday.toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</strong> ha alcanzado <strong>10 jugadores</strong> y está listo para ser confirmado.</p>
+          </div>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">📋 Detalles del Partido</h3>
+            <p><strong>📅 Fecha:</strong> ${nextSunday.toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</p>
+            <p><strong>👥 Jugadores confirmados:</strong> 10</p>
+            <p style="margin-bottom: 0;"><strong>⏰ Estado:</strong> Esperando confirmación del administrador</p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="#" style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; font-size: 16px;">🚨 CONFIRMAR PARTIDO AHORA</a>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
+          <p>Fulbo Jubilados - Panel de Administración</p>
+        </div>
+      </div>
+    `;
+  };
+
+  const generateMatchConfirmationPreview = () => {
+    const today = new Date();
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + (7 - today.getDay()));
+    
+    return `
+      <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 30px; border-radius: 12px; text-align: center;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">⚽ ¡Hola Juan!</h1>
+          <p style="margin: 0; opacity: 0.9;">Tu partido ha sido confirmado</p>
+        </div>
+        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
+          <div style="background: #d1fae5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #059669;">🎉 ¡Partido Confirmado!</h2>
+            <p style="margin-bottom: 0;">El administrador ha confirmado el partido y ha reservado la cancha. ¡Todo listo para jugar!</p>
+          </div>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">📋 Detalles del Partido</h3>
+            <p><strong>📅 Fecha:</strong> ${nextSunday.toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</p>
+            <p><strong>🕒 Hora:</strong> 10:00 AM</p>
+            <p><strong>📍 Ubicación:</strong> Cancha La Bombonera (<a href="https://maps.google.com" target="_blank" style="color: #10b981; text-decoration: none;">🗺️ Ver en Maps</a>)</p>
+            <p><strong>💰 Costo:</strong> ARS $1500</p>
+            <p><strong>👤 Reservado por:</strong> Admin Carlos</p>
+            <p style="margin-bottom: 0;"><strong>💳 Alias para transferir:</strong> fulbo.admin <span style="color: #059669; font-weight: bold;">(ARS $150 por persona)</span></p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin-right: 10px;">Ver Detalles del Partido</a>
+            <a href="#" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold;">📅 Agregar al Calendario</a>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
+          <p>Fulbo Jubilados - ¡Nos vemos en la cancha!</p>
+        </div>
+      </div>
+    `;
+  };
 
   if (!isLoaded || isLoadingData) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
@@ -750,7 +865,7 @@ export default function AdminPage() {
                             <div className="flex justify-center space-x-1">
                               <button
                                 onClick={() => toggleAdminStatus(userData.id)}
-                                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                className={`flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all w-[100px] whitespace-nowrap ${
                                   userData.isAdmin
                                     ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                                     : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
@@ -759,19 +874,19 @@ export default function AdminPage() {
                                 {userData.isAdmin ? (
                                   <>
                                     <ShieldOff className="h-3 w-3" />
-                                    Quitar Admin
+                                    Sacar Admin
                                   </>
                                 ) : (
                                   <>
                                     <Shield className="h-3 w-3" />
-                                    Hacer Admin
+                                    Dar Admin
                                   </>
                                 )}
                               </button>
                               
                               <button
                                 onClick={() => toggleUserWhitelist(userData.id)}
-                                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                className={`flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all w-[100px] whitespace-nowrap ${
                                   userData.isWhitelisted
                                     ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
@@ -877,10 +992,10 @@ export default function AdminPage() {
                       </p>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => toggleAdminStatus(userData.id)}
-                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 ${
+                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 whitespace-nowrap min-w-0 ${
                           userData.isAdmin
                             ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                             : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300'
@@ -889,19 +1004,19 @@ export default function AdminPage() {
                         {userData.isAdmin ? (
                           <>
                             <ShieldOff className="h-4 w-4" />
-                            Quitar Admin
+                            Sacar Admin
                           </>
                         ) : (
                           <>
                             <Shield className="h-4 w-4" />
-                            Hacer Admin
+                            Dar Admin
                           </>
                         )}
                       </button>
                       
                       <button
                         onClick={() => toggleUserWhitelist(userData.id)}
-                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 ${
+                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 whitespace-nowrap min-w-0 ${
                           userData.isWhitelisted
                             ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                             : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300'
@@ -934,6 +1049,172 @@ export default function AdminPage() {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Email Previews Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Vista Previa de Emails</h2>
+                <p className="text-gray-600">Mira cómo se ven los 3 tipos de emails del sistema</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowEmailPreviews(!showEmailPreviews)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors"
+            >
+              {showEmailPreviews ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {showEmailPreviews ? 'Ocultar' : 'Ver Previews'}
+            </button>
+          </div>
+
+          {showEmailPreviews && (
+            <div className="space-y-4">
+              {/* Voting Reminder Email */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => setExpandedEmail(expandedEmail === 'voting' ? null : 'voting')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Vote className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">🗳️ Recordatorio de Votación</h3>
+                      <p className="text-sm text-gray-600">Email enviado manualmente a usuarios que no han votado</p>
+                    </div>
+                  </div>
+                  {expandedEmail === 'voting' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {expandedEmail === 'voting' && (
+                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                    <div 
+                      className="border border-gray-300 rounded-lg bg-white"
+                      dangerouslySetInnerHTML={{ __html: generateVotingReminderPreview() }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Admin Match Ready Email */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => setExpandedEmail(expandedEmail === 'admin' ? null : 'admin')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">🚨 Alerta para Admins</h3>
+                      <p className="text-sm text-gray-600">Email automático cuando un partido alcanza 10 jugadores</p>
+                    </div>
+                  </div>
+                  {expandedEmail === 'admin' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {expandedEmail === 'admin' && (
+                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                    <div 
+                      className="border border-gray-300 rounded-lg bg-white"
+                      dangerouslySetInnerHTML={{ __html: generateAdminMatchReadyPreview() }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Match Confirmation Email */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => setExpandedEmail(expandedEmail === 'match' ? null : 'match')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <Trophy className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">⚽ Confirmación de Partido</h3>
+                      <p className="text-sm text-gray-600">Email enviado manualmente a jugadores confirmados</p>
+                    </div>
+                  </div>
+                  {expandedEmail === 'match' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {expandedEmail === 'match' && (
+                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                    <div 
+                      className="border border-gray-300 rounded-lg bg-white"
+                      dangerouslySetInnerHTML={{ __html: generateMatchConfirmationPreview() }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-blue-800 mb-1">Sobre los Emails</h4>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• <strong>Recordatorio de Votación:</strong> Enviado manualmente desde este panel a usuarios específicos</p>
+                      <p>• <strong>Alerta para Admins:</strong> Enviado automáticamente cuando un partido alcanza 10 jugadores</p>
+                      <p>• <strong>Confirmación de Partido:</strong> Enviado manualmente desde este panel a jugadores confirmados</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Admin Tools */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <Settings className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Herramientas de Administración</h2>
+              <p className="text-gray-600 text-sm">Utilidades para mantener el sistema</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <button
+              onClick={sendTestEmail}
+              className="bg-green-600 text-white border border-green-600 px-6 py-4 rounded-lg font-medium hover:bg-green-700 hover:border-green-700 shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-left">
+                  <div className="font-semibold">📧 Test Email</div>
+                  <div className="text-sm opacity-90">
+                    Enviar email de prueba a admins
+                  </div>
+                </div>
+              </div>
+            </button>
+            
+            <button
+              onClick={testConnection}
+              className="bg-gray-600 text-white border border-gray-600 px-6 py-4 rounded-lg font-medium hover:bg-gray-700 hover:border-gray-700 shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-left">
+                  <div className="font-semibold">🔍 Test Conexión</div>
+                  <div className="text-sm opacity-90">
+                    Verificar estado del sistema
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
 
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mt-8">

@@ -165,14 +165,15 @@ async function checkAndCreateGamesForFullSundays(month: number, year: number, ne
   try {
     console.log(`🔍 Checking for full games in ${month}/${year} for Sundays: ${newAvailableSundays.join(', ')}`);
     
-    // Get all users and their availability
+    // Get all users and filter to only whitelisted users
     const allUsers = await DatabaseService.getUsers();
+    const whitelistedUsers = allUsers.filter(user => user.isWhitelisted);
     
-    console.log(`📊 Found ${allUsers.length} total users`);
+    console.log(`📊 Found ${allUsers.length} total users, ${whitelistedUsers.length} whitelisted users`);
     
-    // Get users from database with availability
+    // Get users from database with availability (only whitelisted users)
     const dbAvailability = [];
-    for (const user of allUsers) {
+    for (const user of whitelistedUsers) {
       try {
         const userAvailability = await DatabaseService.getUserMonthlyAvailability(user.id, month, year);
         const votingStatus = await DatabaseService.getUserVotingStatus(user.id, month, year);
@@ -218,10 +219,20 @@ async function checkAndCreateGamesForFullSundays(month: number, year: number, ne
         
         if (!gameExists) {
           // Create a new game with the first 10 available players
-          const participants = playersAvailableOnSunday.slice(0, 10).map(p => p.userId);
+          const potentialParticipants = playersAvailableOnSunday.slice(0, 10).map(p => p.userId);
           
-          console.log(`🎮 Creating game for ${sunday}/${month}/${year} with ${participants.length} participants`);
+          // Double-check that all participants are whitelisted users
+          const whitelistedUserIds = new Set(whitelistedUsers.map(u => u.id));
+          const participants = potentialParticipants.filter(userId => whitelistedUserIds.has(userId));
+          
+          console.log(`🎮 Creating game for ${sunday}/${month}/${year} with ${participants.length} participants (${potentialParticipants.length} initially, ${potentialParticipants.length - participants.length} filtered out)`);
           console.log(`🎮 Participants: ${participants.join(', ')}`);
+          
+          // Ensure we still have enough players after filtering
+          if (participants.length < 10) {
+            console.log(`⚠️ Not enough whitelisted players (${participants.length}/10) after filtering. Skipping game creation.`);
+            continue;
+          }
           
           const gameId = await DatabaseService.createGame({
             date: gameDate,
@@ -231,9 +242,9 @@ async function checkAndCreateGamesForFullSundays(month: number, year: number, ne
           
           console.log(`✅ Game created with ID: ${gameId}`);
           
-          // Trigger admin notifications
-          console.log(`📧 Triggering admin notifications...`);
-          await DatabaseService.checkAndNotifyAdminsForFullGames();
+          // Trigger admin notifications for this specific game
+          console.log(`📧 Triggering admin notifications for game ${gameId}...`);
+          await DatabaseService.checkAndNotifyAdminsForSpecificGame(gameId);
           
           console.log('✅ Admin notifications triggered successfully!');
         } else {

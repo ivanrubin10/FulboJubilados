@@ -23,7 +23,9 @@ export const games = pgTable('games', {
     location: string,
     time: string,
     cost?: number,
-    reservedBy: string
+    reservedBy: string,
+    mapsLink?: string,
+    paymentAlias?: string
   }>(),
   adminNotificationSent: boolean('admin_notification_sent').default(false).notNull(),
   adminNotificationTimeout: timestamp('admin_notification_timeout'),

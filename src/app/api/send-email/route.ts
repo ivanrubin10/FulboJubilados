@@ -16,45 +16,6 @@ export async function POST(request: NextRequest) {
     let success = false;
 
     switch (type) {
-      case 'game-created':
-        success = await emailService.sendGameCreatedNotification(
-          new Date(data.gameDate),
-          data.players
-        );
-        break;
-
-      case 'game-reminder':
-        success = await emailService.sendGameReminderNotification(
-          new Date(data.gameDate),
-          data.players
-        );
-        break;
-
-      case 'team-assignment':
-        success = await emailService.sendTeamAssignmentNotification(
-          new Date(data.gameDate),
-          data.teams
-        );
-        break;
-
-      case 'match-confirmed':
-        success = await emailService.sendMatchConfirmedNotification(
-          new Date(data.gameDate),
-          data.players,
-          data.customTime,
-          data.reservationInfo,
-          data.calendarEventId
-        );
-        break;
-
-      case 'voting-reminder':
-        success = await emailService.sendVotingReminderNotification(
-          data.players,
-          data.month,
-          data.year
-        );
-        break;
-
       case 'admin-match-ready':
         success = await emailService.sendAdminMatchReadyNotification(
           data.adminEmails,
@@ -65,7 +26,7 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: `Unknown email type: ${type}` },
+          { error: `Unknown email type: ${type}. Only 'admin-match-ready' is supported through this endpoint.` },
           { status: 400 }
         );
     }
