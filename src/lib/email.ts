@@ -79,14 +79,38 @@ export class EmailService {
     console.log('📝 Email subject:', subject);
     console.log('📄 HTML length:', html.length);
     
-    const result = await this.sendEmail({
-      to: adminEmails,
-      subject,
-      html,
-    });
-    
-    console.log('📧 Email sending result:', result);
-    return result;
+    // Send emails individually with rate limiting if there are multiple admins
+    if (adminEmails.length > 1) {
+      let allSuccessful = true;
+      for (let i = 0; i < adminEmails.length; i++) {
+        const result = await this.sendEmail({
+          to: [adminEmails[i]],
+          subject,
+          html,
+        });
+        
+        if (!result) {
+          allSuccessful = false;
+        }
+        
+        // Add delay to respect rate limit (2 emails per second = 500ms delay)
+        if (i < adminEmails.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      console.log('📧 Email sending result:', allSuccessful);
+      return allSuccessful;
+    } else {
+      // Single admin email, send normally
+      const result = await this.sendEmail({
+        to: adminEmails,
+        subject,
+        html,
+      });
+      
+      console.log('📧 Email sending result:', result);
+      return result;
+    }
   }
 
   // Email template generators - only keeping the 3 needed templates

@@ -43,7 +43,8 @@ export async function POST() {
     const emailsSent = [];
     const emailErrors = [];
     
-    for (const user of usersNeedingReminder) {
+    for (let i = 0; i < usersNeedingReminder.length; i++) {
+      const user = usersNeedingReminder[i];
       try {
         console.log(`📧 Attempting to send email to ${user.email}...`);
         const success = await emailService.sendVotingReminder({
@@ -59,6 +60,11 @@ export async function POST() {
         } else {
           emailErrors.push(user.email);
           console.log(`❌ Email failed to send to ${user.email}`);
+        }
+        
+        // Add delay to respect rate limit (2 emails per second = 500ms delay)
+        if (i < usersNeedingReminder.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       } catch (error) {
         emailErrors.push(user.email);

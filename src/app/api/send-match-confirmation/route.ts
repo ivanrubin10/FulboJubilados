@@ -34,8 +34,9 @@ export async function POST() {
         .map(participantId => userMap.get(participantId))
         .filter(user => user !== undefined);
       
-      // Send email to each participant
-      for (const participant of participants) {
+      // Send email to each participant with rate limiting (2 emails per second max)
+      for (let i = 0; i < participants.length; i++) {
+        const participant = participants[i];
         try {
           const success = await emailService.sendMatchConfirmation({
             to: participant.email,
@@ -51,6 +52,11 @@ export async function POST() {
           
           if (success) {
             emailsSent.push(participant.email);
+          }
+          
+          // Add delay to respect rate limit (2 emails per second = 500ms delay)
+          if (i < participants.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         } catch (error) {
           console.error(`Failed to send match confirmation to ${participant.email}:`, error);
