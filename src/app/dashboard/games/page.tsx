@@ -207,15 +207,21 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             {editedGame.teams ? (
               <>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <h4 className="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                  <div className={`p-4 rounded-lg border ${
+                    theme === 'dark' 
+                      ? 'bg-red-950/20 border-red-800/30' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 flex items-center gap-2 ${
+                      theme === 'dark' ? 'text-red-400' : 'text-red-800'
+                    }`}>
                       🔴 Equipo 1 ({editedGame.teams.team1.length} jugadores)
                     </h4>
                     {editedGame.teams.team1.map(playerId => {
                       const player = users.find(u => u.id === playerId);
                       return (
                         <div key={playerId} className="flex justify-between items-center py-1">
-                          <span className="text-red-700">{player?.nickname || player?.name}</span>
+                          <span className={theme === 'dark' ? 'text-red-400' : 'text-red-700'}>{player?.nickname || player?.name}</span>
                           <button
                             onClick={() => swapPlayerBetweenTeams(playerId)}
                             className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
@@ -227,15 +233,21 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                     })}
                   </div>
                   
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                  <div className={`p-4 rounded-lg border ${
+                    theme === 'dark' 
+                      ? 'bg-blue-950/20 border-blue-800/30' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 flex items-center gap-2 ${
+                      theme === 'dark' ? 'text-blue-400' : 'text-blue-800'
+                    }`}>
                       🔵 Equipo 2 ({editedGame.teams.team2.length} jugadores)
                     </h4>
                     {editedGame.teams.team2.map(playerId => {
                       const player = users.find(u => u.id === playerId);
                       return (
                         <div key={playerId} className="flex justify-between items-center py-1">
-                          <span className="text-blue-700">{player?.nickname || player?.name}</span>
+                          <span className={theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}>{player?.nickname || player?.name}</span>
                           <button
                             onClick={() => swapPlayerBetweenTeams(playerId)}
                             className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
@@ -247,8 +259,14 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                     })}
                   </div>
                 </div>
-                <div className="mt-4 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-700 flex items-center gap-2">
+                <div className={`mt-4 p-3 rounded-lg border ${
+                  theme === 'dark' 
+                    ? 'bg-slate-800/50 border-slate-700/50' 
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <p className={`text-sm flex items-center gap-2 ${
+                    theme === 'dark' ? 'text-slate-300' : 'text-blue-700'
+                  }`}>
                     💡 <strong>Tip:</strong> Usa las flechas (→ ←) para intercambiar jugadores entre equipos
                   </p>
                 </div>
@@ -785,12 +803,12 @@ export default function GamesPage() {
                 <div className="flex justify-between items-center mb-4">
                   <span className={`px-3 py-1 rounded-full text-sm ${
                     existingGame.status === 'confirmed' 
-                      ? 'bg-green-100 text-green-800' 
+                      ? (theme === 'dark' ? 'bg-green-950/40 text-green-300 border border-green-600/30' : 'bg-green-100 text-green-800')
                       : existingGame.status === 'completed'
-                      ? 'bg-purple-100 text-purple-800'
+                      ? (theme === 'dark' ? 'bg-purple-950/40 text-purple-300 border border-purple-600/30' : 'bg-purple-100 text-purple-800')
                       : existingGame.status === 'cancelled'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-yellow-100 text-yellow-800'
+                      ? (theme === 'dark' ? 'bg-red-950/40 text-red-300 border border-red-600/30' : 'bg-red-100 text-red-800')
+                      : (theme === 'dark' ? 'bg-yellow-950/40 text-yellow-300 border border-yellow-600/30' : 'bg-yellow-100 text-yellow-800')
                   }`}>
                     {existingGame.status === 'confirmed' ? 'Confirmado' 
                      : existingGame.status === 'completed' ? 'Completado'
@@ -829,13 +847,19 @@ export default function GamesPage() {
 
                 {existingGame.teams && (
                   <div className="grid md:grid-cols-2 gap-4 mb-4">
-                    <div className="bg-red-50 p-4 rounded-lg">
-                      <h5 className="font-semibold text-red-800 mb-2">Equipo 1</h5>
+                    <div className={`p-4 rounded-lg ${
+                      theme === 'dark' ? 'bg-red-950/40 border border-red-600/30' : 'bg-red-50'
+                    }`}>
+                      <h5 className={`font-semibold mb-2 ${
+                        theme === 'dark' ? 'text-red-300' : 'text-red-800'
+                      }`}>Equipo 1</h5>
                       <ul className="space-y-1">
                         {existingGame.teams.team1.map(playerId => {
                           const player = users.find(u => u.id === playerId);
                           return (
-                            <li key={playerId} className="text-red-700 flex items-center gap-2">
+                            <li key={playerId} className={`flex items-center gap-2 ${
+                              theme === 'dark' ? 'text-red-300' : 'text-red-700'
+                            }`}>
                               {player?.imageUrl && (
                                 <img 
                                   src={player.imageUrl} 
@@ -850,13 +874,19 @@ export default function GamesPage() {
                       </ul>
                     </div>
                     
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h5 className="font-semibold text-blue-800 mb-2">Equipo 2</h5>
+                    <div className={`p-4 rounded-lg ${
+                      theme === 'dark' ? 'bg-blue-950/40 border border-blue-600/30' : 'bg-blue-50'
+                    }`}>
+                      <h5 className={`font-semibold mb-2 ${
+                        theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                      }`}>Equipo 2</h5>
                       <ul className="space-y-1">
                         {existingGame.teams.team2.map(playerId => {
                           const player = users.find(u => u.id === playerId);
                           return (
-                            <li key={playerId} className="text-blue-700 flex items-center gap-2">
+                            <li key={playerId} className={`flex items-center gap-2 ${
+                              theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                            }`}>
                               {player?.imageUrl && (
                                 <img 
                                   src={player.imageUrl} 
@@ -919,7 +949,11 @@ export default function GamesPage() {
                           href={existingGame.reservationInfo.mapsLink} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 ml-2"
+                          className={`ml-2 ${
+                            theme === 'dark' 
+                              ? 'text-blue-400 hover:text-blue-300' 
+                              : 'text-blue-600 hover:text-blue-800'
+                          }`}
                         >
                           🗺️ Ver en Google Maps
                         </a>

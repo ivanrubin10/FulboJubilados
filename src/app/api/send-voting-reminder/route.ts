@@ -62,9 +62,9 @@ export async function POST() {
           console.log(`❌ Email failed to send to ${user.email}`);
         }
         
-        // Add delay to respect rate limit (2 emails per second = 500ms delay)
+        // Add delay to respect rate limit (2 emails per second = 1000ms delay for safety)
         if (i < usersNeedingReminder.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (error) {
         emailErrors.push(user.email);

@@ -3,6 +3,22 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { User } from '@/types';
+
+interface GameWithParticipants {
+  id: string;
+  date: string;
+  participants: string[];
+  status: string;
+  participantDetails: User[];
+  reservationInfo?: {
+    location?: string;
+    time?: string;
+    cost?: number;
+    reservedBy?: string;
+    mapsLink?: string;
+    paymentAlias?: string;
+  };
+}
 import { getNextAvailableMonth, getCapitalizedMonthYear, getCapitalizedMonthName } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -162,6 +178,8 @@ export default function AdminPage() {
   const [showMatchConfirmModal, setShowMatchConfirmModal] = useState(false);
   const [showEmailPreviews, setShowEmailPreviews] = useState(false);
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+  const [confirmedGames, setConfirmedGames] = useState<GameWithParticipants[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadData = async () => {
@@ -341,23 +359,89 @@ export default function AdminPage() {
     }
   };
 
-  const handleMatchConfirmationClick = () => {
+  const loadConfirmedGames = async () => {
+    try {
+      const gamesResponse = await fetch('/api/games');
+      const games = await gamesResponse.json();
+      
+      const usersResponse = await fetch('/api/users');
+      const allUsers = await usersResponse.json();
+      const userMap = new Map(allUsers.map((user: User) => [user.id, user]));
+      
+      const confirmedGamesWithParticipants = games
+        .filter((game: GameWithParticipants) => 
+          game.status === 'confirmed' && 
+          game.participants && 
+          game.participants.length >= 10
+        )
+        .map((game: GameWithParticipants) => ({
+          ...game,
+          participantDetails: game.participants
+            .map((participantId: string) => userMap.get(participantId))
+            .filter((user): user is User => user !== undefined)
+        }));
+      
+      setConfirmedGames(confirmedGamesWithParticipants);
+      
+      // Select all participants by default
+      const allParticipantIds = new Set<string>();
+      confirmedGamesWithParticipants.forEach((game: GameWithParticipants) => {
+        game.participantDetails.forEach((participant: User) => {
+          allParticipantIds.add(participant.id);
+        });
+      });
+      setSelectedParticipants(allParticipantIds);
+      
+    } catch (error) {
+      console.error('Error loading confirmed games:', error);
+    }
+  };
+
+  const handleMatchConfirmationClick = async () => {
+    await loadConfirmedGames();
     setShowMatchConfirmModal(true);
+  };
+
+  const toggleParticipantSelection = (participantId: string) => {
+    const newSelection = new Set(selectedParticipants);
+    if (newSelection.has(participantId)) {
+      newSelection.delete(participantId);
+    } else {
+      newSelection.add(participantId);
+    }
+    setSelectedParticipants(newSelection);
+  };
+
+  const selectAllParticipants = () => {
+    const allParticipantIds = new Set<string>();
+    confirmedGames.forEach((game: GameWithParticipants) => {
+      game.participantDetails.forEach((participant: User) => {
+        allParticipantIds.add(participant.id);
+      });
+    });
+    setSelectedParticipants(allParticipantIds);
+  };
+
+  const deselectAllParticipants = () => {
+    setSelectedParticipants(new Set());
   };
 
   const sendMatchConfirmation = async () => {
     setShowMatchConfirmModal(false);
     setIsLoadingMatchConfirmation(true);
     try {
+      const selectedParticipantIds = Array.from(selectedParticipants);
+      
       const response = await fetch('/api/send-match-confirmation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedParticipants: selectedParticipantIds })
       });
 
       const result = await response.json();
       
       if (response.ok) {
-        success('Confirmaciones enviadas', `Confirmaciones de partido enviadas a ${result.count} jugadores confirmados`);
+        success('Confirmaciones enviadas', `Confirmaciones de partido enviadas a ${result.count} jugadores seleccionados`);
       } else {
         error('Error al enviar confirmaciones', result.error || 'No se pudieron enviar las confirmaciones');
       }
@@ -1327,7 +1411,7 @@ export default function AdminPage() {
         {/* Match Confirmation Modal */}
         {showMatchConfirmModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-card rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center gap-3 mb-4">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
                   theme === 'dark' ? 'bg-emerald-900/40' : 'bg-emerald-100'
@@ -1337,13 +1421,93 @@ export default function AdminPage() {
                   }`} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground">Confirmar Envío</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Seleccionar Participantes</h3>
                   <p className="text-sm text-muted-foreground">Confirmaciones de partido</p>
                 </div>
               </div>
-              <p className="text-muted-foreground mb-6">
-                ¿Estás seguro que querés enviar confirmaciones de partido a todos los jugadores de los partidos listos?
-              </p>
+
+              {confirmedGames.length === 0 ? (
+                <p className="text-muted-foreground mb-6">
+                  No hay partidos confirmados con participantes para enviar notificaciones.
+                </p>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-4">
+                    Selecciona los participantes que recibirán la confirmación del partido:
+                  </p>
+
+                  {/* Selection Controls */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={selectAllParticipants}
+                      className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      Seleccionar Todos
+                    </button>
+                    <button
+                      onClick={deselectAllParticipants}
+                      className="px-3 py-1 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Deseleccionar Todos
+                    </button>
+                    <span className="flex items-center text-sm text-muted-foreground">
+                      {selectedParticipants.size} participantes seleccionados
+                    </span>
+                  </div>
+
+                  {/* Games and Participants */}
+                  <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                    {confirmedGames.map((game: GameWithParticipants) => (
+                      <div key={game.id} className="border border-border rounded-lg p-4">
+                        <h4 className="font-semibold text-foreground mb-2">
+                          🏆 Partido {new Date(game.date).toLocaleDateString('es-ES', { 
+                            weekday: 'long', 
+                            day: 'numeric', 
+                            month: 'long' 
+                          })}
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {game.participantDetails.map((participant: User) => (
+                            <label
+                              key={participant.id}
+                              className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                                selectedParticipants.has(participant.id)
+                                  ? (theme === 'dark' ? 'bg-emerald-950/40 border-emerald-600/30' : 'bg-emerald-50 border-emerald-200')
+                                  : 'border-border hover:bg-background'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedParticipants.has(participant.id)}
+                                onChange={() => toggleParticipantSelection(participant.id)}
+                                className="rounded border-border"
+                              />
+                              {participant.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img 
+                                  src={participant.imageUrl} 
+                                  alt={participant.name}
+                                  className="w-6 h-6 rounded-full border border-border"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center border border-border">
+                                  <span className="text-xs font-bold text-muted-foreground">
+                                    {participant.name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-foreground">
+                                {participant.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowMatchConfirmModal(false)}
@@ -1353,10 +1517,10 @@ export default function AdminPage() {
                 </button>
                 <button
                   onClick={sendMatchConfirmation}
-                  disabled={isLoadingMatchConfirmation}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  disabled={isLoadingMatchConfirmation || selectedParticipants.size === 0}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Enviar Confirmaciones
+                  Enviar a {selectedParticipants.size} Participantes
                 </button>
               </div>
             </div>

@@ -93,9 +93,9 @@ export class EmailService {
           allSuccessful = false;
         }
         
-        // Add delay to respect rate limit (2 emails per second = 500ms delay)
+        // Add delay to respect rate limit (2 emails per second = 1000ms delay for safety)
         if (i < adminEmails.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       console.log('📧 Email sending result:', allSuccessful);
@@ -328,10 +328,10 @@ export class EmailService {
               </div>
               
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" class="button" style="margin-right: 10px;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" style="background: linear-gradient(135deg, #059669, #047857); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin-right: 10px; border: 1px solid #047857;">
                   Ver Detalles del Partido
                 </a>
-                <a href="${this.generateCalendarLink(data)}" target="_blank" class="button" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                <a href="${this.generateCalendarLink(data)}" target="_blank" style="background: linear-gradient(135deg, #d97706, #b45309); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; border: 1px solid #b45309;">
                   📅 Agregar al Calendario
                 </a>
               </div>

@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/db/service';
 import { emailService } from '@/lib/email';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
+    const { selectedParticipants } = body;
+
     // Get all confirmed games (games with status 'confirmed' and participants)
     const allGames = await DatabaseService.getAllGames();
     const confirmedGames = allGames.filter(game => 
@@ -29,10 +32,19 @@ export async function POST() {
     for (const game of confirmedGames) {
       console.log(`📧 Sending match confirmation for game on ${new Date(game.date).toLocaleDateString('es-ES')}`);
       
-      // Get participant details
-      const participants = game.participants
+      // Get participant details, filtered by selected participants if provided
+      let participants = game.participants
         .map(participantId => userMap.get(participantId))
         .filter(user => user !== undefined);
+      
+      // If selectedParticipants is provided, filter to only those participants
+      if (selectedParticipants && Array.isArray(selectedParticipants)) {
+        participants = participants.filter(participant => 
+          selectedParticipants.includes(participant.id)
+        );
+      }
+      
+      console.log(`📧 Sending to ${participants.length} selected participants`);
       
       // Send email to each participant with rate limiting (2 emails per second max)
       for (let i = 0; i < participants.length; i++) {
@@ -54,9 +66,9 @@ export async function POST() {
             emailsSent.push(participant.email);
           }
           
-          // Add delay to respect rate limit (2 emails per second = 500ms delay)
+          // Add delay to respect rate limit (2 emails per second = 1000ms delay for safety)
           if (i < participants.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         } catch (error) {
           console.error(`Failed to send match confirmation to ${participant.email}:`, error);

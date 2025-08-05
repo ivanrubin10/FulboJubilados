@@ -33,9 +33,9 @@ export class CalendarService {
       const startTime = new Date(gameDate);
       startTime.setHours(hours, minutes, 0, 0);
       
-      // End time is 2 hours later
+      // End time is 1 hour later
       const endTime = new Date(startTime);
-      endTime.setHours(startTime.getHours() + 2);
+      endTime.setHours(startTime.getHours() + 1);
 
       const event: CalendarEvent = {
         id: `futbol_${Date.now()}_${gameDate.getTime()}`,
@@ -64,7 +64,15 @@ export class CalendarService {
 
   private generateICS(event: CalendarEvent): string {
     const formatDate = (date: Date): string => {
-      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      // Format date in local timezone for ICS
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      
+      return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     };
 
     const icsContent = [
@@ -123,10 +131,18 @@ export class CalendarService {
     startTime.setHours(hours, minutes, 0, 0);
     
     const endTime = new Date(startTime);
-    endTime.setHours(startTime.getHours() + 2);
+    endTime.setHours(startTime.getHours() + 1);
 
     const formatGoogleDate = (date: Date): string => {
-      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      // Format date in local timezone for Google Calendar
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      
+      return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     };
 
     const params = new URLSearchParams({
