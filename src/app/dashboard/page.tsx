@@ -200,6 +200,19 @@ export default function Dashboard() {
       return;
     }
 
+    // Check if this specific date has passed
+    const sundayDate = new Date(selectedYear, selectedMonth - 1, sunday);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+    
+    if (sundayDate < today) {
+      warning(
+        'Fecha pasada',
+        `${sunday} de ${getCapitalizedMonthName(selectedYear, selectedMonth)} ya ha pasado. No puedes votar por fechas que ya han ocurrido.`
+      );
+      return;
+    }
+
     // Check if this month is beyond the 3-month voting limit
     if (isMonthBeyondVotingLimit(selectedMonth, selectedYear)) {
       warning(
@@ -268,6 +281,20 @@ export default function Dashboard() {
       warning(
         'Mes cerrado',
         `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
+      );
+      return;
+    }
+
+    // Check if this entire month has passed
+    const currentDate = new Date();
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0);
+    currentDate.setHours(0, 0, 0, 0);
+    lastDayOfMonth.setHours(23, 59, 59, 999);
+    
+    if (lastDayOfMonth < currentDate) {
+      warning(
+        'Mes pasado',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear} ya ha terminado. No puedes votar por meses que ya han pasado completamente.`
       );
       return;
     }
@@ -527,14 +554,20 @@ export default function Dashboard() {
               const isDisabled = cannotPlayAnyDay;
               const isBlocked = blockedSundays.includes(sunday);
               const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
-              const shouldDisableClick = isDisabled || (!isSelected && isBlocked) || isPastMonth;
+              
+              // Check if this specific date has passed
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const isPastDate = date < today;
+              
+              const shouldDisableClick = isDisabled || (!isSelected && isBlocked) || isPastMonth || isPastDate;
 
               return (
                 <div
                   key={sunday}
                   onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
                   className={`p-4 rounded-xl transition-all duration-200 hover:shadow-md ${
-                    isPastMonth
+                    isPastMonth || isPastDate
                       ? 'opacity-40 cursor-not-allowed bg-accent/20 border-2 border-border'
                       : isDisabled
                         ? 'opacity-50 cursor-not-allowed bg-accent border-2 border-border'
@@ -554,19 +587,19 @@ export default function Dashboard() {
                             }`
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      {isPastMonth ? (
-                        <Lock className="h-6 w-6 text-muted-foreground" />
+                  <div className="flex items-center justify-between mb-3 min-h-[24px]">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {isPastMonth || isPastDate ? (
+                        <Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       ) : isSelected ? (
-                        <CheckCircle className="h-6 w-6 text-green-400" />
+                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
                       ) : isBlocked && !isSelected ? (
-                        <Ban className="h-6 w-6 text-orange-400" />
+                        <Ban className="h-5 w-5 text-orange-400 flex-shrink-0" />
                       ) : (
-                        <Calendar className="h-6 w-6 text-blue-400" />
+                        <Calendar className="h-5 w-5 text-blue-400 flex-shrink-0" />
                       )}
-                      {isSelected && (
-                        <span className={`font-semibold text-xs px-3 py-1 rounded-full ${
+                      {isSelected && !(isPastMonth || isPastDate) && (
+                        <span className={`font-semibold text-xs px-2 py-1 rounded-full whitespace-nowrap ${
                           theme === 'dark' 
                             ? 'text-green-200 bg-green-900/40'
                             : 'text-green-700 bg-green-100'
@@ -575,23 +608,25 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                    {isPastMonth ? (
-                      <span className="text-xs bg-accent text-muted-foreground px-3 py-1 rounded-md font-medium">
-                        Cerrado
-                      </span>
-                    ) : isBlocked && !isSelected && (
-                      <span className={`text-xs px-3 py-1 rounded-md font-medium ${
-                        theme === 'dark' 
-                          ? 'bg-orange-900/40 text-orange-300'
-                          : 'bg-orange-100 text-orange-700'
-                      }`}>
-                        Completo
-                      </span>
-                    )}
+                    <div className="flex-shrink-0 ml-2">
+                      {isPastMonth || isPastDate ? (
+                        <span className="text-xs bg-accent text-muted-foreground px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block">
+                          {isPastDate ? 'Pasado' : 'Cerrado'}
+                        </span>
+                      ) : isBlocked && !isSelected && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block ${
+                          theme === 'dark' 
+                            ? 'bg-orange-900/40 text-orange-300'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          Completo
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
                   <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
-                    isPastMonth ? 'text-muted-foreground' :
+                    isPastMonth || isPastDate ? 'text-muted-foreground' :
                     isSelected ? (theme === 'dark' ? 'text-emerald-200' : 'text-emerald-700') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-300' : 'text-orange-700') : 'text-foreground'
                   }`}>
@@ -599,19 +634,20 @@ export default function Dashboard() {
                   </h3>
                   
                   <p className={`text-sm font-medium mb-2 ${
-                    isPastMonth ? 'text-muted-foreground' :
+                    isPastMonth || isPastDate ? 'text-muted-foreground' :
                     isSelected ? (theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-600') : 'text-muted-foreground'
                   }`}>
-                    {isPastMonth ? 'Mes cerrado' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
+                    {isPastMonth ? 'Mes cerrado' : isPastDate ? 'Fecha pasada' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
                   </p>
                   
                   <p className={`text-xs ${
-                    isPastMonth ? 'text-muted-foreground/60' :
+                    isPastMonth || isPastDate ? 'text-muted-foreground/60' :
                     isSelected ? (theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-500') : 'text-muted-foreground'
                   }`}>
                     {isPastMonth ? 'No se puede votar' :
+                     isPastDate ? 'Fecha ya pasada' :
                      isSelected ? 'Toca para desmarcar' : 
                      isBlocked && !isSelected ? '10 jugadores confirmados' : 'Toca para marcar disponibilidad'}
                   </p>

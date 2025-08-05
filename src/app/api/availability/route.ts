@@ -134,6 +134,20 @@ export async function POST(request: NextRequest) {
         details: 'No puedes votar en meses pasados'
       }, { status: 400 });
     }
+
+    // Validate that individual dates haven't passed
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (const sunday of availableSundays) {
+      const sundayDate = new Date(year, month - 1, sunday);
+      if (sundayDate < today) {
+        return NextResponse.json({
+          error: 'Fecha pasada',
+          details: `No puedes votar por el ${sunday} de ${new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' })} porque esa fecha ya ha pasado`
+        }, { status: 400 });
+      }
+    }
     
     // Update availability in database only
     await DatabaseService.updateMonthlyAvailability(
