@@ -48,6 +48,7 @@ interface EditGameModal {
 }
 
 function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
+  const { theme } = useTheme();
   const [editedGame, setEditedGame] = useState<Game>({ ...game });
   const [reservationInfo, setReservationInfo] = useState({
     location: game.reservationInfo?.location || '',
