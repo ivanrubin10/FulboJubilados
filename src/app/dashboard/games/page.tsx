@@ -1,13 +1,13 @@
 'use client';
 
 import { useUser } from '@clerk/nextjs';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSundaysInMonth, formatDate, generateTeams, getCapitalizedMonthYear } from '@/lib/utils';
 import { Game, User, MonthlyAvailability } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useTheme } from '@/contexts/theme-context';
-import { Calendar, Ban, Trophy, Users, Edit3 } from 'lucide-react';
+import { Calendar, Ban, Trophy, Users, Edit3, X } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -399,6 +399,72 @@ export default function GamesPage() {
     const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
   const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number, seconds: number} | null>(null);
+
+  // Helper function to get next confirmed match for current user
+  const getNextConfirmedMatch = useCallback((): Game | null => {
+    if (!currentUser) return null;
+    
+    const now = new Date();
+    const userConfirmedGames = games.filter(game => 
+      game.status === 'confirmed' && 
+      game.participants.includes(currentUser.id) &&
+      new Date(game.date) > now
+    );
+    
+    if (userConfirmedGames.length === 0) return null;
+    
+    // Sort by date and return the earliest one
+    return userConfirmedGames.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    )[0];
+  }, [currentUser, games]);
+
+  // Helper function to calculate time remaining
+  const calculateTimeLeft = useCallback((targetDate: Date) => {
+    const now = new Date();
+    const difference = targetDate.getTime() - now.getTime();
+    
+    if (difference <= 0) return null;
+    
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+    
+    return { days, hours, minutes, seconds };
+  }, []);
+
+  // Get next match data
+  const nextMatch = useMemo(() => getNextConfirmedMatch(), [getNextConfirmedMatch]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!nextMatch) {
+      setTimeLeft(null);
+      return;
+    }
+
+    // Create match date with time (assume 10:00 AM if no time specified)
+    const matchDate = new Date(nextMatch.date);
+    const matchTime = nextMatch.reservationInfo?.time || '10:00';
+    const [hours, minutes] = matchTime.split(':');
+    matchDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+    const updateCountdown = () => {
+      const time = calculateTimeLeft(matchDate);
+      setTimeLeft(time);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextMatch, calculateTimeLeft]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -769,22 +835,28 @@ export default function GamesPage() {
               
               {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
                 existingGame.participants.includes(currentUser?.id || '') ? (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                  <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg ${
                     theme === 'dark' 
                       ? 'text-green-300 bg-green-950/40 border border-green-600/30'
                       : 'text-green-700 bg-green-50 border border-green-200'
                   }`}>
-                    <Trophy className="h-4 w-4" />
-                    <span className="text-sm font-medium">¡Confirmado! Estás en este partido</span>
+                    <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium">
+                      <span className="sm:hidden">¡Confirmado!</span>
+                      <span className="hidden sm:inline">¡Confirmado! Estás en este partido</span>
+                    </span>
                   </div>
                 ) : (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                  <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg ${
                     theme === 'dark' 
                       ? 'text-orange-300 bg-orange-950/40 border border-orange-600/30'
                       : 'text-orange-700 bg-orange-50 border border-orange-200'
                   }`}>
-                    <Ban className="h-4 w-4" />
-                    <span className="text-sm font-medium">Día completo (10 jugadores)</span>
+                    <Ban className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium">
+                      <span className="sm:hidden">Completo</span>
+                      <span className="hidden sm:inline">Día completo (10 jugadores)</span>
+                    </span>
                   </div>
                 )
               )}
@@ -1023,6 +1095,108 @@ export default function GamesPage() {
           onSave={updateGameResult}
           onClose={() => setAddingResultToGame(null)}
         />
+      )}
+
+      {/* Floating Countdown Timer */}
+      {timeLeft && showCountdown && (
+        <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 ${
+          theme === 'dark' 
+            ? 'bg-blue-950/95 border border-blue-600/30 backdrop-blur-sm'
+            : 'bg-blue-50/95 border border-blue-200 backdrop-blur-sm'
+        } rounded-xl shadow-lg p-3 sm:p-4 max-w-[280px] sm:max-w-sm`}>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className={`h-4 w-4 ${
+                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+              }`} />
+              <h3 className={`text-sm font-semibold ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+              }`}>
+                Próximo Partido
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowCountdown(false)}
+              className={`p-1 rounded-lg hover:bg-blue-100/50 transition-colors ${
+                theme === 'dark' 
+                  ? 'text-blue-400 hover:bg-blue-900/30' 
+                  : 'text-blue-600 hover:bg-blue-100'
+              }`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          
+          <div className={`text-xs mb-3 ${
+            theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+          }`}>
+            {(() => {
+              if (!nextMatch) return '';
+              const date = formatDate(new Date(nextMatch.date));
+              const time = nextMatch.reservationInfo?.time || '10:00';
+              return `${date} • ${time}`;
+            })()}
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className={`${
+              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+            } rounded-lg p-2`}>
+              <div className={`text-lg sm:text-xl font-bold ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                {timeLeft.days}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+              }`}>
+                días
+              </div>
+            </div>
+            <div className={`${
+              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+            } rounded-lg p-2`}>
+              <div className={`text-lg sm:text-xl font-bold ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                {timeLeft.hours}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+              }`}>
+                hrs
+              </div>
+            </div>
+            <div className={`${
+              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+            } rounded-lg p-2`}>
+              <div className={`text-lg sm:text-xl font-bold ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                {timeLeft.minutes}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+              }`}>
+                min
+              </div>
+            </div>
+            <div className={`${
+              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+            } rounded-lg p-2`}>
+              <div className={`text-lg sm:text-xl font-bold ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                {timeLeft.seconds}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+              }`}>
+                seg
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
