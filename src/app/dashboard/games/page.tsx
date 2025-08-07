@@ -768,14 +768,25 @@ export default function GamesPage() {
               )}
               
               {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                  theme === 'dark' 
-                    ? 'text-orange-300 bg-orange-950/40 border border-orange-600/30'
-                    : 'text-orange-700 bg-orange-50 border border-orange-200'
-                }`}>
-                  <Ban className="h-4 w-4" />
-                  <span className="text-sm font-medium">Día completo (10 jugadores)</span>
-                </div>
+                existingGame.participants.includes(currentUser?.id || '') ? (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    theme === 'dark' 
+                      ? 'text-green-300 bg-green-950/40 border border-green-600/30'
+                      : 'text-green-700 bg-green-50 border border-green-200'
+                  }`}>
+                    <Trophy className="h-4 w-4" />
+                    <span className="text-sm font-medium">¡Confirmado! Estás en este partido</span>
+                  </div>
+                ) : (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    theme === 'dark' 
+                      ? 'text-orange-300 bg-orange-950/40 border border-orange-600/30'
+                      : 'text-orange-700 bg-orange-50 border border-orange-200'
+                  }`}>
+                    <Ban className="h-4 w-4" />
+                    <span className="text-sm font-medium">Día completo (10 jugadores)</span>
+                  </div>
+                )
               )}
             </div>
 

@@ -4,10 +4,10 @@ import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, formatDate, getCapitalizedMonthName, getCapitalizedMonthYear } from '@/lib/utils';
-import { User } from '@/types';
+import { User, Game } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useTheme } from '@/contexts/theme-context';
-import { Calendar, ChevronLeft, ChevronRight, Clock, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck, Trophy } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -52,6 +52,12 @@ const apiClient = {
     return res.json();
   },
   
+  async getGames() {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('Failed to fetch games');
+    return res.json();
+  },
+  
   async updateMonthlyAvailability(userId: string, month: number, year: number, availableSundays: number[], cannotPlayAnyDay: boolean) {
     const res = await fetch('/api/availability', {
       method: 'POST',
@@ -78,6 +84,7 @@ export default function Dashboard() {
   const [cannotPlayAnyDay, setCannotPlayAnyDay] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [blockedSundays, setBlockedSundays] = useState<number[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load initial data
@@ -126,6 +133,16 @@ export default function Dashboard() {
         // Load user's availability for the active month
         await loadUserAvailability(user.id, activeMonthData.month, activeMonthData.year);
         
+        // Load games data
+        const allGames = await apiClient.getGames();
+        const gamesWithFixedDates = allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt),
+        }));
+        setGames(gamesWithFixedDates);
+        
       } catch (error) {
         console.error('Error loading initial data:', error);
       } finally {
@@ -146,6 +163,24 @@ export default function Dashboard() {
     
     loadData();
   }, [user, currentUser, selectedMonth, selectedYear]);
+
+  // Helper function to get confirmed game for a specific Sunday
+  const getConfirmedGameForSunday = (year: number, month: number, sunday: number): Game | undefined => {
+    const date = new Date(year, month - 1, sunday);
+    return games.find(game => {
+      const gameDate = game.date instanceof Date ? game.date : new Date(game.date);
+      return gameDate.getFullYear() === date.getFullYear() &&
+             gameDate.getMonth() === date.getMonth() &&
+             gameDate.getDate() === date.getDate() &&
+             game.status === 'confirmed';
+    });
+  };
+
+  // Helper function to check if current user is confirmed in a game
+  const isUserInConfirmedGame = (year: number, month: number, sunday: number): boolean => {
+    const confirmedGame = getConfirmedGameForSunday(year, month, sunday);
+    return confirmedGame ? confirmedGame.participants.includes(currentUser?.id || '') : false;
+  };
 
   // Update Sundays when month changes
   useEffect(() => {
@@ -234,12 +269,20 @@ export default function Dashboard() {
       return;
     }
 
-    // If trying to remove a blocked day, show warning and prevent unvoting
+    // If trying to remove a blocked day, show different messages based on user's confirmation status
     if (availableSundays.includes(sunday) && isBlocked) {
-      warning(
-        'No se puede desvotar',
-        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
-      );
+      const isUserConfirmed = isUserInConfirmedGame(selectedYear, selectedMonth, sunday);
+      if (isUserConfirmed) {
+        warning(
+          'Estás confirmado',
+          `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Estás confirmado en este partido. No puedes desvotar una vez que el partido ha sido confirmado.`
+        );
+      } else {
+        warning(
+          'No se puede desvotar',
+          `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
+        );
+      }
       return;
     }
 
@@ -554,30 +597,37 @@ export default function Dashboard() {
               const isDisabled = cannotPlayAnyDay;
               const isBlocked = blockedSundays.includes(sunday);
               const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+              const isUserConfirmed = isUserInConfirmedGame(selectedYear, selectedMonth, sunday);
               
               // Check if this specific date has passed
               const today = new Date();
               today.setHours(0, 0, 0, 0);
               const isPastDate = date < today;
               
-              const shouldDisableClick = isDisabled || (!isSelected && isBlocked) || isPastMonth || isPastDate;
+              const shouldDisableClick = isDisabled || isBlocked || isPastMonth || isPastDate;
 
               return (
                 <div
                   key={sunday}
                   onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
-                  className={`p-4 rounded-xl transition-all duration-200 hover:shadow-md ${
+                  className={`p-4 rounded-xl transition-all duration-200 ${
                     isPastMonth || isPastDate
                       ? 'opacity-40 cursor-not-allowed bg-accent/20 border-2 border-border'
                       : isDisabled
                         ? 'opacity-50 cursor-not-allowed bg-accent border-2 border-border'
-                        : isBlocked && !isSelected
-                          ? `opacity-75 cursor-not-allowed ${
+                        : isBlocked && isUserConfirmed
+                          ? `${
+                            theme === 'dark' 
+                              ? 'bg-blue-950/40 border-2 border-blue-600/30'
+                              : 'bg-blue-50 border-2 border-blue-200'
+                          } cursor-not-allowed`
+                        : isBlocked && !isUserConfirmed
+                          ? `cursor-not-allowed ${
                             theme === 'dark' 
                               ? 'bg-orange-950/40 border-2 border-orange-600/30'
                               : 'bg-orange-50 border-2 border-orange-200'
                           }`
-                          : `cursor-pointer ${isSelected
+                        : `cursor-pointer hover:shadow-md ${isSelected
                               ? `${
                                 theme === 'dark' 
                                   ? 'bg-emerald-950/40 border-2 border-emerald-600/30'
@@ -591,6 +641,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {isPastMonth || isPastDate ? (
                         <Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      ) : isBlocked && isUserConfirmed ? (
+                        <Trophy className="h-5 w-5 text-blue-400 flex-shrink-0" />
                       ) : isSelected ? (
                         <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
                       ) : isBlocked && !isSelected ? (
@@ -598,7 +650,15 @@ export default function Dashboard() {
                       ) : (
                         <Calendar className="h-5 w-5 text-blue-400 flex-shrink-0" />
                       )}
-                      {isSelected && !(isPastMonth || isPastDate) && (
+                      {isBlocked && isUserConfirmed && !(isPastMonth || isPastDate) ? (
+                        <span className={`font-semibold text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                          theme === 'dark' 
+                            ? 'text-blue-200 bg-blue-900/40'
+                            : 'text-blue-700 bg-blue-100'
+                        }`}>
+                          CONFIRMADO
+                        </span>
+                      ) : isSelected && !(isPastMonth || isPastDate) && (
                         <span className={`font-semibold text-xs px-2 py-1 rounded-full whitespace-nowrap ${
                           theme === 'dark' 
                             ? 'text-green-200 bg-green-900/40'
@@ -613,7 +673,7 @@ export default function Dashboard() {
                         <span className="text-xs bg-accent text-muted-foreground px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block">
                           {isPastDate ? 'Pasado' : 'Cerrado'}
                         </span>
-                      ) : isBlocked && !isSelected && (
+                      ) : isBlocked && !isUserConfirmed ? (
                         <span className={`text-xs px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block ${
                           theme === 'dark' 
                             ? 'bg-orange-900/40 text-orange-300'
@@ -621,12 +681,13 @@ export default function Dashboard() {
                         }`}>
                           Completo
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   
                   <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
                     isPastMonth || isPastDate ? 'text-muted-foreground' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-300' : 'text-blue-700') :
                     isSelected ? (theme === 'dark' ? 'text-emerald-200' : 'text-emerald-700') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-300' : 'text-orange-700') : 'text-foreground'
                   }`}>
@@ -635,21 +696,25 @@ export default function Dashboard() {
                   
                   <p className={`text-sm font-medium mb-2 ${
                     isPastMonth || isPastDate ? 'text-muted-foreground' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600') :
                     isSelected ? (theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-600') : 'text-muted-foreground'
                   }`}>
-                    {isPastMonth ? 'Mes cerrado' : isPastDate ? 'Fecha pasada' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
+                    {isPastMonth ? 'Mes cerrado' : isPastDate ? 'Fecha pasada' : isBlocked && isUserConfirmed ? '¡Estás confirmado!' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
                   </p>
                   
                   <p className={`text-xs ${
                     isPastMonth || isPastDate ? 'text-muted-foreground/60' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-500') :
                     isSelected ? (theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500') :
                     isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-500') : 'text-muted-foreground'
                   }`}>
                     {isPastMonth ? 'No se puede votar' :
                      isPastDate ? 'Fecha ya pasada' :
+                     isBlocked && isUserConfirmed ? 'Vas a jugar este domingo' :
+                     isBlocked && !isUserConfirmed ? 'Partido confirmado - No se puede votar' :
                      isSelected ? 'Toca para desmarcar' : 
-                     isBlocked && !isSelected ? '10 jugadores confirmados' : 'Toca para marcar disponibilidad'}
+                     'Toca para marcar disponibilidad'}
                   </p>
                 </div>
               );
