@@ -248,6 +248,12 @@ export default function Dashboard() {
     return confirmedGame ? confirmedGame.participants.includes(currentUser?.id || '') : false;
   };
 
+  // Helper function to check if user has any confirmed matches in the month
+  const hasConfirmedMatchesInMonth = (year: number, month: number): boolean => {
+    if (!currentUser) return false;
+    return sundaysInMonth.some(sunday => isUserInConfirmedGame(year, month, sunday));
+  };
+
 
   // Update Sundays when month changes
   useEffect(() => {
@@ -416,6 +422,25 @@ export default function Dashboard() {
         `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: Solo puedes votar hasta 3 meses en el futuro. Este límite mantiene la flexibilidad del sistema.`
       );
       return;
+    }
+
+    // Check if user is confirmed in any matches this month when trying to mark as unavailable
+    if (!cannotPlayAnyDay && currentUser) {
+      const userConfirmedDays = sundaysInMonth.filter(sunday => 
+        isUserInConfirmedGame(selectedYear, selectedMonth, sunday)
+      );
+      
+      if (userConfirmedDays.length > 0) {
+        const daysList = userConfirmedDays.length === 1 
+          ? `el domingo ${userConfirmedDays[0]}`
+          : `los domingos ${userConfirmedDays.slice(0, -1).join(', ')} y ${userConfirmedDays.slice(-1)[0]}`;
+        
+        warning(
+          'No podés marcarte como no disponible',
+          `Estás confirmado para ${daysList} de ${getCapitalizedMonthName(selectedYear, selectedMonth)}. No podés desanotarte de partidos ya confirmados.`
+        );
+        return;
+      }
     }
 
     const newCannotPlayAnyDay = !cannotPlayAnyDay;
@@ -610,22 +635,35 @@ export default function Dashboard() {
               );
             }
             
+            const userHasConfirmedMatches = hasConfirmedMatchesInMonth(selectedYear, selectedMonth);
+            const isButtonDisabled = !cannotPlayAnyDay && userHasConfirmedMatches;
+            
             return (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-accent/20 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   ¿No puedes jugar ningún domingo este mes?
                 </span>
-                <button
-                  onClick={toggleCannotPlayAnyDay}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
-                    cannotPlayAnyDay
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-accent text-muted-foreground hover:bg-accent/80'
-                  }`}
-                >
-                  <Ban className="h-4 w-4" />
-                  {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
-                </button>
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    onClick={toggleCannotPlayAnyDay}
+                    disabled={isButtonDisabled}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
+                      isButtonDisabled
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-60'
+                        : cannotPlayAnyDay
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-accent text-muted-foreground hover:bg-accent/80'
+                    }`}
+                  >
+                    <Ban className="h-4 w-4" />
+                    {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
+                  </button>
+                  {isButtonDisabled && (
+                    <p className="text-xs text-orange-600 text-center max-w-xs">
+                      No podés marcarte como no disponible porque tenés partidos confirmados este mes
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })()}
