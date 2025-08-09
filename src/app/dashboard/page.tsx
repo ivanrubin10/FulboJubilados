@@ -636,34 +636,43 @@ export default function Dashboard() {
             }
             
             const userHasConfirmedMatches = hasConfirmedMatchesInMonth(selectedYear, selectedMonth);
-            const isButtonDisabled = !cannotPlayAnyDay && userHasConfirmedMatches;
+            
+            // If user has confirmed matches and is not already marked as unavailable, don't show the button
+            if (userHasConfirmedMatches && !cannotPlayAnyDay) {
+              return (
+                <div className={`flex items-center justify-center gap-3 mb-6 p-4 rounded-lg ${
+                  theme === 'dark' 
+                    ? 'bg-blue-950/40 border border-blue-600/30'
+                    : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  <Trophy className={`h-5 w-5 ${
+                    theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                  }`} />
+                  <span className={`text-sm font-semibold ${
+                    theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                  }`}>
+                    Tenés partidos confirmados este mes
+                  </span>
+                </div>
+              );
+            }
             
             return (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-accent/20 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   ¿No puedes jugar ningún domingo este mes?
                 </span>
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={toggleCannotPlayAnyDay}
-                    disabled={isButtonDisabled}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
-                      isButtonDisabled
-                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-60'
-                        : cannotPlayAnyDay
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-accent text-muted-foreground hover:bg-accent/80'
-                    }`}
-                  >
-                    <Ban className="h-4 w-4" />
-                    {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
-                  </button>
-                  {isButtonDisabled && (
-                    <p className="text-xs text-orange-600 text-center max-w-xs">
-                      No podés marcarte como no disponible porque tenés partidos confirmados este mes
-                    </p>
-                  )}
-                </div>
+                <button
+                  onClick={toggleCannotPlayAnyDay}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
+                    cannotPlayAnyDay
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-accent text-muted-foreground hover:bg-accent/80'
+                  }`}
+                >
+                  <Ban className="h-4 w-4" />
+                  {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
+                </button>
               </div>
             );
           })()}
