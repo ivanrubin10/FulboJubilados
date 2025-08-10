@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/connection';
 import { games, mvpVotes, users } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, inArray } from 'drizzle-orm';
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +46,7 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Get the player with the most votes
+    // Get all players with their vote counts
     const voteResults = await db
       .select({
         votedForId: mvpVotes.votedForId,
@@ -55,8 +55,7 @@ export async function POST(
       .from(mvpVotes)
       .where(eq(mvpVotes.gameId, gameId))
       .groupBy(mvpVotes.votedForId)
-      .orderBy(sql`count(*) desc`)
-      .limit(1);
+      .orderBy(sql`count(*) desc`);
 
     if (!voteResults.length) {
       return NextResponse.json({ 
@@ -64,7 +63,15 @@ export async function POST(
       }, { status: 400 });
     }
 
-    const mvpPlayerId = voteResults[0].votedForId;
+    // Find the highest vote count
+    const highestVoteCount = voteResults[0].voteCount;
+    
+    // Get all players tied for the highest vote count
+    const mvpPlayers = voteResults
+      .filter(result => result.voteCount === highestVoteCount)
+      .map(result => result.votedForId);
+
+    const mvpPlayerId = mvpPlayers.length === 1 ? mvpPlayers[0] : mvpPlayers;
 
     // Update the game result with MVP
     const updatedResult = {
@@ -80,21 +87,36 @@ export async function POST(
       })
       .where(eq(games.id, gameId));
 
-    // Get MVP player info for response
-    const mvpPlayer = await db
+    // Get MVP player(s) info for response
+    const mvpPlayerIds = Array.isArray(mvpPlayerId) ? mvpPlayerId : [mvpPlayerId];
+    const mvpPlayersData = await db
       .select()
       .from(users)
-      .where(eq(users.id, mvpPlayerId))
-      .limit(1);
+      .where(inArray(users.id, mvpPlayerIds));
+
+    const isMultipleMVPs = Array.isArray(mvpPlayerId);
+    const message = isMultipleMVPs 
+      ? `MVP voting ended in a tie - ${mvpPlayerIds.length} players awarded MVP`
+      : 'MVP finalized successfully';
 
     return NextResponse.json({
       success: true,
-      message: 'MVP finalized successfully',
-      mvp: {
+      message,
+      mvp: isMultipleMVPs ? {
+        playerIds: mvpPlayerId,
+        players: mvpPlayersData.map(player => ({
+          playerId: player.id,
+          playerName: player.name,
+          playerNickname: player.nickname
+        })),
+        voteCount: highestVoteCount,
+        isTie: true
+      } : {
         playerId: mvpPlayerId,
-        playerName: mvpPlayer[0]?.name,
-        playerNickname: mvpPlayer[0]?.nickname,
-        voteCount: voteResults[0].voteCount
+        playerName: mvpPlayersData[0]?.name,
+        playerNickname: mvpPlayersData[0]?.nickname,
+        voteCount: highestVoteCount,
+        isTie: false
       }
     });
 

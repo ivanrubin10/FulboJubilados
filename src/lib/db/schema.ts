@@ -18,7 +18,7 @@ export const games = pgTable('games', {
   status: text('status', { enum: ['scheduled', 'confirmed', 'completed', 'cancelled'] }).default('scheduled').notNull(),
   participants: jsonb('participants').$type<string[]>().default([]).notNull(), // Array of user IDs
   teams: jsonb('teams').$type<{ team1: string[], team2: string[] }>(),
-  result: jsonb('result').$type<{ team1Score: number, team2Score: number, notes?: string, mvp?: string }>(),
+  result: jsonb('result').$type<{ team1Score: number, team2Score: number, notes?: string, mvp?: string | string[] }>(),
   reservationInfo: jsonb('reservation_info').$type<{
     location: string,
     time: string,

@@ -93,8 +93,11 @@ const ProfilePage = () => {
       if (!isInTeam1 && !isInTeam2) return;
 
       // Count MVP wins
-      if (game.result.mvp === user.id) {
-        mvpWins++;
+      if (game.result.mvp) {
+        const mvpIds = Array.isArray(game.result.mvp) ? game.result.mvp : [game.result.mvp];
+        if (mvpIds.includes(user.id)) {
+          mvpWins++;
+        }
       }
 
       if (team1Score > team2Score) {

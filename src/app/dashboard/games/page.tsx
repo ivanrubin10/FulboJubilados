@@ -633,6 +633,7 @@ export default function GamesPage() {
     });
   };
 
+
   const createGameForSunday = async (year: number, month: number, sunday: number) => {
     const gameDate = new Date(year, month - 1, sunday);
     const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
@@ -856,7 +857,7 @@ export default function GamesPage() {
               ...game,
               result: {
                 ...game.result,
-                mvp: result.mvp.playerId
+                mvp: result.mvp.isTie ? result.mvp.playerIds : result.mvp.playerId
               },
               updatedAt: new Date()
             };
@@ -1003,25 +1004,32 @@ export default function GamesPage() {
               )}
             </div>
 
-            {availablePlayers.length > 0 && existingGame && existingGame.status !== 'confirmed' && existingGame.status !== 'completed' && (
-              <div className="mb-4">
-                <h4 className="font-medium text-muted-foreground mb-2">Jugadores disponibles:</h4>
-                <div className="flex flex-wrap gap-2">
-                  {availablePlayers.map(player => (
-                    <span
-                      key={player.id}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        theme === 'dark' 
-                          ? 'bg-blue-950/40 text-blue-300 border border-blue-600/30' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {player.nickname || player.name}
-                    </span>
-                  ))}
+            {/* Show players who voted available for this day (only if game is not confirmed or completed) */}
+            {(!existingGame || (existingGame.status !== 'confirmed' && existingGame.status !== 'completed')) && (() => {
+              const availablePlayersWhoVoted = getAvailablePlayersForSunday(year, month, sunday);
+              
+              return availablePlayersWhoVoted.length > 0 ? (
+                <div className="mb-4">
+                  <h4 className="font-medium text-muted-foreground mb-2">
+                    Jugadores disponibles:
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {availablePlayersWhoVoted.map(player => (
+                      <span
+                        key={player.id}
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          theme === 'dark' 
+                            ? 'bg-green-950/40 text-green-300 border border-green-600/30' 
+                            : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {player.nickname || player.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : null;
+            })()}
 
             {existingGame && (
               <div className="border-t pt-4">
@@ -1178,22 +1186,52 @@ export default function GamesPage() {
                         </div>
                         <div className="text-center">
                           {(() => {
-                            const mvpPlayer = users.find(u => u.id === existingGame.result!.mvp);
-                            return (
-                              <div className="flex items-center justify-center gap-3">
-                                {mvpPlayer?.imageUrl && (
-                                  <img 
-                                    src={mvpPlayer.imageUrl} 
-                                    alt={mvpPlayer.name} 
-                                    className="w-12 h-12 rounded-full border-2 border-yellow-400"
-                                  />
-                                )}
-                                <span className="text-xl font-bold text-yellow-800 dark:text-yellow-200">
-                                  {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador desconocido'}
-                                </span>
-                                <Star className="h-6 w-6 text-yellow-500 fill-current" />
-                              </div>
-                            );
+                            const mvpIds = Array.isArray(existingGame.result!.mvp) ? existingGame.result!.mvp : [existingGame.result!.mvp];
+                            const mvpPlayers = mvpIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+                            
+                            if (mvpIds.length > 1) {
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-3">
+                                    Empate en votación - {mvpIds.length} MVPs
+                                  </p>
+                                  <div className="flex items-center justify-center gap-4 flex-wrap">
+                                    {mvpPlayers.map((mvpPlayer, index) => (
+                                      <div key={mvpPlayer?.id || index} className="flex items-center gap-2">
+                                        {mvpPlayer?.imageUrl && (
+                                          <img 
+                                            src={mvpPlayer.imageUrl} 
+                                            alt={mvpPlayer.name} 
+                                            className="w-10 h-10 rounded-full border-2 border-yellow-400"
+                                          />
+                                        )}
+                                        <span className="text-lg font-bold text-yellow-800 dark:text-yellow-200">
+                                          {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador desconocido'}
+                                        </span>
+                                        <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              const mvpPlayer = mvpPlayers[0];
+                              return (
+                                <div className="flex items-center justify-center gap-3">
+                                  {mvpPlayer?.imageUrl && (
+                                    <img 
+                                      src={mvpPlayer.imageUrl} 
+                                      alt={mvpPlayer.name} 
+                                      className="w-12 h-12 rounded-full border-2 border-yellow-400"
+                                    />
+                                  )}
+                                  <span className="text-xl font-bold text-yellow-800 dark:text-yellow-200">
+                                    {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador desconocido'}
+                                  </span>
+                                  <Star className="h-6 w-6 text-yellow-500 fill-current" />
+                                </div>
+                              );
+                            }
                           })()}
                         </div>
                       </div>
@@ -1308,6 +1346,30 @@ export default function GamesPage() {
                             <div className="mt-3 text-xs text-muted-foreground text-center">
                               Total votos: {mvpResults[existingGame.id].totalVotes} / {mvpResults[existingGame.id].totalParticipants} jugadores
                             </div>
+                            
+                            {/* Admin-only: Show non-voters list */}
+                            {currentUser.isAdmin && mvpResults[existingGame.id].nonVoters && mvpResults[existingGame.id].nonVoters!.nonVotersCount > 0 && (
+                              <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/30 rounded-lg">
+                                <h6 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+                                  Pendientes de votar ({mvpResults[existingGame.id].nonVoters!.nonVotersCount}):
+                                </h6>
+                                <div className="flex flex-wrap gap-2">
+                                  {mvpResults[existingGame.id].nonVoters!.nonVoters.map(user => (
+                                    <div key={user.id} className="flex items-center gap-1 text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 px-2 py-1 rounded-full">
+                                      {user.imageUrl && (
+                                        <img 
+                                          src={user.imageUrl} 
+                                          alt={user.name} 
+                                          className="w-4 h-4 rounded-full"
+                                        />
+                                      )}
+                                      <span>{user.displayName}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {currentUser.isAdmin && mvpResults[existingGame.id].mvp && (
                               <button
                                 onClick={() => finalizeMVP(existingGame.id)}

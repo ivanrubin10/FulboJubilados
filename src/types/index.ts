@@ -23,7 +23,7 @@ export interface Game {
     team1Score: number;
     team2Score: number;
     notes?: string;
-    mvp?: string; // User ID of the MVP
+    mvp?: string | string[]; // User ID(s) of the MVP(s) - array for ties
   };
   reservationInfo?: {
     location: string;
@@ -81,11 +81,26 @@ export interface MvpVoteResult {
   votePercentage: number;
 }
 
+export interface NonVoterInfo {
+  id: string;
+  name: string;
+  nickname?: string;
+  imageUrl?: string;
+  displayName: string;
+}
+
+export interface NonVotersData {
+  votersCount: number;
+  nonVotersCount: number;
+  nonVoters: NonVoterInfo[];
+}
+
 export interface MvpResults {
   gameId: string;
   totalParticipants: number;
   totalVotes: number;
   mvp: MvpVoteResult | null;
-  finalizedMvp: string | null;
+  finalizedMvp: string | string[] | null;
   voteResults: MvpVoteResult[];
+  nonVoters?: NonVotersData; // Only available for admins when MVP not finalized
 }
