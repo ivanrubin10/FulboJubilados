@@ -100,13 +100,13 @@ function ToastComponent({ toast, onRemove }: { toast: Toast; onRemove: (id: stri
   const getToastStyles = (type: ToastType) => {
     switch (type) {
       case 'success':
-        return 'bg-green-900/20 border-green-500/30 text-green-300';
+        return 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-500/30 text-green-800 dark:text-green-300';
       case 'error':
-        return 'bg-red-900/20 border-red-500/30 text-red-300';
+        return 'bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-500/30 text-red-800 dark:text-red-300';
       case 'warning':
-        return 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300';
+        return 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-500/30 text-yellow-800 dark:text-yellow-300';
       case 'info':
-        return 'bg-blue-900/20 border-blue-500/30 text-blue-300';
+        return 'bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-500/30 text-blue-800 dark:text-blue-300';
       default:
         return 'bg-card border-border text-foreground';
     }

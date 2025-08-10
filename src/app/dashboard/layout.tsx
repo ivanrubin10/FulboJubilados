@@ -44,7 +44,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center">
         <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-emerald-100 to-sky-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-gradient-to-r from-emerald-200 to-sky-200 dark:from-emerald-800 dark:to-sky-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl animate-spin">⚽</span>
           </div>
           <p className="text-muted-foreground font-medium">Cargando...</p>
@@ -59,8 +59,8 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center">
         <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Lock className="h-8 w-8 text-red-600" />
+          <div className="w-16 h-16 bg-gradient-to-r from-red-200 to-orange-200 dark:from-red-800 dark:to-orange-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Lock className="h-8 w-8 text-red-600 dark:text-red-300" />
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">Acceso Requerido</h2>
           <p className="text-muted-foreground font-medium mb-4">Redirigiendo a la página principal...</p>

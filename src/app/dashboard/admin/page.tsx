@@ -851,7 +851,7 @@ export default function AdminPage() {
             <button
               onClick={handleVotingReminderClick}
               disabled={isLoadingVotingReminder}
-              className="bg-blue-600 text-white border border-blue-600 px-6 py-4 rounded-lg font-medium hover:bg-blue-700 hover:border-blue-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 dark:bg-blue-700 text-white border border-blue-600 dark:border-blue-700 px-6 py-4 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 hover:border-blue-700 dark:hover:border-blue-600 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Vote className="h-5 w-5" />
@@ -874,7 +874,7 @@ export default function AdminPage() {
             <button
               onClick={handleMatchConfirmationClick}
               disabled={isLoadingMatchConfirmation}
-              className="bg-emerald-600 text-white border border-emerald-600 px-6 py-4 rounded-lg font-medium hover:bg-emerald-700 hover:border-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-emerald-600 dark:bg-emerald-700 text-white border border-emerald-600 dark:border-emerald-700 px-6 py-4 rounded-lg font-medium hover:bg-emerald-700 dark:hover:bg-emerald-600 hover:border-emerald-700 dark:hover:border-emerald-600 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Trophy className="h-5 w-5" />
@@ -897,7 +897,7 @@ export default function AdminPage() {
             <button
               onClick={handleMvpReminderClick}
               disabled={isLoadingMvpReminder}
-              className="bg-purple-600 text-white border border-purple-600 px-6 py-4 rounded-lg font-medium hover:bg-purple-700 hover:border-purple-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-purple-600 dark:bg-purple-700 text-white border border-purple-600 dark:border-purple-700 px-6 py-4 rounded-lg font-medium hover:bg-purple-700 dark:hover:bg-purple-600 hover:border-purple-700 dark:hover:border-purple-600 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-3">
                 <Star className="h-5 w-5" />

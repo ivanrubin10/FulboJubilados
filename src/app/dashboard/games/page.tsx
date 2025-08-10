@@ -245,7 +245,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
               </h3>
               <button
                 onClick={regenerateTeams}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 flex items-center gap-2"
               >
                 🎲 Regenerar Equipos (Aleatorio)
               </button>
@@ -297,7 +297,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
                           <span className={theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}>{player?.nickname || player?.name}</span>
                           <button
                             onClick={() => swapPlayerBetweenTeams(playerId)}
-                            className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            className="text-xs bg-red-500 dark:bg-red-600 text-white px-2 py-1 rounded hover:bg-red-600 dark:hover:bg-red-500"
                           >
                             ←
                           </button>
@@ -421,7 +421,7 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
             >
               Guardar Cambios
             </button>
@@ -452,18 +452,27 @@ export default function GamesPage() {
   const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
   const [mvpResults, setMvpResults] = useState<{[gameId: string]: MvpResults}>({});
   const [votedGames, setVotedGames] = useState<{[gameId: string]: boolean}>({});
+  const [voteStatusLoading, setVoteStatusLoading] = useState<{[gameId: string]: boolean}>({});
 
   // MVP voting helper functions
   const hasUserVotedForGame = (gameId: string): boolean => {
     return votedGames[gameId] === true;
   };
 
+  const isVoteStatusLoading = (gameId: string): boolean => {
+    return voteStatusLoading[gameId] === true;
+  };
+
   const loadVoteStatus = async (gameId: string) => {
+    setVoteStatusLoading(prev => ({ ...prev, [gameId]: true }));
     try {
       const result = await apiClient.checkVoteStatus(gameId);
       setVotedGames(prev => ({ ...prev, [gameId]: result.hasVoted }));
     } catch (error) {
       console.error('Error loading vote status:', error);
+      setVotedGames(prev => ({ ...prev, [gameId]: false }));
+    } finally {
+      setVoteStatusLoading(prev => ({ ...prev, [gameId]: false }));
     }
   };
 
@@ -969,7 +978,7 @@ export default function GamesPage() {
               {!existingGame && availablePlayers.length >= 10 && (
                 <button
                   onClick={() => createGameForSunday(year, month, sunday)}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
                 >
                   Confirmar Partido
                 </button>
@@ -1054,7 +1063,7 @@ export default function GamesPage() {
                       {!existingGame.teams && existingGame.participants.length === 10 && (
                     <button
                       onClick={() => organizeTeams(existingGame.id)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                      className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
                     >
                       Organizar Equipos
                     </button>
@@ -1062,7 +1071,7 @@ export default function GamesPage() {
                       {existingGame.status === 'completed' && !existingGame.result && (
                         <button
                           onClick={() => setAddingResultToGame(existingGame)}
-                          className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                          className="bg-green-600 dark:bg-green-700 text-white px-3 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 flex items-center gap-2"
                         >
                           <Trophy className="h-4 w-4" />
                           Agregar Resultado
@@ -1137,16 +1146,22 @@ export default function GamesPage() {
                 )}
 
                 {existingGame.result && (
-                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg mb-4">
+                  <div className={`p-4 rounded-lg mb-4 ${
+                    theme === 'dark' ? 'bg-green-950/40 border border-green-600/30' : 'bg-green-50 border border-green-200'
+                  }`}>
                     <div className="flex items-center justify-between mb-3">
-                      <h5 className="font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
+                      <h5 className={`font-semibold flex items-center gap-2 ${
+                        theme === 'dark' ? 'text-green-300' : 'text-green-800'
+                      }`}>
                         <Trophy className="h-5 w-5" />
                         Resultado Final
                       </h5>
                       {currentUser.isAdmin && (
                         <button
                           onClick={() => setAddingResultToGame(existingGame)}
-                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 p-1"
+                          className={`p-1 ${
+                            theme === 'dark' ? 'text-green-400 hover:text-green-200' : 'text-green-600 hover:text-green-800'
+                          }`}
                           title="Editar resultado"
                         >
                           <Edit3 className="h-4 w-4" />
@@ -1158,7 +1173,9 @@ export default function GamesPage() {
                         {existingGame.result.team1Score} - {existingGame.result.team2Score}
                       </div>
                       {existingGame.teams && (
-                        <div className="text-sm text-green-700 dark:text-green-300 mb-2">
+                        <div className={`text-sm mb-2 ${
+                          theme === 'dark' ? 'text-green-300' : 'text-green-700'
+                        }`}>
                           <span className="font-medium">Equipo 1</span> vs <span className="font-medium">Equipo 2</span>
                         </div>
                       )}
@@ -1237,19 +1254,25 @@ export default function GamesPage() {
                       </div>
                     ) : existingGame.participants.includes(currentUser.id) ? (
                       // Show MVP Voting for Participants
-                      <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/20">
+                      <div className={`p-4 rounded-lg ${
+                        theme === 'dark' ? 'bg-blue-950/40 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
+                      }`}>
                         <div className="flex items-center justify-between mb-3">
-                          <h5 className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                          <h5 className={`font-semibold flex items-center gap-2 ${
+                            theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                          }`}>
                             <Star className="h-5 w-5" />
                             Votación MVP
                           </h5>
-                          {!hasUserVotedForGame(existingGame.id) && (
+                          {!hasUserVotedForGame(existingGame.id) && !isVoteStatusLoading(existingGame.id) && (
                             <button
                               onClick={() => setShowMVPVoting(prev => ({ 
                                 ...prev, 
                                 [existingGame.id]: !prev[existingGame.id] 
                               }))}
-                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                              className={`text-sm font-medium ${
+                                theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                              }`}
                             >
                               {showMVPVoting[existingGame.id] ? 'Ocultar votación' : 'Votar MVP'}
                             </button>
@@ -1258,7 +1281,9 @@ export default function GamesPage() {
                         
                         {hasUserVotedForGame(existingGame.id) ? (
                           <div className="text-center">
-                            <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                            <div className={`flex items-center justify-center gap-2 mb-2 ${
+                              theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                            }`}>
                               <Trophy className="h-5 w-5" />
                               <span className="font-medium">¡Ya votaste!</span>
                             </div>
@@ -1274,7 +1299,9 @@ export default function GamesPage() {
                                     [existingGame.id]: true 
                                   }));
                                 }}
-                                className="mt-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                                className={`mt-2 text-sm font-medium ${
+                                  theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                                }`}
                               >
                                 Ver resultados (Admin)
                               </button>
@@ -1293,7 +1320,11 @@ export default function GamesPage() {
                                   <button
                                     key={player!.id}
                                     onClick={() => submitMVPVote(existingGame.id, player!.id)}
-                                    className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+                                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                      theme === 'dark' 
+                                        ? 'border-blue-700/30 hover:bg-blue-900/20' 
+                                        : 'border-blue-200 hover:bg-blue-100'
+                                    }`}
                                   >
                                     {player!.imageUrl && (
                                       <img 
@@ -1302,7 +1333,7 @@ export default function GamesPage() {
                                         className="w-8 h-8 rounded-full"
                                       />
                                     )}
-                                    <span className="font-medium text-blue-800 dark:text-blue-200">
+                                    <span className="font-medium text-blue-400 dark:text-blue-200">
                                       {player!.nickname || player!.name}
                                     </span>
                                     <Star className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-auto" />
@@ -1320,7 +1351,9 @@ export default function GamesPage() {
                         {/* Show results if available (for admins or after voting) */}
                         {mvpResults[existingGame.id] && showMVPVoting[existingGame.id] && (
                           <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700/30">
-                            <h6 className="font-medium text-blue-800 dark:text-blue-200 mb-3">
+                            <h6 className={`font-medium ${
+                                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                                } mb-3`}>
                               Resultados actuales:
                             </h6>
                             <div className="space-y-2">
@@ -1349,13 +1382,19 @@ export default function GamesPage() {
                             
                             {/* Admin-only: Show non-voters list */}
                             {currentUser.isAdmin && mvpResults[existingGame.id].nonVoters && mvpResults[existingGame.id].nonVoters!.nonVotersCount > 0 && (
-                              <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/30 rounded-lg">
-                                <h6 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+                              <div className={`mt-3 p-3 rounded-lg ${
+                                theme === 'dark' ? 'bg-orange-950/40 border border-orange-600/30' : 'bg-orange-50 border border-orange-200'
+                              }`}>
+                                <h6 className={`text-sm font-medium mb-2 ${
+                                  theme === 'dark' ? 'text-orange-300' : 'text-orange-800'
+                                }`}>
                                   Pendientes de votar ({mvpResults[existingGame.id].nonVoters!.nonVotersCount}):
                                 </h6>
                                 <div className="flex flex-wrap gap-2">
                                   {mvpResults[existingGame.id].nonVoters!.nonVoters.map(user => (
-                                    <div key={user.id} className="flex items-center gap-1 text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 px-2 py-1 rounded-full">
+                                    <div key={user.id} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                                      theme === 'dark' ? 'bg-orange-900/40 text-orange-200' : 'bg-orange-100 text-orange-800'
+                                    }`}>
                                       {user.imageUrl && (
                                         <img 
                                           src={user.imageUrl} 
@@ -1375,7 +1414,21 @@ export default function GamesPage() {
                                 onClick={() => finalizeMVP(existingGame.id)}
                                 className="mt-3 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                               >
-                                Finalizar MVP: {mvpResults[existingGame.id].mvp!.playerNickname || mvpResults[existingGame.id].mvp!.playerName}
+                                {(() => {
+                                  const results = mvpResults[existingGame.id].voteResults;
+                                  if (results.length === 0) return "Finalizar MVP";
+                                  
+                                  const highestVoteCount = results[0].voteCount;
+                                  const tiedPlayers = results.filter(r => r.voteCount === highestVoteCount);
+                                  
+                                  if (tiedPlayers.length === 1) {
+                                    const winner = tiedPlayers[0];
+                                    return `Finalizar MVP: ${winner.playerNickname || winner.playerName}`;
+                                  } else {
+                                    const names = tiedPlayers.map(p => p.playerNickname || p.playerName).join(", ");
+                                    return `Finalizar MVP (Empate): ${names}`;
+                                  }
+                                })()}
                               </button>
                             )}
                           </div>
@@ -1383,7 +1436,9 @@ export default function GamesPage() {
                       </div>
                     ) : (
                       // Show message for non-participants
-                      <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+                      <div className={`p-4 rounded-lg border ${
+                        theme === 'dark' ? 'bg-gray-900/40 border-gray-800' : 'bg-gray-50 border-gray-200'
+                      }`}>
                         <div className="flex items-center justify-center gap-2 text-muted-foreground">
                           <Star className="h-5 w-5" />
                           <span className="text-sm">Solo los jugadores que participaron pueden votar por el MVP</span>
@@ -1690,7 +1745,7 @@ function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProp
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
             >
               Guardar Resultado
             </button>

@@ -92,6 +92,7 @@ export default function HistoryPage() {
   const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
   const [mvpResults, setMvpResults] = useState<{[gameId: string]: MvpResults}>({});
   const [votedGames, setVotedGames] = useState<{[gameId: string]: boolean}>({});
+  const [voteStatusLoading, setVoteStatusLoading] = useState<{[gameId: string]: boolean}>({});
   
   // Ranking explanation state
   const [showRankingExplanation, setShowRankingExplanation] = useState(false);
@@ -146,12 +147,20 @@ export default function HistoryPage() {
     return votedGames[gameId] === true;
   };
 
+  const isVoteStatusLoading = (gameId: string): boolean => {
+    return voteStatusLoading[gameId] === true;
+  };
+
   const loadVoteStatus = async (gameId: string) => {
+    setVoteStatusLoading(prev => ({ ...prev, [gameId]: true }));
     try {
       const result = await apiClient.checkVoteStatus(gameId);
       setVotedGames(prev => ({ ...prev, [gameId]: result.hasVoted }));
     } catch (error) {
       console.error('Error loading vote status:', error);
+      setVotedGames(prev => ({ ...prev, [gameId]: false }));
+    } finally {
+      setVoteStatusLoading(prev => ({ ...prev, [gameId]: false }));
     }
   };
 
@@ -406,7 +415,7 @@ export default function HistoryPage() {
                   {currentUser.isAdmin && (
                     <button
                       onClick={() => setSelectedGame(game.id)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                      className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
                     >
                       Agregar Resultado
                     </button>
@@ -494,7 +503,7 @@ export default function HistoryPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => addResult(game.id)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                        className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
                       >
                         Guardar Resultado
                       </button>
@@ -663,19 +672,25 @@ export default function HistoryPage() {
                         </div>
                       ) : game.participants.includes(currentUser?.id || '') ? (
                         // Show MVP Voting for Participants
-                        <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/20">
+                        <div className={`p-4 rounded-lg ${
+                          theme === 'dark' ? 'bg-blue-950/40 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
+                        }`}>
                           <div className="flex items-center justify-between mb-3">
-                            <h5 className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                            <h5 className={`font-semibold flex items-center gap-2 ${
+                              theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                            }`}>
                               <Star className="h-5 w-5" />
                               Votación MVP
                             </h5>
-                            {!hasUserVotedForGame(game.id) && (
+                            {!hasUserVotedForGame(game.id) && !isVoteStatusLoading(game.id) && (
                               <button
                                 onClick={() => setShowMVPVoting(prev => ({ 
                                   ...prev, 
                                   [game.id]: !prev[game.id] 
                                 }))}
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                                className={`text-sm font-medium ${
+                                  theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                                }`}
                               >
                                 {showMVPVoting[game.id] ? 'Ocultar votación' : 'Votar MVP'}
                               </button>
@@ -684,7 +699,9 @@ export default function HistoryPage() {
                           
                           {hasUserVotedForGame(game.id) ? (
                             <div className="text-center">
-                              <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                              <div className={`flex items-center justify-center gap-2 mb-2 ${
+                                theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                              }`}>
                                 <Trophy className="h-5 w-5" />
                                 <span className="font-medium">¡Ya votaste!</span>
                               </div>
@@ -700,7 +717,9 @@ export default function HistoryPage() {
                                       [game.id]: true 
                                     }));
                                   }}
-                                  className="mt-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                                  className={`mt-2 text-sm font-medium ${
+                                    theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                                  }`}
                                 >
                                   Ver resultados (Admin)
                                 </button>
@@ -719,7 +738,11 @@ export default function HistoryPage() {
                                     <button
                                       key={player!.id}
                                       onClick={() => submitMVPVote(game.id, player!.id)}
-                                      className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+                                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                        theme === 'dark' 
+                                          ? 'border-blue-700/30 hover:bg-blue-900/20' 
+                                          : 'border-blue-200 hover:bg-blue-100'
+                                      }`}
                                     >
                                       {player!.imageUrl && (
                                         <img 
@@ -728,10 +751,14 @@ export default function HistoryPage() {
                                           className="w-8 h-8 rounded-full"
                                         />
                                       )}
-                                      <span className="font-medium text-blue-800 dark:text-blue-200">
+                                      <span className={`font-medium ${
+                                        theme === 'dark' ? 'text-blue-200' : 'text-blue-800'
+                                      }`}>
                                         {player!.nickname || player!.name}
                                       </span>
-                                      <Star className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-auto" />
+                                      <Star className={`h-4 w-4 ml-auto ${
+                                        theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                                      }`} />
                                     </button>
                                   ))
                                 }
@@ -746,7 +773,9 @@ export default function HistoryPage() {
                           {/* Show results if available (for admins or after voting) */}
                           {mvpResults[game.id] && showMVPVoting[game.id] && (
                             <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700/30">
-                              <h6 className="font-medium text-blue-800 dark:text-blue-200 mb-3">
+                              <h6 className={`font-medium ${
+                                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                                } mb-3`}>
                                 Resultados actuales:
                               </h6>
                               <div className="space-y-2">
@@ -775,13 +804,19 @@ export default function HistoryPage() {
                               
                               {/* Admin-only: Show non-voters list */}
                               {currentUser?.isAdmin && mvpResults[game.id].nonVoters && mvpResults[game.id].nonVoters!.nonVotersCount > 0 && (
-                                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/30 rounded-lg">
-                                  <h6 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+                                <div className={`mt-3 p-3 rounded-lg ${
+                                  theme === 'dark' ? 'bg-orange-950/40 border border-orange-600/30' : 'bg-orange-50 border border-orange-200'
+                                }`}>
+                                  <h6 className={`text-sm font-medium mb-2 ${
+                                    theme === 'dark' ? 'text-orange-300' : 'text-orange-800'
+                                  }`}>
                                     Pendientes de votar ({mvpResults[game.id].nonVoters!.nonVotersCount}):
                                   </h6>
                                   <div className="flex flex-wrap gap-2">
                                     {mvpResults[game.id].nonVoters!.nonVoters.map(user => (
-                                      <div key={user.id} className="flex items-center gap-1 text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 px-2 py-1 rounded-full">
+                                      <div key={user.id} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                                        theme === 'dark' ? 'bg-orange-900/40 text-orange-200' : 'bg-orange-100 text-orange-800'
+                                      }`}>
                                         {user.imageUrl && (
                                           <img 
                                             src={user.imageUrl} 
@@ -801,7 +836,21 @@ export default function HistoryPage() {
                                   onClick={() => finalizeMVP(game.id)}
                                   className="mt-3 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                                 >
-                                  Finalizar MVP: {mvpResults[game.id].mvp!.playerNickname || mvpResults[game.id].mvp!.playerName}
+                                  {(() => {
+                                    const results = mvpResults[game.id].voteResults;
+                                    if (results.length === 0) return "Finalizar MVP";
+                                    
+                                    const highestVoteCount = results[0].voteCount;
+                                    const tiedPlayers = results.filter(r => r.voteCount === highestVoteCount);
+                                    
+                                    if (tiedPlayers.length === 1) {
+                                      const winner = tiedPlayers[0];
+                                      return `Finalizar MVP: ${winner.playerNickname || winner.playerName}`;
+                                    } else {
+                                      const names = tiedPlayers.map(p => p.playerNickname || p.playerName).join(", ");
+                                      return `Finalizar MVP (Empate): ${names}`;
+                                    }
+                                  })()}
                                 </button>
                               )}
                             </div>
@@ -809,7 +858,9 @@ export default function HistoryPage() {
                         </div>
                       ) : (
                         // Show message for non-participants
-                        <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div className={`p-4 rounded-lg border ${
+                          theme === 'dark' ? 'bg-gray-900/40 border-gray-800' : 'bg-gray-50 border-gray-200'
+                        }`}>
                           <div className="flex items-center justify-center gap-2 text-muted-foreground">
                             <Star className="h-5 w-5" />
                             <span className="text-sm">Solo los jugadores que participaron pueden votar por el MVP</span>
@@ -930,7 +981,11 @@ export default function HistoryPage() {
                 .sort(([,a], [,b]) => b.mvpVotesReceived - a.mvpVotesReceived) // Sort by MVP votes received descending
                 .slice(0, 5)
                 .map(([playerId, stats], index) => (
-                  <div key={playerId} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+                  <div key={playerId} className={`flex items-center justify-between p-3 rounded-lg border ${
+                    theme === 'dark' 
+                      ? 'bg-gradient-to-r from-blue-950/40 to-indigo-950/40 border-blue-600/30' 
+                      : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+                  }`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                         index === 0 ? 'bg-blue-600 text-blue-100' :
@@ -940,20 +995,30 @@ export default function HistoryPage() {
                         {index === 0 ? <Star className="h-4 w-4" /> : index + 1}
                       </div>
                       <div>
-                        <p className="font-medium text-blue-800 dark:text-blue-200">
+                        <p className={`font-medium ${
+                          theme === 'dark' ? 'text-blue-200' : 'text-blue-800'
+                        }`}>
                           {stats.player.nickname || stats.player.name}
                         </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <p className={`text-xs ${
+                          theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                        }`}>
                           {stats.wins + stats.losses + stats.draws} partidos jugados
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="flex items-center gap-1">
-                        <Trophy className="h-4 w-4 text-blue-500" />
-                        <p className="font-bold text-blue-800 dark:text-blue-200">{stats.mvpVotesReceived}</p>
+                        <Trophy className={`h-4 w-4 ${
+                          theme === 'dark' ? 'text-blue-400' : 'text-blue-500'
+                        }`} />
+                        <p className={`font-bold ${
+                          theme === 'dark' ? 'text-blue-200' : 'text-blue-800'
+                        }`}>{stats.mvpVotesReceived}</p>
                       </div>
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <p className={`text-xs ${
+                        theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                      }`}>
                         {stats.mvpVotesReceived === 1 ? 'voto' : 'votos'}
                       </p>
                     </div>
@@ -981,7 +1046,11 @@ export default function HistoryPage() {
                 .sort(([,a], [,b]) => b.mvpWins - a.mvpWins) // Sort by MVP wins descending
                 .slice(0, 5)
                 .map(([playerId, stats], index) => (
-                  <div key={playerId} className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800/30">
+                  <div key={playerId} className={`flex items-center justify-between p-3 rounded-lg border ${
+                    theme === 'dark' 
+                      ? 'bg-gradient-to-r from-yellow-950/40 to-amber-950/40 border-yellow-600/30' 
+                      : 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200'
+                  }`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                         index === 0 ? 'bg-yellow-600 text-yellow-100' :
@@ -991,20 +1060,30 @@ export default function HistoryPage() {
                         {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
                       </div>
                       <div>
-                        <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                        <p className={`font-medium ${
+                          theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'
+                        }`}>
                           {stats.player.nickname || stats.player.name}
                         </p>
-                        <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                        <p className={`text-xs ${
+                          theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'
+                        }`}>
                           {stats.wins + stats.losses + stats.draws} partidos jugados
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <p className="font-bold text-yellow-800 dark:text-yellow-200">{stats.mvpWins}</p>
+                        <Star className={`h-4 w-4 fill-current ${
+                          theme === 'dark' ? 'text-yellow-400' : 'text-yellow-500'
+                        }`} />
+                        <p className={`font-bold ${
+                          theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'
+                        }`}>{stats.mvpWins}</p>
                       </div>
-                      <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                      <p className={`text-xs ${
+                        theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'
+                      }`}>
                         {stats.mvpWins === 1 ? 'MVP' : 'MVPs'}
                       </p>
                     </div>
@@ -1104,7 +1183,7 @@ export default function HistoryPage() {
                           </div>
                         </td>
                         <td className="text-center py-3 px-2 text-foreground">
-                          <span className={stats.mvpVotesReceived > 0 ? 'font-medium text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}>
+                          <span className={stats.mvpVotesReceived > 0 ? 'font-medium text-blue-400 dark:text-blue-400' : 'text-muted-foreground'}>
                             {stats.mvpVotesReceived}
                           </span>
                         </td>

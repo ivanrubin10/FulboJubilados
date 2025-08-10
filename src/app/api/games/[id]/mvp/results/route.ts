@@ -70,6 +70,9 @@ export async function GET(
     // Get total number of participants for vote percentage calculation
     const totalParticipants = gameData.participants.length;
 
+    // Calculate total votes cast
+    const totalVotesCast = voteResults.reduce((sum, result) => sum + result.voteCount, 0);
+
     // Calculate MVP (player with most votes)
     const mvpResult = voteResults.length > 0 ? {
       playerId: voteResults[0].votedForId,
@@ -77,7 +80,7 @@ export async function GET(
       playerNickname: voteResults[0].playerNickname || undefined,
       playerImageUrl: voteResults[0].playerImageUrl || undefined,
       voteCount: voteResults[0].voteCount,
-      votePercentage: Math.round((voteResults[0].voteCount / Math.max(voteResults.length, 1)) * 100)
+      votePercentage: Math.round((voteResults[0].voteCount / Math.max(totalVotesCast, 1)) * 100)
     } : null;
 
     // Get non-voters information for admins
@@ -166,7 +169,7 @@ export async function GET(
         playerNickname: result.playerNickname || undefined,
         playerImageUrl: result.playerImageUrl || undefined,
         voteCount: result.voteCount,
-        votePercentage: Math.round((result.voteCount / Math.max(voteResults.length, 1)) * 100)
+        votePercentage: Math.round((result.voteCount / Math.max(totalVotesCast, 1)) * 100)
       }))
     };
 
