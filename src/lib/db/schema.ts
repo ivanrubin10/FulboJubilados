@@ -18,7 +18,7 @@ export const games = pgTable('games', {
   status: text('status', { enum: ['scheduled', 'confirmed', 'completed', 'cancelled'] }).default('scheduled').notNull(),
   participants: jsonb('participants').$type<string[]>().default([]).notNull(), // Array of user IDs
   teams: jsonb('teams').$type<{ team1: string[], team2: string[] }>(),
-  result: jsonb('result').$type<{ team1Score: number, team2Score: number, notes?: string }>(),
+  result: jsonb('result').$type<{ team1Score: number, team2Score: number, notes?: string, mvp?: string }>(),
   reservationInfo: jsonb('reservation_info').$type<{
     location: string,
     time: string,
@@ -80,6 +80,24 @@ export const adminNotifications = pgTable('admin_notifications', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const mvpVotes = pgTable('mvp_votes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  gameId: uuid('game_id').notNull().references(() => games.id, { onDelete: 'cascade' }),
+  votedForId: text('voted_for_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const mvpVoteStatus = pgTable('mvp_vote_status', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  gameId: uuid('game_id').notNull().references(() => games.id, { onDelete: 'cascade' }),
+  voterId: text('voter_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  hasVoted: boolean('has_voted').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  // Ensure one vote status per voter per game
+  oneStatusPerGameVoter: unique('one_status_per_game_voter').on(table.gameId, table.voterId),
+}));
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -91,3 +109,7 @@ export type ReminderStatus = typeof reminderStatus.$inferSelect;
 export type NewReminderStatus = typeof reminderStatus.$inferInsert;
 export type AdminNotification = typeof adminNotifications.$inferSelect;
 export type NewAdminNotification = typeof adminNotifications.$inferInsert;
+export type MvpVote = typeof mvpVotes.$inferSelect;
+export type NewMvpVote = typeof mvpVotes.$inferInsert;
+export type MvpVoteStatus = typeof mvpVoteStatus.$inferSelect;
+export type NewMvpVoteStatus = typeof mvpVoteStatus.$inferInsert;

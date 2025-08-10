@@ -3,11 +3,11 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSundaysInMonth, formatDate, generateTeams, getCapitalizedMonthYear } from '@/lib/utils';
-import { Game, User, MonthlyAvailability } from '@/types';
+import { Game, User, MonthlyAvailability, MvpResults } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useTheme } from '@/contexts/theme-context';
-import { Calendar, Ban, Trophy, Users, Edit3, X } from 'lucide-react';
+import { Calendar, Ban, Trophy, Users, Edit3, X, Star, Crown } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -36,6 +36,52 @@ const apiClient = {
       body: JSON.stringify(games)
     });
     if (!res.ok) throw new Error('Failed to save games');
+    return res.json();
+  },
+
+  async voteMVP(gameId: string, votedForId: string) {
+    console.log('Submitting MVP vote:', { gameId, votedForId });
+    
+    const res = await fetch(`/api/games/${gameId}/mvp/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ votedForId })
+    });
+    
+    console.log('MVP vote response status:', res.status);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('MVP vote error response:', errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(errorData.error || 'Failed to submit MVP vote');
+      } catch {
+        throw new Error(`HTTP ${res.status}: ${errorText || 'Failed to submit MVP vote'}`);
+      }
+    }
+    
+    return res.json();
+  },
+
+  async getMVPResults(gameId: string): Promise<MvpResults> {
+    const res = await fetch(`/api/games/${gameId}/mvp/results`);
+    if (!res.ok) throw new Error('Failed to fetch MVP results');
+    return res.json();
+  },
+
+  async finalizeMVP(gameId: string) {
+    const res = await fetch(`/api/games/${gameId}/mvp/finalize`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to finalize MVP');
+    return res.json();
+  },
+
+  async checkVoteStatus(gameId: string) {
+    const res = await fetch(`/api/games/${gameId}/mvp/voted`);
+    if (!res.ok) throw new Error('Failed to check vote status');
     return res.json();
   }
 };
@@ -401,6 +447,29 @@ export default function GamesPage() {
   const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
   const [showCountdown, setShowCountdown] = useState(true);
   const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number, seconds: number} | null>(null);
+  
+  // MVP voting state
+  const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
+  const [mvpResults, setMvpResults] = useState<{[gameId: string]: MvpResults}>({});
+  const [votedGames, setVotedGames] = useState<{[gameId: string]: boolean}>({});
+
+  // MVP voting helper functions
+  const hasUserVotedForGame = (gameId: string): boolean => {
+    return votedGames[gameId] === true;
+  };
+
+  const loadVoteStatus = async (gameId: string) => {
+    try {
+      const result = await apiClient.checkVoteStatus(gameId);
+      setVotedGames(prev => ({ ...prev, [gameId]: result.hasVoted }));
+    } catch (error) {
+      console.error('Error loading vote status:', error);
+    }
+  };
+
+  const markGameAsVoted = (gameId: string) => {
+    setVotedGames(prev => ({ ...prev, [gameId]: true }));
+  };
 
   // Helper function to get next confirmed match for current user
   const getNextConfirmedMatch = useCallback((): Game | null => {
@@ -492,6 +561,19 @@ export default function GamesPage() {
         setGames(gamesWithFixedDates);
       setCurrentUser(userData || null);
         setAvailability(monthlyAvailability);
+
+        // Load vote status for completed games where user participated
+        if (userData) {
+          const completedGames = gamesWithFixedDates.filter((game: Game) => 
+            game.status === 'completed' && 
+            game.result && 
+            game.participants.includes(userData.id)
+          );
+          
+          completedGames.forEach((game: Game) => {
+            loadVoteStatus(game.id);
+          });
+        }
       } catch (error) {
         console.error('Error loading games data:', error);
       } finally {
@@ -732,6 +814,65 @@ export default function GamesPage() {
     }
   };
 
+  // MVP voting functions continue here
+
+  const loadMVPResults = async (gameId: string) => {
+    try {
+      const results = await apiClient.getMVPResults(gameId);
+      setMvpResults(prev => ({ ...prev, [gameId]: results }));
+    } catch (error) {
+      console.error('Error loading MVP results:', error);
+    }
+  };
+
+  const submitMVPVote = async (gameId: string, votedForId: string) => {
+    try {
+      await apiClient.voteMVP(gameId, votedForId);
+      markGameAsVoted(gameId);
+      success('Voto enviado', 'Tu voto para MVP se envió correctamente');
+      
+      // Refresh MVP results
+      await loadMVPResults(gameId);
+      
+      // Hide voting UI
+      setShowMVPVoting(prev => ({ ...prev, [gameId]: false }));
+    } catch (err) {
+      console.error('Error voting MVP:', err);
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo enviar el voto para MVP';
+      error('Error al votar', errorMessage);
+    }
+  };
+
+  const finalizeMVP = async (gameId: string) => {
+    try {
+      const result = await apiClient.finalizeMVP(gameId);
+      success('MVP finalizado', 'El MVP se ha establecido correctamente');
+      
+      // Update the game in local state with the new MVP result
+      setGames(prevGames => 
+        prevGames.map(game => {
+          if (game.id === gameId && game.result) {
+            return {
+              ...game,
+              result: {
+                ...game.result,
+                mvp: result.mvp.playerId
+              },
+              updatedAt: new Date()
+            };
+          }
+          return game;
+        })
+      );
+      
+      // Refresh MVP results
+      await loadMVPResults(gameId);
+    } catch (err) {
+      console.error('Error finalizing MVP:', err);
+      error('Error al finalizar MVP', 'No se pudo establecer el MVP');
+    }
+  };
+
   if (!isLoaded || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -862,7 +1003,7 @@ export default function GamesPage() {
               )}
             </div>
 
-            {availablePlayers.length > 0 && (
+            {availablePlayers.length > 0 && existingGame && existingGame.status !== 'confirmed' && existingGame.status !== 'completed' && (
               <div className="mb-4">
                 <h4 className="font-medium text-muted-foreground mb-2">Jugadores disponibles:</h4>
                 <div className="flex flex-wrap gap-2">
@@ -988,16 +1129,16 @@ export default function GamesPage() {
                 )}
 
                 {existingGame.result && (
-                  <div className="bg-green-50 p-4 rounded-lg mb-4">
+                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg mb-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h5 className="font-semibold text-green-800 flex items-center gap-2">
+                      <h5 className="font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
                         <Trophy className="h-5 w-5" />
                         Resultado Final
                       </h5>
                       {currentUser.isAdmin && (
                         <button
                           onClick={() => setAddingResultToGame(existingGame)}
-                          className="text-green-600 hover:text-green-800 p-1"
+                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 p-1"
                           title="Editar resultado"
                         >
                           <Edit3 className="h-4 w-4" />
@@ -1009,7 +1150,7 @@ export default function GamesPage() {
                         {existingGame.result.team1Score} - {existingGame.result.team2Score}
                       </div>
                       {existingGame.teams && (
-                        <div className="text-sm text-green-700 mb-2">
+                        <div className="text-sm text-green-700 dark:text-green-300 mb-2">
                           <span className="font-medium">Equipo 1</span> vs <span className="font-medium">Equipo 2</span>
                         </div>
                       )}
@@ -1019,6 +1160,174 @@ export default function GamesPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* MVP Voting Section */}
+                {existingGame.status === 'completed' && existingGame.result && (
+                  <div className="mb-4">
+                    {existingGame.result.mvp ? (
+                      // Show MVP Result
+                      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800/30">
+                        <div className="flex items-center justify-center gap-3 mb-2">
+                          <Crown className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                          <h5 className="font-bold text-yellow-800 dark:text-yellow-200 text-lg">
+                            MVP del Partido
+                          </h5>
+                          <Crown className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div className="text-center">
+                          {(() => {
+                            const mvpPlayer = users.find(u => u.id === existingGame.result!.mvp);
+                            return (
+                              <div className="flex items-center justify-center gap-3">
+                                {mvpPlayer?.imageUrl && (
+                                  <img 
+                                    src={mvpPlayer.imageUrl} 
+                                    alt={mvpPlayer.name} 
+                                    className="w-12 h-12 rounded-full border-2 border-yellow-400"
+                                  />
+                                )}
+                                <span className="text-xl font-bold text-yellow-800 dark:text-yellow-200">
+                                  {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador desconocido'}
+                                </span>
+                                <Star className="h-6 w-6 text-yellow-500 fill-current" />
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ) : existingGame.participants.includes(currentUser.id) ? (
+                      // Show MVP Voting for Participants
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                            <Star className="h-5 w-5" />
+                            Votación MVP
+                          </h5>
+                          {!hasUserVotedForGame(existingGame.id) && (
+                            <button
+                              onClick={() => setShowMVPVoting(prev => ({ 
+                                ...prev, 
+                                [existingGame.id]: !prev[existingGame.id] 
+                              }))}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                            >
+                              {showMVPVoting[existingGame.id] ? 'Ocultar votación' : 'Votar MVP'}
+                            </button>
+                          )}
+                        </div>
+                        
+                        {hasUserVotedForGame(existingGame.id) ? (
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                              <Trophy className="h-5 w-5" />
+                              <span className="font-medium">¡Ya votaste!</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Tu voto se registró correctamente. Los resultados se mostrarán cuando termine la votación.
+                            </p>
+                            {currentUser.isAdmin && (
+                              <button
+                                onClick={() => {
+                                  loadMVPResults(existingGame.id);
+                                  setShowMVPVoting(prev => ({ 
+                                    ...prev, 
+                                    [existingGame.id]: true 
+                                  }));
+                                }}
+                                className="mt-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-sm font-medium"
+                              >
+                                Ver resultados (Admin)
+                              </button>
+                            )}
+                          </div>
+                        ) : showMVPVoting[existingGame.id] ? (
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              Vota por el mejor jugador del partido (votación anónima):
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {existingGame.participants
+                                .map(participantId => users.find(u => u.id === participantId))
+                                .filter(Boolean)
+                                .map(player => (
+                                  <button
+                                    key={player!.id}
+                                    onClick={() => submitMVPVote(existingGame.id, player!.id)}
+                                    className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+                                  >
+                                    {player!.imageUrl && (
+                                      <img 
+                                        src={player!.imageUrl} 
+                                        alt={player!.name} 
+                                        className="w-8 h-8 rounded-full"
+                                      />
+                                    )}
+                                    <span className="font-medium text-blue-800 dark:text-blue-200">
+                                      {player!.nickname || player!.name}
+                                    </span>
+                                    <Star className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-auto" />
+                                  </button>
+                                ))
+                              }
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center">
+                            Haz clic en &quot;Votar MVP&quot; para elegir al mejor jugador del partido
+                          </p>
+                        )}
+
+                        {/* Show results if available (for admins or after voting) */}
+                        {mvpResults[existingGame.id] && showMVPVoting[existingGame.id] && (
+                          <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700/30">
+                            <h6 className="font-medium text-blue-800 dark:text-blue-200 mb-3">
+                              Resultados actuales:
+                            </h6>
+                            <div className="space-y-2">
+                              {mvpResults[existingGame.id].voteResults.map(result => (
+                                <div key={result.playerId} className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-2">
+                                    {result.playerImageUrl && (
+                                      <img 
+                                        src={result.playerImageUrl} 
+                                        alt={result.playerName} 
+                                        className="w-6 h-6 rounded-full"
+                                      />
+                                    )}
+                                    <span>{result.playerNickname || result.playerName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{result.voteCount} voto{result.voteCount !== 1 ? 's' : ''}</span>
+                                    <span className="text-muted-foreground">({result.votePercentage}%)</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-3 text-xs text-muted-foreground text-center">
+                              Total votos: {mvpResults[existingGame.id].totalVotes} / {mvpResults[existingGame.id].totalParticipants} jugadores
+                            </div>
+                            {currentUser.isAdmin && mvpResults[existingGame.id].mvp && (
+                              <button
+                                onClick={() => finalizeMVP(existingGame.id)}
+                                className="mt-3 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                              >
+                                Finalizar MVP: {mvpResults[existingGame.id].mvp!.playerNickname || mvpResults[existingGame.id].mvp!.playerName}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Show message for non-participants
+                      <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Star className="h-5 w-5" />
+                          <span className="text-sm">Solo los jugadores que participaron pueden votar por el MVP</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

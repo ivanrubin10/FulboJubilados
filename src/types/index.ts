@@ -23,6 +23,7 @@ export interface Game {
     team1Score: number;
     team2Score: number;
     notes?: string;
+    mvp?: string; // User ID of the MVP
   };
   reservationInfo?: {
     location: string;
@@ -62,4 +63,29 @@ export interface ReminderStatus {
   lastReminderSent: Date;
   reminderCount: number;
   isActive: boolean; // Stop sending when user votes or opts out
+}
+
+export interface MvpVote {
+  id: string;
+  gameId: string;
+  votedForId: string;
+  createdAt: Date;
+}
+
+export interface MvpVoteResult {
+  playerId: string;
+  playerName: string;
+  playerNickname?: string;
+  playerImageUrl?: string;
+  voteCount: number;
+  votePercentage: number;
+}
+
+export interface MvpResults {
+  gameId: string;
+  totalParticipants: number;
+  totalVotes: number;
+  mvp: MvpVoteResult | null;
+  finalizedMvp: string | null;
+  voteResults: MvpVoteResult[];
 }

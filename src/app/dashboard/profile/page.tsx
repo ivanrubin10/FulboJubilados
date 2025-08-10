@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { Edit2, Save, X, Sun, Moon, User as UserIcon, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
+import { Edit2, Save, X, Sun, Moon, User as UserIcon, Trophy, Target, TrendingUp, Calendar, Crown } from 'lucide-react';
 import { useTheme } from '@/contexts/theme-context';
 import { useToast } from '@/components/ui/toast';
 import { User, Game } from '@/types';
@@ -26,7 +26,8 @@ const ProfilePage = () => {
     goalsAgainst: 0,
     totalGames: 0,
     winRate: 0,
-    goalDifference: 0
+    goalDifference: 0,
+    mvpWins: 0
   });
 
 
@@ -79,6 +80,7 @@ const ProfilePage = () => {
     let draws = 0;
     let goalsFor = 0;
     let goalsAgainst = 0;
+    let mvpWins = 0;
 
     completedGames.forEach(game => {
       if (!game.teams || !game.result) return;
@@ -89,6 +91,11 @@ const ProfilePage = () => {
       const isInTeam2 = team2.includes(user.id);
       
       if (!isInTeam1 && !isInTeam2) return;
+
+      // Count MVP wins
+      if (game.result.mvp === user.id) {
+        mvpWins++;
+      }
 
       if (team1Score > team2Score) {
         if (isInTeam1) {
@@ -129,7 +136,8 @@ const ProfilePage = () => {
       goalsAgainst,
       totalGames,
       winRate,
-      goalDifference
+      goalDifference,
+      mvpWins
     });
   }, [user, games]);
 
@@ -413,6 +421,60 @@ const ProfilePage = () => {
         </div>
       </div>
 
+      {/* MVP Awards Section */}
+      {playerStats.mvpWins > 0 && (
+        <div className="mt-8 bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
+          <div className={`px-8 py-6 ${theme === 'dark' ? 'bg-gradient-to-r from-yellow-900 to-amber-900' : 'bg-gradient-to-r from-yellow-500 to-amber-500'}`}>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-card/20 rounded-2xl flex items-center justify-center">
+                <Crown className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Premios MVP</h2>
+                <p className={theme === 'dark' ? 'text-yellow-200' : 'text-yellow-100'}>Tus reconocimientos como jugador más valioso</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="text-center">
+              <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 ${
+                theme === 'dark' 
+                  ? 'bg-yellow-950/40 border-4 border-yellow-600/30' 
+                  : 'bg-yellow-50 border-4 border-yellow-300'
+              }`}>
+                <Crown className={`h-12 w-12 ${
+                  theme === 'dark' ? 'text-yellow-300' : 'text-yellow-600'
+                }`} />
+              </div>
+              
+              <h3 className={`text-4xl font-bold mb-2 ${
+                theme === 'dark' ? 'text-yellow-200' : 'text-yellow-700'
+              }`}>
+                {playerStats.mvpWins}
+              </h3>
+              
+              <p className={`text-lg font-medium mb-4 ${
+                theme === 'dark' ? 'text-yellow-300' : 'text-yellow-600'
+              }`}>
+                {playerStats.mvpWins === 1 ? 'Premio MVP' : 'Premios MVP'}
+              </p>
+              
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+                theme === 'dark' 
+                  ? 'bg-yellow-950/60 text-yellow-200' 
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                <Trophy className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {((playerStats.mvpWins / playerStats.totalGames) * 100).toFixed(1)}% de tus partidos
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Player Statistics */}
       {playerStats.totalGames > 0 && (
         <div className="mt-8 bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden">
@@ -463,11 +525,21 @@ const ProfilePage = () => {
                 <div className="text-sm text-muted-foreground font-medium">Diferencia</div>
               </div>
 
-              {/* Goals */}
-              <div className="text-center p-4 bg-accent/20 rounded-xl border border-border">
-                <Trophy className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <div className="text-2xl font-bold text-foreground">{playerStats.goalsFor}</div>
-                <div className="text-sm text-muted-foreground font-medium">Goles</div>
+              {/* MVP Wins */}
+              <div className={`text-center p-4 rounded-xl ${
+                theme === 'dark' 
+                  ? 'bg-yellow-950/40 border border-yellow-600/30' 
+                  : 'bg-yellow-50 border border-yellow-200'
+              }`}>
+                <Crown className={`h-8 w-8 mx-auto mb-2 ${
+                  theme === 'dark' ? 'text-yellow-300' : 'text-yellow-600'
+                }`} />
+                <div className={`text-2xl font-bold ${
+                  theme === 'dark' ? 'text-yellow-200' : 'text-yellow-700'
+                }`}>{playerStats.mvpWins}</div>
+                <div className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-yellow-300' : 'text-yellow-600'
+                }`}>MVP</div>
               </div>
             </div>
 

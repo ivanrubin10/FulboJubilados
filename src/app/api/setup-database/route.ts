@@ -77,6 +77,16 @@ export async function POST() {
       );
     `);
 
+    // Create MVP votes table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS "mvp_votes" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "game_id" uuid NOT NULL REFERENCES "games"("id") ON DELETE CASCADE,
+        "voted_for_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
     return NextResponse.json({ 
       success: true, 
       message: 'Database tables created successfully' 

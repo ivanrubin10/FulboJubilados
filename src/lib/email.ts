@@ -224,6 +224,28 @@ export class EmailService {
     });
   }
 
+  async sendMvpVotingAndPaymentReminder(data: {
+    to: string;
+    name: string;
+    gameDate: Date;
+    location: string;
+    time: string;
+    cost?: number;
+    paymentAlias?: string;
+    organizerName: string;
+    teamName: string;
+    finalScore: string;
+  }): Promise<boolean> {
+    const subject = `⭐ MVP + 💰 Pago: Partido del ${data.gameDate.toLocaleDateString('es-ES')}`;
+    const html = this.generateMvpVotingAndPaymentReminderEmail(data);
+    
+    return this.sendEmail({
+      to: [data.to],
+      subject,
+      html,
+    });
+  }
+
   private generateIndividualVotingReminderEmail(name: string, month: number, year: number): string {
     const monthCapitalized = getCapitalizedMonthName(year, month);
     
@@ -324,7 +346,7 @@ export class EmailService {
                 <p><strong>📍 Ubicación:</strong> ${data.location}${data.mapsLink ? ` (<a href="${data.mapsLink}" target="_blank" style="color: #10b981; text-decoration: none;">🗺️ Ver en Maps</a>)` : ''}</p>
                 ${data.cost ? `<p><strong>💰 Costo:</strong> ARS $${data.cost}</p>` : ''}
                 <p><strong>👤 Reservado por:</strong> ${data.reservedBy}</p>
-                ${data.paymentAlias ? `<p><strong>💳 Alias para transferir:</strong> ${data.paymentAlias}${data.cost ? ` <span style="color: #059669; font-weight: bold;">(ARS $${(data.cost / 10).toFixed(0)} por persona)</span>` : ''}</p>` : ''}
+                ${data.paymentAlias ? `<p><strong>💳 Alias para transferir:</strong> ${data.paymentAlias}${data.cost ? ` <span style="color: #059669; font-weight: bold; margin-left: 10px;">(ARS $${(data.cost / 10).toFixed(0)} por persona)</span>` : ''}</p>` : ''}
               </div>
               
               <div style="text-align: center; margin: 30px 0;">
@@ -338,6 +360,112 @@ export class EmailService {
             </div>
             <div class="footer">
               <p>Fulbo Jubilados - ¡Nos vemos en la cancha!</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private generateMvpVotingAndPaymentReminderEmail(data: {
+    name: string;
+    gameDate: Date;
+    location: string;
+    time: string;
+    cost?: number;
+    paymentAlias?: string;
+    organizerName: string;
+    teamName: string;
+    finalScore: string;
+  }): string {
+    const costPerPerson = data.cost ? (data.cost / 10).toFixed(0) : null;
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 30px; border-radius: 12px; text-align: center; }
+            .content { background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; }
+            .button { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px; }
+            .button-mvp { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px; }
+            .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 14px; }
+            .mvp-section { background: #fefce8; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+            .payment-section { background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0; }
+            .details { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0; }
+            .score-display { background: #1e293b; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; }
+            .score-number { font-size: 2rem; font-weight: bold; color: #10b981; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚽ ¡Hola ${data.name}!</h1>
+              <p>¡Partido terminado! Hora de votar MVP y pagar</p>
+            </div>
+            <div class="content">
+              <div class="score-display">
+                <h2 style="margin-top: 0; color: white;">🏆 Resultado Final</h2>
+                <div class="score-number">${data.finalScore}</div>
+                <p style="margin-bottom: 0; color: #94a3b8;">Tu equipo: ${data.teamName}</p>
+              </div>
+              
+              <div class="details">
+                <h3>📋 Detalles del Partido</h3>
+                <p><strong>📅 Fecha:</strong> ${data.gameDate.toLocaleDateString('es-ES', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
+                <p><strong>🕒 Hora:</strong> ${data.time}</p>
+                <p><strong>📍 Ubicación:</strong> ${data.location}</p>
+                <p><strong>👤 Organizado por:</strong> ${data.organizerName}</p>
+              </div>
+              
+              <div class="mvp-section">
+                <h2 style="margin-top: 0; color: #d97706;">⭐ ¡Vota por el MVP!</h2>
+                <p><strong>¿Quién fue el mejor jugador del partido?</strong></p>
+                <p>Tu voto es importante para reconocer al jugador más valioso. La votación es completamente anónima y solo los participantes pueden votar.</p>
+                <ul style="color: #92400e;">
+                  <li>Solo puedes votar UNA vez por partido</li>
+                  <li>Puedes votar por cualquier jugador que participó</li>
+                  <li>Los resultados se muestran cuando termine la votación</li>
+                </ul>
+              </div>
+              
+              ${data.cost && data.paymentAlias ? `
+              <div class="payment-section">
+                <h2 style="margin-top: 0; color: #059669;">💰 Pago del Partido</h2>
+                <p><strong>Costo total:</strong> ARS $${data.cost}</p>
+                <p><strong>Tu parte:</strong> ARS $${costPerPerson} (dividido entre 10 jugadores)</p>
+                <p><strong>Transferir a:</strong> <span style="background: #dcfce7; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;">${data.paymentAlias}</span></p>
+                <p><strong>Organizado por:</strong> ${data.organizerName}</p>
+              </div>
+              ` : ''}
+              
+              <div class="actions">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" class="button-mvp" style="color: white; text-decoration: none;">
+                  ⭐ VOTAR MVP AHORA
+                </a>
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/history" class="button" style="color: white; text-decoration: none;">
+                  📊 VER ESTADÍSTICAS
+                </a>
+              </div>
+              
+              <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                <p style="margin: 0; color: #475569; font-size: 14px;">
+                  <strong>🏃‍♂️ ¿Ya votaste?</strong> Revisa el resultado en la sección de partidos o historial
+                </p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>Fulbo Jubilados - ¡Gracias por jugar!</p>
+              <p style="font-size: 12px; color: #94a3b8;">Este email se envía automáticamente cuando termina un partido</p>
             </div>
           </div>
         </body>

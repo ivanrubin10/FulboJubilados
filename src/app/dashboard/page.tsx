@@ -725,52 +725,58 @@ export default function Dashboard() {
                             }`
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-3 min-h-[24px]">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {isPastMonth || isPastDate ? (
-                        <Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      ) : isBlocked && isUserConfirmed ? (
-                        <Trophy className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                      ) : isSelected ? (
-                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      ) : isBlocked && !isSelected ? (
-                        <Ban className="h-5 w-5 text-orange-400 flex-shrink-0" />
-                      ) : (
-                        <Calendar className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                      )}
-                      {isBlocked && isUserConfirmed && !(isPastMonth || isPastDate) ? (
-                        <span className={`font-semibold text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                          theme === 'dark' 
-                            ? 'text-blue-200 bg-blue-900/40'
-                            : 'text-blue-700 bg-blue-100'
-                        }`}>
-                          CONFIRMADO
-                        </span>
-                      ) : isSelected && !(isPastMonth || isPastDate) && (
-                        <span className={`font-semibold text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                          theme === 'dark' 
-                            ? 'text-green-200 bg-green-900/40'
-                            : 'text-green-700 bg-green-100'
-                        }`}>
-                          DISPONIBLE
-                        </span>
-                      )}
+                  <div className="mb-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isPastMonth || isPastDate ? (
+                          <Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        ) : isBlocked && isUserConfirmed ? (
+                          <Trophy className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                        ) : isSelected ? (
+                          <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                        ) : isBlocked && !isSelected ? (
+                          <Ban className="h-5 w-5 text-orange-400 flex-shrink-0" />
+                        ) : (
+                          <Calendar className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {isPastMonth || isPastDate ? (
+                          <span className="text-xs bg-accent text-muted-foreground px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block">
+                            {isPastDate ? 'Pasado' : 'Cerrado'}
+                          </span>
+                        ) : isBlocked && !isUserConfirmed ? (
+                          <span className={`text-xs px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block ${
+                            theme === 'dark' 
+                              ? 'bg-orange-900/40 text-orange-300'
+                              : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            Completo
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="flex-shrink-0 ml-2">
-                      {isPastMonth || isPastDate ? (
-                        <span className="text-xs bg-accent text-muted-foreground px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block">
-                          {isPastDate ? 'Pasado' : 'Cerrado'}
-                        </span>
-                      ) : isBlocked && !isUserConfirmed ? (
-                        <span className={`text-xs px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block ${
-                          theme === 'dark' 
-                            ? 'bg-orange-900/40 text-orange-300'
-                            : 'bg-orange-100 text-orange-700'
-                        }`}>
-                          Completo
-                        </span>
-                      ) : null}
-                    </div>
+                    {(isBlocked && isUserConfirmed && !shouldDisableClick) || (isSelected && !shouldDisableClick) ? (
+                      <div className="flex justify-center">
+                        {isBlocked && isUserConfirmed ? (
+                          <span className={`font-semibold text-xs px-2 py-1 rounded-full ${
+                            theme === 'dark' 
+                              ? 'text-blue-200 bg-blue-900/40'
+                              : 'text-blue-700 bg-blue-100'
+                          }`}>
+                            CONFIRMADO
+                          </span>
+                        ) : (
+                          <span className={`font-semibold text-xs px-2 py-1 rounded-full ${
+                            theme === 'dark' 
+                              ? 'text-green-200 bg-green-900/40'
+                              : 'text-green-700 bg-green-100'
+                          }`}>
+                            DISPONIBLE
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                   
                   <h3 className={`text-lg sm:text-xl font-bold mb-1 ${

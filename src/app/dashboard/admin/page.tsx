@@ -10,6 +10,12 @@ interface GameWithParticipants {
   participants: string[];
   status: string;
   participantDetails: User[];
+  result?: {
+    team1Score: number;
+    team2Score: number;
+    notes?: string;
+    mvp?: string;
+  };
   reservationInfo?: {
     location?: string;
     time?: string;
@@ -40,7 +46,8 @@ import {
   AlertTriangle,
   Eye,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Star
 } from 'lucide-react';
 
 
@@ -156,6 +163,15 @@ const apiClient = {
     });
     if (!res.ok) throw new Error('Failed to send test email');
     return res.json();
+  },
+
+  async sendMvpReminder() {
+    const res = await fetch('/api/send-mvp-reminder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Failed to send MVP reminder');
+    return res.json();
   }
 };
 
@@ -170,16 +186,20 @@ export default function AdminPage() {
   const [currentActiveMonth, setCurrentActiveMonth] = useState({ month: 7, year: 2025 });
   const [isLoadingVotingReminder, setIsLoadingVotingReminder] = useState(false);
   const [isLoadingMatchConfirmation, setIsLoadingMatchConfirmation] = useState(false);
+  const [isLoadingMvpReminder, setIsLoadingMvpReminder] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [manualAdminMode] = useState(false);
   const [pendingMonth, setPendingMonth] = useState<number | null>(null);
   const [pendingYear, setPendingYear] = useState<number | null>(null);
   const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
   const [showMatchConfirmModal, setShowMatchConfirmModal] = useState(false);
+  const [showMvpReminderModal, setShowMvpReminderModal] = useState(false);
   const [showEmailPreviews, setShowEmailPreviews] = useState(false);
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
   const [confirmedGames, setConfirmedGames] = useState<GameWithParticipants[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [latestCompletedGame, setLatestCompletedGame] = useState<GameWithParticipants | null>(null);
+  const [selectedMvpParticipants, setSelectedMvpParticipants] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadData = async () => {
@@ -488,6 +508,117 @@ export default function AdminPage() {
     }
   };
 
+  const loadLatestCompletedGame = async () => {
+    try {
+      const gamesResponse = await fetch('/api/games');
+      const games = await gamesResponse.json();
+      
+      const usersResponse = await fetch('/api/users');
+      const allUsers = await usersResponse.json();
+      const userMap = new Map(allUsers.map((user: User) => [user.id, user]));
+      
+      // Find the latest completed game with results
+      const completedGamesWithResults = games
+        .filter((game: GameWithParticipants) => 
+          game.status === 'completed' && 
+          game.result && 
+          game.participants && 
+          game.participants.length > 0
+        )
+        .sort((a: GameWithParticipants, b: GameWithParticipants) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+      if (completedGamesWithResults.length === 0) {
+        error('No hay partidos', 'No se encontraron partidos completados con resultados');
+        return;
+      }
+
+      const latest = completedGamesWithResults[0];
+      const gameWithParticipants = {
+        ...latest,
+        date: new Date(latest.date).toISOString(),
+        participantDetails: latest.participants
+          .map((participantId: string) => userMap.get(participantId))
+          .filter((user: User | undefined): user is User => user !== undefined)
+      };
+
+      setLatestCompletedGame(gameWithParticipants);
+      
+      // Select all participants by default
+      const allParticipantIds = new Set<string>(latest.participants);
+      setSelectedMvpParticipants(allParticipantIds);
+      
+    } catch (err) {
+      console.error('Error loading latest completed game:', err);
+      error('Error al cargar', 'No se pudo cargar el último partido completado');
+    }
+  };
+
+  const handleMvpReminderClick = async () => {
+    await loadLatestCompletedGame();
+    setShowMvpReminderModal(true);
+  };
+
+  const toggleMvpParticipantSelection = (participantId: string) => {
+    const newSelection = new Set(selectedMvpParticipants);
+    if (newSelection.has(participantId)) {
+      newSelection.delete(participantId);
+    } else {
+      newSelection.add(participantId);
+    }
+    setSelectedMvpParticipants(newSelection);
+  };
+
+  const selectAllMvpParticipants = () => {
+    if (latestCompletedGame) {
+      const allParticipantIds = new Set(latestCompletedGame.participants);
+      setSelectedMvpParticipants(allParticipantIds);
+    }
+  };
+
+  const deselectAllMvpParticipants = () => {
+    setSelectedMvpParticipants(new Set());
+  };
+
+  const sendMvpReminder = async () => {
+    setShowMvpReminderModal(false);
+    setIsLoadingMvpReminder(true);
+    try {
+      console.log('[ADMIN] Sending MVP voting reminders to selected participants...');
+      const selectedParticipantIds = Array.from(selectedMvpParticipants);
+      
+      const result = await fetch('/api/send-mvp-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          gameId: latestCompletedGame?.id,
+          selectedParticipants: selectedParticipantIds 
+        })
+      });
+
+      const responseData = await result.json();
+      console.log('[ADMIN] MVP reminder API response:', responseData);
+      
+      if (result.ok && responseData.success) {
+        const detailMessage = `Partido: ${responseData.gameDate || 'No especificado'}\n` +
+                             `Resultado: ${responseData.finalScore || 'No disponible'}\n` +
+                             `Emails enviados: ${responseData.successful || 0}\n` +
+                             `Emails fallidos: ${responseData.failed || 0}\n` +
+                             `Participantes seleccionados: ${responseData.selectedParticipants || selectedParticipantIds.length}`;
+        
+        success('Recordatorios MVP enviados', detailMessage);
+      } else {
+        error('Error al enviar recordatorios MVP', responseData.error || 'No se pudieron enviar los recordatorios');
+      }
+    } catch (err) {
+      console.error('Error sending MVP reminders:', err);
+      error('Error al enviar recordatorios MVP', 'Ocurrió un error inesperado');
+    } finally {
+      setIsLoadingMvpReminder(false);
+    }
+  };
+
 
   // Email preview generators
   const generateVotingReminderPreview = () => {
@@ -600,6 +731,63 @@ export default function AdminPage() {
     `;
   };
 
+  const generateMvpVotingReminderPreview = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    return `
+      <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 30px; border-radius: 12px; text-align: center;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">⚽ ¡Hola Juan!</h1>
+          <p style="margin: 0; opacity: 0.9;">¡Partido terminado! Hora de votar MVP y pagar</p>
+        </div>
+        <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
+          <div style="background: #1e293b; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: white;">🏆 Resultado Final</h2>
+            <div style="font-size: 2rem; font-weight: bold; color: #10b981;">3 - 2</div>
+            <p style="margin-bottom: 0; color: #94a3b8;">Tu equipo: Equipo 1</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">📋 Detalles del Partido</h3>
+            <p><strong>📅 Fecha:</strong> ${yesterday.toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</p>
+            <p><strong>🕒 Hora:</strong> 10:00 AM</p>
+            <p><strong>📍 Ubicación:</strong> Cancha La Bombonera</p>
+            <p style="margin-bottom: 0;"><strong>👤 Organizado por:</strong> Admin Carlos</p>
+          </div>
+          
+          <div style="background: #fefce8; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #d97706;">⭐ ¡Vota por el MVP!</h2>
+            <p><strong>¿Quién fue el mejor jugador del partido?</strong></p>
+            <p>Tu voto es importante para reconocer al jugador más valioso. La votación es completamente anónima y solo los participantes pueden votar.</p>
+          </div>
+          
+          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #059669;">💰 Pago del Partido</h2>
+            <p><strong>Costo total:</strong> ARS $1500</p>
+            <p><strong>Tu parte:</strong> ARS $150 (dividido entre 10 jugadores)</p>
+            <p><strong>Transferir a:</strong> <span style="background: #dcfce7; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;">fulbo.admin</span></p>
+            <p><strong>Organizado por:</strong> Admin Carlos</p>
+          </div>
+          
+          <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0;">
+            <a href="#" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">⭐ VOTAR MVP AHORA</a>
+            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">📊 VER ESTADÍSTICAS</a>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
+          <p>Fulbo Jubilados - ¡Gracias por jugar!</p>
+        </div>
+      </div>
+    `;
+  };
+
   if (!isLoaded || isLoadingData) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
   }
@@ -659,7 +847,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <button
               onClick={handleVotingReminderClick}
               disabled={isLoadingVotingReminder}
@@ -701,6 +889,29 @@ export default function AdminPage() {
                   </div>
                   <div className="text-sm opacity-90">
                     A jugadores confirmados
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={handleMvpReminderClick}
+              disabled={isLoadingMvpReminder}
+              className="bg-purple-600 text-white border border-purple-600 px-6 py-4 rounded-lg font-medium hover:bg-purple-700 hover:border-purple-700 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-3">
+                <Star className="h-5 w-5" />
+                <div className="text-left">
+                  <div className="font-semibold">
+                    {isLoadingMvpReminder ? (
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Enviando...
+                      </span>
+                    ) : 'Recordar MVP'}
+                  </div>
+                  <div className="text-sm opacity-90">
+                    Último partido terminado
                   </div>
                 </div>
               </div>
@@ -1266,6 +1477,37 @@ export default function AdminPage() {
                 )}
               </div>
 
+              {/* MVP Voting Reminder Email */}
+              <div className="border border-border rounded-lg">
+                <button
+                  onClick={() => setExpandedEmail(expandedEmail === 'mvp' ? null : 'mvp')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-background transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                    }`}>
+                      <Star className={`h-4 w-4 ${
+                        theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">⭐ Recordatorio MVP y Pago</h3>
+                      <p className="text-sm text-muted-foreground">Email automático/manual después de completar un partido</p>
+                    </div>
+                  </div>
+                  {expandedEmail === 'mvp' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {expandedEmail === 'mvp' && (
+                  <div className="border-t border-border p-4 bg-background">
+                    <div 
+                      className="border border-border rounded-lg bg-card"
+                      dangerouslySetInnerHTML={{ __html: generateMvpVotingReminderPreview() }}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className={`rounded-lg p-4 mt-4 ${
                 theme === 'dark' 
                   ? 'bg-blue-950/40 border border-blue-600/30' 
@@ -1289,6 +1531,7 @@ export default function AdminPage() {
                       <p>• <strong>Recordatorio de Votación:</strong> Enviado manualmente desde este panel a usuarios específicos</p>
                       <p>• <strong>Alerta para Admins:</strong> Enviado automáticamente cuando un partido alcanza 10 jugadores</p>
                       <p>• <strong>Confirmación de Partido:</strong> Enviado manualmente desde este panel a jugadores confirmados</p>
+                      <p>• <strong>Recordatorio MVP y Pago:</strong> Enviado automáticamente al completar un partido o manualmente desde este panel</p>
                     </div>
                   </div>
                 </div>
@@ -1521,6 +1764,143 @@ export default function AdminPage() {
                   className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Enviar a {selectedParticipants.size} Participantes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MVP Reminder Modal */}
+        {showMvpReminderModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-card rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                }`}>
+                  <Star className={`h-6 w-6 ${
+                    theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                  }`} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Seleccionar Participantes</h3>
+                  <p className="text-sm text-muted-foreground">Recordatorio MVP y Pago</p>
+                </div>
+              </div>
+
+              {!latestCompletedGame ? (
+                <p className="text-muted-foreground mb-6">
+                  No hay partidos completados con resultados para enviar recordatorios MVP.
+                </p>
+              ) : (
+                <>
+                  <div className={`rounded-lg p-4 mb-4 ${
+                    theme === 'dark' 
+                      ? 'bg-purple-950/40 border border-purple-600/30' 
+                      : 'bg-purple-50 border border-purple-200'
+                  }`}>
+                    <h4 className="font-semibold text-foreground mb-2">
+                      🏆 Último Partido Completado
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Fecha:</strong> {new Date(latestCompletedGame.date).toLocaleDateString('es-ES', { 
+                        weekday: 'long', 
+                        day: 'numeric', 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Participantes:</strong> {latestCompletedGame.participants.length} jugadores
+                    </p>
+                    {latestCompletedGame.reservationInfo?.location && (
+                      <p className="text-sm text-muted-foreground">
+                        <strong>Ubicación:</strong> {latestCompletedGame.reservationInfo.location}
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="text-muted-foreground mb-4">
+                    Selecciona los participantes que recibirán el recordatorio para votar MVP y pagar:
+                  </p>
+
+                  {/* Selection Controls */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={selectAllMvpParticipants}
+                      className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      Seleccionar Todos
+                    </button>
+                    <button
+                      onClick={deselectAllMvpParticipants}
+                      className="px-3 py-1 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Deseleccionar Todos
+                    </button>
+                    <span className="flex items-center text-sm text-muted-foreground">
+                      {selectedMvpParticipants.size} participantes seleccionados
+                    </span>
+                  </div>
+
+                  {/* Participants */}
+                  <div className="border border-border rounded-lg p-4 mb-6 max-h-96 overflow-y-auto">
+                    <h4 className="font-semibold text-foreground mb-3">
+                      👥 Participantes del Partido
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {latestCompletedGame.participantDetails.map((participant: User) => (
+                        <label
+                          key={participant.id}
+                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                            selectedMvpParticipants.has(participant.id)
+                              ? (theme === 'dark' ? 'bg-purple-950/40 border-purple-600/30' : 'bg-purple-50 border-purple-200')
+                              : 'border-border hover:bg-background'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMvpParticipants.has(participant.id)}
+                            onChange={() => toggleMvpParticipantSelection(participant.id)}
+                            className="rounded border-border"
+                          />
+                          {participant.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img 
+                              src={participant.imageUrl} 
+                              alt={participant.name}
+                              className="w-6 h-6 rounded-full border border-border"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center border border-border">
+                              <span className="text-xs font-bold text-muted-foreground">
+                                {participant.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-sm font-medium text-foreground">
+                            {participant.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowMvpReminderModal(false)}
+                  className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={sendMvpReminder}
+                  disabled={isLoadingMvpReminder || selectedMvpParticipants.size === 0 || !latestCompletedGame}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Enviar a {selectedMvpParticipants.size} Participantes
                 </button>
               </div>
             </div>
