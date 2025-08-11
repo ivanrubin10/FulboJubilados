@@ -148,35 +148,47 @@ export class DatabaseService {
     availableSundays: number[],
     cannotPlayAnyDay: boolean = false
   ): Promise<void> {
-    // Check for confirmed games that would prevent availability
-    const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays);
-    
-    // Calculate voting status: user has voted if they have days selected OR marked as cannot play
-    const hasVoted = filteredSundays.length > 0 || cannotPlayAnyDay;
-    
-    await db.insert(monthlyAvailability)
-      .values({
-        userId,
-        month,
-        year,
-        availableSundays: filteredSundays,
-        cannotPlayAnyDay,
-        hasVoted,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [monthlyAvailability.userId, monthlyAvailability.month, monthlyAvailability.year],
-        set: {
+    try {
+      // Check for confirmed games that would prevent availability
+      const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays);
+      
+      // Calculate voting status: user has voted if they have days selected OR marked as cannot play
+      const hasVoted = filteredSundays.length > 0 || cannotPlayAnyDay;
+      
+      await db.insert(monthlyAvailability)
+        .values({
+          userId,
+          month,
+          year,
           availableSundays: filteredSundays,
           cannotPlayAnyDay,
           hasVoted,
           updatedAt: new Date(),
-        }
-      });
+        })
+        .onConflictDoUpdate({
+          target: [monthlyAvailability.userId, monthlyAvailability.month, monthlyAvailability.year],
+          set: {
+            availableSundays: filteredSundays,
+            cannotPlayAnyDay,
+            hasVoted,
+            updatedAt: new Date(),
+          }
+        });
 
-    // Stop or reactivate reminders based on voting status
-    if (hasVoted) {
-      await this.deactivateReminders(userId, month, year);
+      // Stop reminders if user has voted
+      if (hasVoted) {
+        await this.deactivateReminders(userId, month, year);
+      }
+    } catch (error) {
+      console.error('Error in updateMonthlyAvailability:', {
+        userId,
+        month,
+        year,
+        availableSundays,
+        cannotPlayAnyDay,
+        error
+      });
+      throw new Error(`Failed to update monthly availability: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

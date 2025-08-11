@@ -141,7 +141,10 @@ export async function POST(request: NextRequest) {
     
     for (const sunday of availableSundays) {
       const sundayDate = new Date(year, month - 1, sunday);
-      if (sundayDate < today) {
+      sundayDate.setHours(0, 0, 0, 0); // Normalize the sunday date
+      
+      
+      if (sundayDate <= today) {
         return NextResponse.json({
           error: 'Fecha pasada',
           details: `No puedes votar por el ${sunday} de ${new Date(year, month - 1, 1).toLocaleDateString('es-ES', { month: 'long' })} porque esa fecha ya ha pasado`
@@ -150,13 +153,18 @@ export async function POST(request: NextRequest) {
     }
     
     // Update availability in database only
-    await DatabaseService.updateMonthlyAvailability(
-      userId,
-      month,
-      year,
-      availableSundays,
-      cannotPlayAnyDay
-    );
+    try {
+      await DatabaseService.updateMonthlyAvailability(
+        userId,
+        month,
+        year,
+        availableSundays,
+        cannotPlayAnyDay
+      );
+    } catch (dbError) {
+      console.error('Database error in updateMonthlyAvailability:', dbError);
+      throw new Error(`Database update failed: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`);
+    }
     
     // Check if any Sunday now has 10+ players and create games/notifications
     console.log(`🗳️ User ${userId} voted for ${month}/${year}, Sundays: ${availableSundays.join(', ')}`);

@@ -64,7 +64,10 @@ const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, month, year, availableSundays, cannotPlayAnyDay })
     });
-    if (!res.ok) throw new Error('Failed to update availability');
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(`Failed to update availability: ${errorData.error || res.statusText} (${res.status})`);
+    }
     return res.json();
   }
 };
@@ -312,8 +315,10 @@ export default function Dashboard() {
     const sundayDate = new Date(selectedYear, selectedMonth - 1, sunday);
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+    sundayDate.setHours(0, 0, 0, 0); // Ensure sunday date is also normalized
     
-    if (sundayDate < today) {
+    
+    if (sundayDate <= today) {
       warning(
         'Fecha pasada',
         `${sunday} de ${getCapitalizedMonthName(selectedYear, selectedMonth)} ya ha pasado. No puedes votar por fechas que ya han ocurrido.`
@@ -363,10 +368,19 @@ export default function Dashboard() {
       ? availableSundays.filter(s => s !== sunday)
       : [...availableSundays, sunday];
 
+    // Filter out any past dates before sending to API to avoid validation errors
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    
+    const filteredAvailability = newAvailability.filter(day => {
+      const dayDate = new Date(selectedYear, selectedMonth - 1, day);
+      dayDate.setHours(0, 0, 0, 0);
+      return dayDate > currentDate; // Only include future dates
+    });
+
+
     // Update UI immediately for better UX
     setAvailableSundays(newAvailability);
-    // Set hasVoted to false if user has no days selected and can't play any day is false
-    setHasVoted(newAvailability.length > 0 || cannotPlayAnyDay);
     setCannotPlayAnyDay(false);
     
     try {
@@ -374,9 +388,16 @@ export default function Dashboard() {
         user.id,
         selectedMonth,
         selectedYear,
-        newAvailability,
+        filteredAvailability,
         false
       );
+      
+      // Update UI state to match what was actually saved (remove past dates)
+      setAvailableSundays(filteredAvailability);
+      
+      // Update hasVoted state based on backend logic after successful update
+      const newHasVoted = filteredAvailability.length > 0 || false; // false because cannotPlayAnyDay is set to false
+      setHasVoted(newHasVoted);
       
       // Refresh blocked Sundays after voting (voting might create new games)
       const updatedBlocked = await apiClient.getBlockedSundays(selectedMonth, selectedYear);
@@ -385,6 +406,7 @@ export default function Dashboard() {
       console.error('Error updating availability:', error);
       // Revert UI changes on error
       setAvailableSundays(availableSundays);
+      setHasVoted(availableSundays.length > 0 || cannotPlayAnyDay);
     }
   };
 
@@ -444,16 +466,12 @@ export default function Dashboard() {
     }
 
     const newCannotPlayAnyDay = !cannotPlayAnyDay;
+    const newAvailableSundays = newCannotPlayAnyDay ? [] : availableSundays;
     
     // Update UI immediately
     setCannotPlayAnyDay(newCannotPlayAnyDay);
-    
     if (newCannotPlayAnyDay) {
       setAvailableSundays([]);
-      setHasVoted(true); // Marking as "cannot play" is a vote
-    } else {
-      // If turning off "cannot play" and user has no selected days, they haven't voted
-      setHasVoted(availableSundays.length > 0);
     }
     
     try {
@@ -461,13 +479,22 @@ export default function Dashboard() {
         user.id,
         selectedMonth,
         selectedYear,
-        newCannotPlayAnyDay ? [] : availableSundays,
+        newAvailableSundays,
         newCannotPlayAnyDay
       );
+      
+      // Update hasVoted state based on backend logic after successful update
+      const newHasVoted = newAvailableSundays.length > 0 || newCannotPlayAnyDay;
+      setHasVoted(newHasVoted);
+      
     } catch (error) {
       console.error('Error updating availability:', error);
       // Revert UI changes on error
       setCannotPlayAnyDay(!newCannotPlayAnyDay);
+      if (newCannotPlayAnyDay) {
+        setAvailableSundays(availableSundays);
+      }
+      setHasVoted(availableSundays.length > 0 || cannotPlayAnyDay);
     }
   };
 
@@ -690,7 +717,9 @@ export default function Dashboard() {
               // Check if this specific date has passed
               const today = new Date();
               today.setHours(0, 0, 0, 0);
-              const isPastDate = date < today;
+              const normalizedDate = new Date(date);
+              normalizedDate.setHours(0, 0, 0, 0);
+              const isPastDate = normalizedDate <= today;
               
               const shouldDisableClick = isDisabled || isBlocked || isPastMonth || isPastDate;
 
