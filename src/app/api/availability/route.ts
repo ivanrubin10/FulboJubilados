@@ -26,17 +26,17 @@ export async function GET(request: NextRequest) {
       );
       return NextResponse.json(votingStatus);
     } else if (type === 'blocked' && month && year) {
-      // Get blocked Sundays (dates with confirmed games)
+      // Get blocked Sundays (dates with confirmed games only)
       try {
         const allGames = await DatabaseService.getAllGames();
         const blockedSundays: number[] = [];
         
         for (const game of allGames) {
           const gameDate = new Date(game.date);
-          // Check if game is in the requested month/year and has confirmed status or 10+ participants
+          // Check if game is in the requested month/year and is confirmed
           if (gameDate.getFullYear() === parseInt(year) && 
               gameDate.getMonth() + 1 === parseInt(month) &&
-              (game.status === 'confirmed' || game.participants.length >= 10)) {
+              game.status === 'confirmed') {
             const sunday = gameDate.getDate();
             if (!blockedSundays.includes(sunday)) {
               blockedSundays.push(sunday);
