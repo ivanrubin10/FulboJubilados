@@ -14,7 +14,9 @@
       "Bash(grep:*)",
       "Bash(rm:*)",
       "Bash(timeout 10 npm run dev)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebSearch",
+      "Bash(npx drizzle-kit:*)"
     ],
     "deny": []
   }

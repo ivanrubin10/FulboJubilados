@@ -17,7 +17,7 @@ const apiClient = {
   },
   
   async getGames() {
-    const res = await fetch('/api/games');
+    const res = await fetch('/api/games?type=all');
     if (!res.ok) throw new Error('Failed to fetch games');
     return res.json();
   },
@@ -238,7 +238,7 @@ export default function HistoryPage() {
         }
       });
     }
-  }, [currentUser, games]);
+  }, [currentUser, games, votedGames]);
 
   const completedGames = games.filter(game => game.status === 'completed');
   const confirmedGames = games.filter(game => 

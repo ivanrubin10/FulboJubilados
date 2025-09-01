@@ -1,0 +1,1 @@
+ALTER TABLE "games" ADD COLUMN "waitlist" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -9,18 +9,66 @@ export async function GET(request: NextRequest) {
     const type = url.searchParams.get('type');
     
     if (type === 'full-participants') {
-      // Get games with 10+ participants for admin notifications
+      // Get games with 10+ participants for admin notifications (from current month onwards)
       const fullGames = await DatabaseService.getGamesWithFullParticipants();
-      return NextResponse.json(fullGames);
+      
+      // Get current active month from settings and filter
+      const { month: currentMonth, year: currentYear } = await DatabaseService.getCurrentActiveMonth();
+      const filteredFullGames = fullGames.filter(game => {
+        const gameDate = new Date(game.date);
+        const gameMonth = gameDate.getMonth() + 1;
+        const gameYear = gameDate.getFullYear();
+        
+        // Show games from current month onwards
+        return gameYear > currentYear || (gameYear === currentYear && gameMonth >= currentMonth);
+      });
+      
+      return NextResponse.json(filteredFullGames);
     }
-    
-    // Get all games from database only
-    try {
+
+    if (type === 'all') {
+      // Get ALL games without any filtering (for history page)
       const dbGames = await DatabaseService.getAllGames();
-      console.log(`📊 Found ${dbGames.length} games in database`);
+      console.log(`📊 Returning ALL ${dbGames.length} games (unfiltered for history)`);
       
       // Format games with proper date objects
       const formattedGames = dbGames.map(game => ({
+        ...game,
+        date: new Date(game.date),
+        createdAt: new Date(game.createdAt),
+        updatedAt: new Date(game.updatedAt)
+      }));
+      
+      const response = NextResponse.json(formattedGames);
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      return response;
+    }
+    
+    // Get all games from database and filter by current active month
+    try {
+      const dbGames = await DatabaseService.getAllGames();
+      console.log(`📊 Found ${dbGames.length} total games in database`);
+      
+      // Get current active month from settings
+      const { month: currentMonth, year: currentYear } = await DatabaseService.getCurrentActiveMonth();
+      console.log(`📅 Current active month: ${currentMonth}/${currentYear}`);
+      
+      // Filter games to only show current month and future
+      const filteredGames = dbGames.filter(game => {
+        const gameDate = new Date(game.date);
+        const gameMonth = gameDate.getMonth() + 1;
+        const gameYear = gameDate.getFullYear();
+        
+        // Show games from current month onwards
+        return gameYear > currentYear || (gameYear === currentYear && gameMonth >= currentMonth);
+      });
+      
+      console.log(`📊 Filtered to ${filteredGames.length} games from current/future months`);
+      
+      // Format games with proper date objects
+      const formattedGames = filteredGames.map(game => ({
         ...game,
         date: new Date(game.date),
         createdAt: new Date(game.createdAt),
@@ -32,7 +80,11 @@ export async function GET(request: NextRequest) {
         console.log(`  - Game ${game.id}: ${new Date(game.date).toLocaleDateString()}, status: ${game.status}`);
       });
       
-      return NextResponse.json(formattedGames);
+      const response = NextResponse.json(formattedGames);
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      return response;
       
     } catch (dbError) {
       console.error('Error fetching from database:', dbError);

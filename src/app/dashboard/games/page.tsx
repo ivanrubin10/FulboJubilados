@@ -18,7 +18,12 @@ const apiClient = {
   },
   
   async getGames() {
-    const res = await fetch('/api/games');
+    const res = await fetch('/api/games', {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
     if (!res.ok) throw new Error('Failed to fetch games');
     return res.json();
   },
@@ -445,6 +450,8 @@ export default function GamesPage() {
     const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
   const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
+  const [sortedPlayersCache, setSortedPlayersCache] = useState<{[key: string]: User[]}>({});
+  const [settingsCurrentMonth, setSettingsCurrentMonth] = useState<{month: number, year: number} | null>(null);
   const [showCountdown, setShowCountdown] = useState(true);
   const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number, seconds: number} | null>(null);
   
@@ -550,10 +557,11 @@ export default function GamesPage() {
       
       setIsLoading(true);
       try {
-        const [allUsers, allGames, monthlyAvailability] = await Promise.all([
+        const [allUsers, allGames, monthlyAvailability, settingsResponse] = await Promise.all([
           apiClient.getUsers(),
           apiClient.getGames(),
-          apiClient.getMonthlyAvailability()
+          apiClient.getMonthlyAvailability(),
+          fetch('/api/settings')
         ]);
         
         const userData = allUsers.find((u: User) => u.id === user.id);
@@ -566,6 +574,16 @@ export default function GamesPage() {
           updatedAt: new Date(game.updatedAt),
         }));
       
+        // Parse settings response
+        if (settingsResponse.ok) {
+          const settings = await settingsResponse.json();
+          setSettingsCurrentMonth({ month: settings.month, year: settings.year });
+        } else {
+          // Fallback to actual current month if settings fail to load
+          const now = new Date();
+          setSettingsCurrentMonth({ month: now.getMonth() + 1, year: now.getFullYear() });
+        }
+
       setUsers(allUsers);
         setGames(gamesWithFixedDates);
       setCurrentUser(userData || null);
@@ -642,6 +660,41 @@ export default function GamesPage() {
     });
   };
 
+  const getAvailablePlayersWithVotingOrder = async (year: number, month: number, sunday: number): Promise<User[]> => {
+    const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
+    
+    // Get voting timestamps for each player
+    const playersWithTimestamps = await Promise.all(
+      availablePlayers.map(async (player) => {
+        try {
+          // Get the monthly record to get the voting timestamp
+          const monthlyResponse = await fetch(`/api/monthly-availability-record?userId=${player.id}&month=${month}&year=${year}`);
+          let votingTimestamp = new Date(0); // Default to epoch if not found
+          
+          if (monthlyResponse.ok) {
+            const record = await monthlyResponse.json();
+            votingTimestamp = new Date(record.updatedAt);
+          }
+          
+          return {
+            player,
+            votedAt: votingTimestamp
+          };
+        } catch (error) {
+          console.warn(`Failed to get voting timestamp for ${player.name}:`, error);
+          return {
+            player,
+            votedAt: new Date(0) // Default to epoch if error
+          };
+        }
+      })
+    );
+    
+    // Sort by voting timestamp (earliest first)
+    playersWithTimestamps.sort((a, b) => a.votedAt.getTime() - b.votedAt.getTime());
+    
+    return playersWithTimestamps.map(p => p.player);
+  };
 
   const createGameForSunday = async (year: number, month: number, sunday: number) => {
     const gameDate = new Date(year, month - 1, sunday);
@@ -670,6 +723,7 @@ export default function GamesPage() {
       date: gameDate,
       status: 'confirmed',
       participants: availablePlayers.slice(0, 10).map(p => p.id),
+      waitlist: availablePlayers.slice(10).map(p => p.id),
       reservationInfo: {
         location: 'Cancha Principal', 
         time: '10:00',
@@ -695,21 +749,45 @@ export default function GamesPage() {
 
   const handleEditGame = async (updatedGame: Game) => {
     try {
+      // Use the individual game update API endpoint
+      const response = await fetch(`/api/games/${updatedGame.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: updatedGame.status,
+          teams: updatedGame.teams,
+          reservationInfo: updatedGame.reservationInfo,
+          result: updatedGame.result
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update game');
+      }
+
+      // Update local state
       const updatedGames = games.map(g => g.id === updatedGame.id ? updatedGame : g);
       setGames(updatedGames);
-      await apiClient.saveGames(updatedGames);
       setEditingGame(null);
-    } catch (error) {
-      console.error('Error editing game:', error);
+      success('Partido actualizado', 'Los cambios se guardaron correctamente');
+    } catch (err) {
+      console.error('Error editing game:', err);
+      error('Error al actualizar', 'No se pudieron guardar los cambios');
     }
   };
 
   const getCurrentMonthSundays = () => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    // Don't render until settings are loaded
+    if (!settingsCurrentMonth) {
+      return [];
+    }
     
-    // Show current and next month's Sundays
+    const { month: currentMonth, year: currentYear } = settingsCurrentMonth;
+    const now = new Date(); // Still needed for filtering past dates
+    
+    // Show current and next month's Sundays based on settings
     const monthsToShow = [
       { year: currentYear, month: currentMonth },
       { year: currentMonth === 12 ? currentYear + 1 : currentYear, month: currentMonth === 12 ? 1 : currentMonth + 1 }
@@ -894,7 +972,7 @@ export default function GamesPage() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser || !settingsCurrentMonth) {
     return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
   }
 
@@ -1014,31 +1092,16 @@ export default function GamesPage() {
             </div>
 
             {/* Show players who voted available for this day (only if game is not confirmed or completed) */}
-            {(!existingGame || (existingGame.status !== 'confirmed' && existingGame.status !== 'completed')) && (() => {
-              const availablePlayersWhoVoted = getAvailablePlayersForSunday(year, month, sunday);
-              
-              return availablePlayersWhoVoted.length > 0 ? (
-                <div className="mb-4">
-                  <h4 className="font-medium text-muted-foreground mb-2">
-                    Jugadores disponibles:
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {availablePlayersWhoVoted.map(player => (
-                      <span
-                        key={player.id}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          theme === 'dark' 
-                            ? 'bg-green-950/40 text-green-300 border border-green-600/30' 
-                            : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {player.nickname || player.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null;
-            })()}
+            <PlayersForSunday 
+              year={year} 
+              month={month} 
+              sunday={sunday} 
+              existingGame={existingGame} 
+              theme={theme}
+              getAvailablePlayersWithVotingOrder={getAvailablePlayersWithVotingOrder}
+              sortedPlayersCache={sortedPlayersCache}
+              setSortedPlayersCache={setSortedPlayersCache}
+            />
 
             {existingGame && (
               <div className="border-t pt-4">
@@ -1060,6 +1123,17 @@ export default function GamesPage() {
                   
                   {currentUser.isAdmin && (
                     <div className="flex gap-2">
+                      {existingGame.status === 'scheduled' && (
+                        <button
+                          onClick={() => {
+                            const updatedGame = { ...existingGame, status: 'confirmed' as const };
+                            handleEditGame(updatedGame);
+                          }}
+                          className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
+                        >
+                          Confirmar Partido
+                        </button>
+                      )}
                       {!existingGame.teams && existingGame.participants.length === 10 && (
                     <button
                       onClick={() => organizeTeams(existingGame.id)}
@@ -1141,6 +1215,66 @@ export default function GamesPage() {
                           );
                         })}
                       </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show waitlist for confirmed games */}
+                {existingGame.status === 'confirmed' && existingGame.waitlist && existingGame.waitlist.length > 0 && (
+                  <div className={`p-4 rounded-lg mb-4 ${
+                    theme === 'dark' ? 'bg-yellow-950/40 border border-yellow-600/30' : 'bg-yellow-50 border border-yellow-200'
+                  }`}>
+                    <h5 className={`font-semibold mb-3 flex items-center gap-2 ${
+                      theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'
+                    }`}>
+                      <Users className="h-5 w-5" />
+                      Lista de Espera ({existingGame.waitlist.length})
+                    </h5>
+                    <div className="space-y-2">
+                      {existingGame.waitlist.map((playerId, index) => {
+                        const player = users.find(u => u.id === playerId);
+                        return (
+                          <div key={playerId} className={`flex items-center justify-between p-2 rounded ${
+                            theme === 'dark' ? 'bg-yellow-900/20' : 'bg-yellow-100/50'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                theme === 'dark' ? 'bg-yellow-800/40 text-yellow-200' : 'bg-yellow-200 text-yellow-800'
+                              }`}>
+                                #{index + 1}
+                              </span>
+                              {player?.imageUrl && (
+                                <img 
+                                  src={player.imageUrl} 
+                                  alt={player.name} 
+                                  className="w-6 h-6 rounded-full"
+                                />
+                              )}
+                              <span className={theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'}>
+                                {player?.nickname || player?.name || 'Jugador desconocido'}
+                              </span>
+                            </div>
+                            {currentUser.isAdmin && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    // TODO: Implement remove from waitlist
+                                    console.log('Remove from waitlist:', playerId);
+                                  }}
+                                  className={`p-1 rounded text-xs ${
+                                    theme === 'dark' 
+                                      ? 'text-red-400 hover:bg-red-900/20 hover:text-red-300' 
+                                      : 'text-red-600 hover:bg-red-100 hover:text-red-800'
+                                  }`}
+                                  title="Eliminar de lista de espera"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1634,6 +1768,120 @@ interface ResultInputModalProps {
   users: User[];
   onSave: (gameId: string, team1Score: number, team2Score: number, notes?: string) => void;
   onClose: () => void;
+}
+
+interface PlayersForSundayProps {
+  year: number;
+  month: number;
+  sunday: number;
+  existingGame: Game | undefined;
+  theme: string;
+  getAvailablePlayersWithVotingOrder: (year: number, month: number, sunday: number) => Promise<User[]>;
+  sortedPlayersCache: {[key: string]: User[]};
+  setSortedPlayersCache: React.Dispatch<React.SetStateAction<{[key: string]: User[]}>>;
+}
+
+function PlayersForSunday({ 
+  year, 
+  month, 
+  sunday, 
+  existingGame, 
+  theme, 
+  getAvailablePlayersWithVotingOrder,
+  sortedPlayersCache,
+  setSortedPlayersCache 
+}: PlayersForSundayProps) {
+  const [sortedPlayers, setSortedPlayers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const cacheKey = `${year}-${month}-${sunday}`;
+    
+    if (sortedPlayersCache[cacheKey]) {
+      setSortedPlayers(sortedPlayersCache[cacheKey]);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+      getAvailablePlayersWithVotingOrder(year, month, sunday)
+        .then(players => {
+          setSortedPlayers(players);
+          setSortedPlayersCache(prev => ({ ...prev, [cacheKey]: players }));
+          setIsLoading(false);
+        })
+        .catch(error => {
+          console.error('Error loading sorted players:', error);
+          setIsLoading(false);
+        });
+    }
+  }, [year, month, sunday, getAvailablePlayersWithVotingOrder, sortedPlayersCache, setSortedPlayersCache]);
+
+  if (existingGame && (existingGame.status === 'confirmed' || existingGame.status === 'completed')) {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mb-4">
+        <h4 className="font-medium text-muted-foreground mb-2">
+          Jugadores disponibles:
+        </h4>
+        <div className="text-sm text-muted-foreground">Cargando orden de votación...</div>
+      </div>
+    );
+  }
+
+  if (sortedPlayers.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-4">
+      <h4 className="font-medium text-muted-foreground mb-2">
+        Jugadores disponibles (por orden de voto):
+      </h4>
+      <div className="flex flex-wrap gap-2">
+        {sortedPlayers.map((player, index) => {
+          // If there's an existing game, use the actual game data to determine status
+          let isInWaitlist = false;
+          let isParticipant = false;
+          
+          if (existingGame) {
+            isParticipant = existingGame.participants?.includes(player.id) || false;
+            isInWaitlist = existingGame.waitlist?.includes(player.id) || false;
+          } else {
+            // If no game exists yet, use index-based logic (first 10 are participants)
+            isParticipant = index < 10;
+            isInWaitlist = index >= 10;
+          }
+          
+          return (
+            <span
+              key={player.id}
+              className={`px-3 py-1 rounded-full text-sm ${
+                isParticipant ? (
+                  theme === 'dark' 
+                    ? 'bg-green-950/40 text-green-300 border border-green-600/30' 
+                    : 'bg-green-100 text-green-800'
+                ) : isInWaitlist ? (
+                  theme === 'dark'
+                    ? 'bg-yellow-950/40 text-yellow-300 border border-yellow-600/30'
+                    : 'bg-yellow-100 text-yellow-800'
+                ) : (
+                  theme === 'dark'
+                    ? 'bg-gray-950/40 text-gray-300 border border-gray-600/30'
+                    : 'bg-gray-100 text-gray-800'
+                )
+              }`}
+            >
+              <span className="text-xs mr-1 opacity-70">#{index + 1}</span>
+              {player.nickname || player.name}
+              {isInWaitlist && <span className="ml-1 text-xs">(Lista de espera)</span>}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ResultInputModal({ game, users, onSave, onClose }: ResultInputModalProps) {

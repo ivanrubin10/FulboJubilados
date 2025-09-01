@@ -99,9 +99,10 @@ async function sendMvpVotingEmails(gameId: string, game: Game, result: { team1Sc
         }
       }
       
-      // Add delay to respect rate limits (2 emails per second = 500ms delay)
+      // Add delay to respect rate limits (improved to 2 second delay)
       if (index > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500 * index));
+        const rateLimit = parseInt(process.env.EMAIL_RATE_LIMIT || '2000');
+        await new Promise(resolve => setTimeout(resolve, rateLimit));
       }
       
       console.log(`📧 Sending MVP voting email to ${participant.nickname || participant.name} (${participant.email})`);

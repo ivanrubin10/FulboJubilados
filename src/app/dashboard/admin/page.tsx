@@ -626,7 +626,7 @@ export default function AdminPage() {
     return `
       <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 30px; border-radius: 12px; text-align: center;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px;">🗳️ ¡Hola Juan!</h1>
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Hola Juan!</h1>
           <p style="margin: 0; opacity: 0.9;">Recordatorio de disponibilidad para ${monthName}</p>
         </div>
         <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
@@ -635,8 +635,8 @@ export default function AdminPage() {
             <p style="margin-bottom: 0;">Aún no has marcado qué domingos puedes jugar este mes. ¡Tu participación es importante para organizar los partidos!</p>
           </div>
           <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0;">
-            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">✅ Marcar Disponibilidad</a>
-            <a href="#" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">❌ No Puedo Ningún Día</a>
+            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">Marcar Disponibilidad</a>
+            <a href="#" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px;">No Puedo Ningún Día</a>
           </div>
         </div>
         <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
@@ -654,12 +654,12 @@ export default function AdminPage() {
     return `
       <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; border-radius: 12px; text-align: center;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px;">🚨 ACCIÓN REQUERIDA</h1>
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Acción Requerida</h1>
           <p style="margin: 0; opacity: 0.9;">Un partido ha alcanzado 10 jugadores</p>
         </div>
         <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
           <div style="background: #fee2e2; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; margin: 20px 0;">
-            <h2 style="margin-top: 0; color: #dc2626;">⚽ ¡Partido Listo para Confirmación!</h2>
+            <h2 style="margin-top: 0; color: #dc2626;">Partido Listo para Confirmación</h2>
             <p style="margin-bottom: 0;">Un partido para el <strong>${nextSunday.toLocaleDateString('es-ES', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -679,7 +679,7 @@ export default function AdminPage() {
             <p style="margin-bottom: 0;"><strong>⏰ Estado:</strong> Esperando confirmación del administrador</p>
           </div>
           <div style="text-align: center; margin: 30px 0;">
-            <a href="#" style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; font-size: 16px;">🚨 CONFIRMAR PARTIDO AHORA</a>
+            <a href="#" style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; font-size: 16px;">Confirmar Partido Ahora</a>
           </div>
         </div>
         <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">
@@ -697,12 +697,12 @@ export default function AdminPage() {
     return `
       <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 30px; border-radius: 12px; text-align: center;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px;">⚽ ¡Hola Juan!</h1>
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Hola Juan!</h1>
           <p style="margin: 0; opacity: 0.9;">Tu partido ha sido confirmado</p>
         </div>
         <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
           <div style="background: #d1fae5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
-            <h2 style="margin-top: 0; color: #059669;">🎉 ¡Partido Confirmado!</h2>
+            <h2 style="margin-top: 0; color: #059669;">Partido Confirmado</h2>
             <p style="margin-bottom: 0;">El administrador ha confirmado el partido y ha reservado la cancha. ¡Todo listo para jugar!</p>
           </div>
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -739,8 +739,8 @@ export default function AdminPage() {
     return `
       <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 30px; border-radius: 12px; text-align: center;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px;">⚽ ¡Hola Juan!</h1>
-          <p style="margin: 0; opacity: 0.9;">¡Partido terminado! Hora de votar MVP y pagar</p>
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Hola Juan!</h1>
+          <p style="margin: 0; opacity: 0.9;">Partido terminado - Hora de votar MVP y pagar</p>
         </div>
         <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px;">
           <div style="background: #1e293b; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
@@ -763,7 +763,7 @@ export default function AdminPage() {
           </div>
           
           <div style="background: #fefce8; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-            <h2 style="margin-top: 0; color: #d97706;">⭐ ¡Vota por el MVP!</h2>
+            <h2 style="margin-top: 0; color: #d97706;">Vota por el MVP</h2>
             <p><strong>¿Quién fue el mejor jugador del partido?</strong></p>
             <p>Tu voto es importante para reconocer al jugador más valioso. La votación es completamente anónima y solo los participantes pueden votar.</p>
           </div>
@@ -777,8 +777,8 @@ export default function AdminPage() {
           </div>
           
           <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0;">
-            <a href="#" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">⭐ VOTAR MVP AHORA</a>
-            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">📊 VER ESTADÍSTICAS</a>
+            <a href="#" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">Votar MVP Ahora</a>
+            <a href="#" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px;">Ver Estadísticas</a>
           </div>
         </div>
         <div style="text-align: center; margin-top: 30px; color: #64748b; font-size: 14px;">

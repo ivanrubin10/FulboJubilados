@@ -15,6 +15,7 @@ export interface Game {
   date: Date;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   participants: string[]; // User IDs
+  waitlist: string[]; // User IDs in waitlist order
   teams?: {
     team1: string[];
     team2: string[];

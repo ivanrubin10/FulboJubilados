@@ -1,5 +1,5 @@
 import { db } from './connection';
-import { users, monthlyAvailability, reminderStatus, settings, games, adminNotifications } from './schema';
+import { users, monthlyAvailability, reminderStatus, settings, games, adminNotifications, dayVotes } from './schema';
 import { eq, and, desc } from 'drizzle-orm';
 import type { User } from '@/types';
 import type { Game, AdminNotification, NewGame, NewAdminNotification } from './schema';
@@ -230,6 +230,62 @@ export class DatabaseService {
       hasVoted: result[0].hasVoted,
       cannotPlayAnyDay: result[0].cannotPlayAnyDay
     };
+  }
+
+  static async getUserMonthlyAvailabilityRecord(userId: string, month: number, year: number): Promise<{ updatedAt: Date } | null> {
+    const result = await db.select()
+      .from(monthlyAvailability)
+      .where(and(
+        eq(monthlyAvailability.userId, userId),
+        eq(monthlyAvailability.month, month),
+        eq(monthlyAvailability.year, year)
+      ))
+      .limit(1);
+
+    return result.length > 0 ? { updatedAt: new Date(result[0].updatedAt) } : null;
+  }
+
+  // Day vote management
+  static async recordDayVote(userId: string, year: number, month: number, day: number): Promise<void> {
+    await db.insert(dayVotes)
+      .values({
+        userId,
+        year,
+        month,
+        day,
+        votedAt: new Date(),
+        createdAt: new Date()
+      })
+      .onConflictDoNothing(); // Don't update if already exists - preserve original voting time
+  }
+
+  static async removeDayVote(userId: string, year: number, month: number, day: number): Promise<void> {
+    await db.delete(dayVotes)
+      .where(and(
+        eq(dayVotes.userId, userId),
+        eq(dayVotes.year, year),
+        eq(dayVotes.month, month),
+        eq(dayVotes.day, day)
+      ));
+  }
+
+  static async getDayVotesForDay(year: number, month: number, day: number): Promise<Array<{ userId: string; votedAt: Date }>> {
+    const result = await db.select({
+      userId: dayVotes.userId,
+      votedAt: dayVotes.votedAt
+    })
+      .from(dayVotes)
+      .where(and(
+        eq(dayVotes.year, year),
+        eq(dayVotes.month, month),
+        eq(dayVotes.day, day)
+      ))
+      .orderBy(dayVotes.votedAt); // Order by voting time (earliest first)
+
+    return result.map(row => ({
+      userId: row.userId,
+      votedAt: new Date(row.votedAt)
+    }));
   }
 
   // Reminder status management

@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { getCapitalizedMonthName } from './utils';
 import { calendarService } from './calendar';
+import { emailMonitoring } from './email-monitoring';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -8,12 +9,16 @@ export interface EmailNotificationData {
   to: string[];
   subject: string;
   html: string;
+  text?: string;
   from?: string;
 }
 
 export class EmailService {
   private static instance: EmailService;
-  private readonly fromEmail = process.env.FROM_EMAIL || 'noreply@fulbojubilados.com';
+  private readonly fromEmail = process.env.FROM_EMAIL || 'admin@fulbojubilados.com';
+  private readonly rateLimit = parseInt(process.env.EMAIL_RATE_LIMIT || '2000');
+  private readonly organizationName = 'Fulbo Jubilados';
+  private readonly organizationAddress = 'Buenos Aires, Argentina';
 
   public static getInstance(): EmailService {
     if (!EmailService.instance) {
@@ -22,7 +27,7 @@ export class EmailService {
     return EmailService.instance;
   }
 
-  async sendEmail(data: EmailNotificationData): Promise<boolean> {
+  async sendEmail(data: EmailNotificationData, emailType: 'admin_notification' | 'voting_reminder' | 'match_confirmation' | 'mvp_voting' = 'admin_notification'): Promise<boolean> {
     try {
       console.log('📧 EmailService.sendEmail called with:', {
         to: data.to,
@@ -32,9 +37,29 @@ export class EmailService {
         htmlLength: data.html?.length || 0
       });
 
+      // Validate each email before sending
+      for (const email of data.to) {
+        const validation = await emailMonitoring.validateEmailDeliverability(email);
+        if (!validation.shouldSend) {
+          console.warn(`⚠️ Skipping email to ${email}: ${validation.reason}`);
+          await emailMonitoring.logEmailFailure({
+            to: email,
+            subject: data.subject,
+            type: emailType,
+            errorMessage: validation.reason || 'Email validation failed'
+          });
+          continue;
+        }
+      }
+
       if (!process.env.RESEND_API_KEY) {
         console.error('❌ RESEND_API_KEY not configured. Email not sent.');
-        console.error('❌ Available env vars:', Object.keys(process.env).filter(key => key.includes('RESEND')));
+        await emailMonitoring.logEmailFailure({
+          to: data.to.join(', '),
+          subject: data.subject,
+          type: emailType,
+          errorMessage: 'RESEND_API_KEY not configured'
+        });
         return false;
       }
 
@@ -46,21 +71,51 @@ export class EmailService {
         to: data.to,
         subject: data.subject,
         html: data.html,
+        text: data.text,
+        headers: {
+          'List-Unsubscribe': `<${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+        }
       });
 
       if (error) {
         console.error('❌ Resend API error:', error);
         console.error('❌ Error details:', JSON.stringify(error, null, 2));
+        
+        await emailMonitoring.logEmailFailure({
+          to: data.to.join(', '),
+          subject: data.subject,
+          type: emailType,
+          errorMessage: error.message || 'Resend API error'
+        });
+        
         return false;
       }
 
       console.log('✅ Email sent successfully via Resend');
       console.log('📧 Email ID:', result?.id);
       console.log('📧 Result:', JSON.stringify(result, null, 2));
+
+      // Log successful email
+      await emailMonitoring.logEmailSent({
+        to: data.to.join(', '),
+        subject: data.subject,
+        type: emailType,
+        resendId: result?.id
+      });
+
       return true;
     } catch (error) {
       console.error('❌ Failed to send email - caught exception:', error);
       console.error('❌ Exception details:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      await emailMonitoring.logEmailFailure({
+        to: data.to.join(', '),
+        subject: data.subject,
+        type: emailType,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       return false;
     }
   }
@@ -73,8 +128,9 @@ export class EmailService {
     console.log('📅 Game date:', gameDate);
     console.log('👥 Player count:', playerCount);
     
-    const subject = `🚨 ADMIN: Partido listo con ${playerCount} jugadores - ${gameDate.toLocaleDateString('es-ES')}`;
+    const subject = `Partido listo con ${playerCount} jugadores - ${gameDate.toLocaleDateString('es-ES')}`;
     const html = this.generateAdminMatchReadyEmail(gameDate, playerCount);
+    const text = this.generateAdminMatchReadyEmailText(gameDate, playerCount);
     
     console.log('📝 Email subject:', subject);
     console.log('📄 HTML length:', html.length);
@@ -87,15 +143,16 @@ export class EmailService {
           to: [adminEmails[i]],
           subject,
           html,
-        });
+          text,
+        }, 'admin_notification');
         
         if (!result) {
           allSuccessful = false;
         }
         
-        // Add delay to respect rate limit (2 emails per second = 1000ms delay for safety)
+        // Add delay to respect rate limit
         if (i < adminEmails.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, this.rateLimit));
         }
       }
       console.log('📧 Email sending result:', allSuccessful);
@@ -106,7 +163,8 @@ export class EmailService {
         to: adminEmails,
         subject,
         html,
-      });
+        text,
+      }, 'admin_notification');
       
       console.log('📧 Email sending result:', result);
       return result;
@@ -116,11 +174,14 @@ export class EmailService {
   // Email template generators - only keeping the 3 needed templates
 
   private generateAdminMatchReadyEmail(gameDate: Date, playerCount: number): string {
+    const previewText = `${playerCount} jugadores confirmados para ${gameDate.toLocaleDateString('es-ES')} - Confirma el partido ahora`;
+    
     return `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -134,14 +195,18 @@ export class EmailService {
           </style>
         </head>
         <body>
+          <!-- Email Preview Text (hidden but used by email clients) -->
+          <div style="display: none; max-height: 0; overflow: hidden;">
+            ${previewText}
+          </div>
           <div class="container">
             <div class="header">
-              <h1>🚨 ACCIÓN REQUERIDA</h1>
+              <h1>Acción Requerida</h1>
               <p>Un partido ha alcanzado ${playerCount} jugadores</p>
             </div>
             <div class="content">
               <div class="alert-box">
-                <h2 style="margin-top: 0; color: #dc2626;">⚽ ¡Partido Listo para Confirmación!</h2>
+                <h2 style="margin-top: 0; color: #dc2626;">Partido Listo para Confirmación</h2>
                 <p>Un partido para el <strong>${gameDate.toLocaleDateString('es-ES', { 
                   weekday: 'long', 
                   year: 'numeric', 
@@ -171,7 +236,7 @@ export class EmailService {
               
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" class="button-confirm" style="color: white; text-decoration: none;">
-                  🚨 CONFIRMAR PARTIDO AHORA
+                  Confirmar Partido Ahora
                 </a>
               </div>
               
@@ -193,14 +258,16 @@ export class EmailService {
   // Individual notification methods for the 3 simplified email types
   async sendVotingReminder(data: { to: string; name: string; month: number; year: number }): Promise<boolean> {
     const monthCapitalized = getCapitalizedMonthName(data.year, data.month);
-    const subject = `🗳️ Recordatorio: Marca tu disponibilidad para ${monthCapitalized}`;
+    const subject = `Recordatorio: Marca tu disponibilidad para ${monthCapitalized}`;
     const html = this.generateIndividualVotingReminderEmail(data.name, data.month, data.year);
+    const text = this.generateIndividualVotingReminderEmailText(data.name, data.month, data.year);
     
     return this.sendEmail({
       to: [data.to],
       subject,
       html,
-    });
+      text,
+    }, 'voting_reminder');
   }
 
   async sendMatchConfirmation(data: { 
@@ -214,14 +281,16 @@ export class EmailService {
     mapsLink?: string;
     paymentAlias?: string;
   }): Promise<boolean> {
-    const subject = `⚽ Partido confirmado - ${data.gameDate.toLocaleDateString('es-ES')}`;
+    const subject = `Partido confirmado - ${data.gameDate.toLocaleDateString('es-ES')}`;
     const html = this.generateIndividualMatchConfirmationEmail(data);
+    const text = this.generateIndividualMatchConfirmationEmailText(data);
     
     return this.sendEmail({
       to: [data.to],
       subject,
       html,
-    });
+      text,
+    }, 'match_confirmation');
   }
 
   async sendMvpVotingAndPaymentReminder(data: {
@@ -236,18 +305,21 @@ export class EmailService {
     teamName: string;
     finalScore: string;
   }): Promise<boolean> {
-    const subject = `⭐ MVP + 💰 Pago: Partido del ${data.gameDate.toLocaleDateString('es-ES')}`;
+    const subject = `MVP y pago del partido - ${data.gameDate.toLocaleDateString('es-ES')}`;
     const html = this.generateMvpVotingAndPaymentReminderEmail(data);
+    const text = this.generateMvpVotingAndPaymentReminderEmailText(data);
     
     return this.sendEmail({
       to: [data.to],
       subject,
       html,
-    });
+      text,
+    }, 'mvp_voting');
   }
 
   private generateIndividualVotingReminderEmail(name: string, month: number, year: number): string {
     const monthCapitalized = getCapitalizedMonthName(year, month);
+    const previewText = `Marca tu disponibilidad para ${monthCapitalized} ${year} - Solo toma un minuto`;
     
     return `
       <!DOCTYPE html>
@@ -267,9 +339,13 @@ export class EmailService {
           </style>
         </head>
         <body>
+          <!-- Email Preview Text (hidden but used by email clients) -->
+          <div style="display: none; max-height: 0; overflow: hidden;">
+            ${previewText}
+          </div>
           <div class="container">
             <div class="header">
-              <h1>🗳️ ¡Hola ${name}!</h1>
+              <h1>Hola ${name}!</h1>
               <p>Recordatorio de disponibilidad para ${monthCapitalized}</p>
             </div>
             <div class="content">
@@ -280,10 +356,10 @@ export class EmailService {
               
               <div class="options">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">
-                  ✅ Marcar Disponibilidad
+                  Marcar Disponibilidad
                 </a>
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button-red">
-                  ❌ No Puedo Ningún Día
+                  No Puedo Ningún Día
                 </a>
               </div>
             </div>
@@ -325,12 +401,12 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚽ ¡Hola ${data.name}!</h1>
+              <h1>Hola ${data.name}!</h1>
               <p>Tu partido ha sido confirmado</p>
             </div>
             <div class="content">
               <div class="confirmed-box">
-                <h2 style="margin-top: 0; color: #059669;">🎉 ¡Partido Confirmado!</h2>
+                <h2 style="margin-top: 0; color: #059669;">Partido Confirmado</h2>
                 <p>El administrador ha confirmado el partido y ha reservado la cancha. ¡Todo listo para jugar!</p>
               </div>
               
@@ -404,8 +480,8 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚽ ¡Hola ${data.name}!</h1>
-              <p>¡Partido terminado! Hora de votar MVP y pagar</p>
+              <h1>Hola ${data.name}!</h1>
+              <p>Partido terminado - Hora de votar MVP y pagar</p>
             </div>
             <div class="content">
               <div class="score-display">
@@ -450,10 +526,10 @@ export class EmailService {
               
               <div class="actions">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" class="button-mvp" style="color: white; text-decoration: none;">
-                  ⭐ VOTAR MVP AHORA
+                  Votar MVP Ahora
                 </a>
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/history" class="button" style="color: white; text-decoration: none;">
-                  📊 VER ESTADÍSTICAS
+                  Ver Estadísticas
                 </a>
               </div>
               
@@ -484,6 +560,169 @@ export class EmailService {
       data.time,
       data.mapsLink ? `${data.location} - ${data.mapsLink}` : data.location
     );
+  }
+
+  // Text versions of emails for better deliverability
+  private generateAdminMatchReadyEmailText(gameDate: Date, playerCount: number): string {
+    return `
+ACCIÓN REQUERIDA - Partido Listo para Confirmación
+
+Un partido para el ${gameDate.toLocaleDateString('es-ES', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric' 
+})} ha alcanzado ${playerCount} jugadores y está listo para ser confirmado.
+
+DETALLES DEL PARTIDO:
+- Fecha: ${gameDate.toLocaleDateString('es-ES', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric' 
+})}
+- Jugadores confirmados: ${playerCount}
+- Estado: Esperando confirmación del administrador
+
+ACCIONES REQUERIDAS:
+1. Confirmar el partido: Reserva la cancha y confirma el horario
+2. Organizar equipos: Los equipos se pueden generar automáticamente
+3. Notificar jugadores: Una vez confirmado, se notificará a todos los participantes
+
+Para confirmar el partido, visita: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games
+
+RECORDATORIO: Si no confirmas el partido dentro de las próximas 24 horas, recibirás otro recordatorio. Los jugadores están esperando la confirmación.
+
+---
+${this.organizationName}
+${this.organizationAddress}
+Este es un email automático enviado cuando un partido alcanza 10 jugadores.
+    `.trim();
+  }
+
+  private generateIndividualVotingReminderEmailText(name: string, month: number, year: number): string {
+    const monthCapitalized = getCapitalizedMonthName(year, month);
+    
+    return `
+Hola ${name}!
+
+Recordatorio de disponibilidad para ${monthCapitalized} ${year}
+
+Aún no has marcado qué domingos puedes jugar este mes. Tu participación es importante para organizar los partidos.
+
+Para marcar tu disponibilidad, visita: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard
+
+También puedes indicar si no puedes jugar ningún día del mes.
+
+---
+${this.organizationName}
+${this.organizationAddress}
+Organizando tu diversión dominical.
+    `.trim();
+  }
+
+  private generateIndividualMatchConfirmationEmailText(data: { 
+    name: string; 
+    gameDate: Date; 
+    location: string; 
+    time: string; 
+    cost?: number; 
+    reservedBy: string;
+    mapsLink?: string;
+    paymentAlias?: string;
+  }): string {
+    const costPerPerson = data.cost ? (data.cost / 10).toFixed(0) : null;
+    
+    return `
+Hola ${data.name}!
+
+PARTIDO CONFIRMADO
+
+El administrador ha confirmado el partido y ha reservado la cancha. Todo listo para jugar!
+
+DETALLES DEL PARTIDO:
+- Fecha: ${data.gameDate.toLocaleDateString('es-ES', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric' 
+})}
+- Hora: ${data.time}
+- Ubicación: ${data.location}${data.mapsLink ? `\n- Google Maps: ${data.mapsLink}` : ''}
+${data.cost ? `- Costo: ARS $${data.cost}` : ''}
+- Reservado por: ${data.reservedBy}
+${data.paymentAlias ? `- Alias para transferir: ${data.paymentAlias}${costPerPerson ? ` (ARS $${costPerPerson} por persona)` : ''}` : ''}
+
+Ver detalles del partido: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games
+Agregar al calendario: ${this.generateCalendarLink(data)}
+
+---
+${this.organizationName}
+${this.organizationAddress}
+Nos vemos en la cancha!
+    `.trim();
+  }
+
+  private generateMvpVotingAndPaymentReminderEmailText(data: {
+    name: string;
+    gameDate: Date;
+    location: string;
+    time: string;
+    cost?: number;
+    paymentAlias?: string;
+    organizerName: string;
+    teamName: string;
+    finalScore: string;
+  }): string {
+    const costPerPerson = data.cost ? (data.cost / 10).toFixed(0) : null;
+    
+    return `
+Hola ${data.name}!
+
+PARTIDO TERMINADO - Hora de votar MVP y pagar
+
+RESULTADO FINAL: ${data.finalScore}
+Tu equipo: ${data.teamName}
+
+DETALLES DEL PARTIDO:
+- Fecha: ${data.gameDate.toLocaleDateString('es-ES', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric' 
+})}
+- Hora: ${data.time}
+- Ubicación: ${data.location}
+- Organizado por: ${data.organizerName}
+
+VOTACIÓN MVP:
+¿Quién fue el mejor jugador del partido?
+Tu voto es importante para reconocer al jugador más valioso. La votación es completamente anónima y solo los participantes pueden votar.
+
+Importante:
+- Solo puedes votar UNA vez por partido
+- Puedes votar por cualquier jugador que participó
+- Los resultados se muestran cuando termine la votación
+
+${data.cost && data.paymentAlias ? `
+PAGO DEL PARTIDO:
+- Costo total: ARS $${data.cost}
+- Tu parte: ARS $${costPerPerson} (dividido entre 10 jugadores)
+- Transferir a: ${data.paymentAlias}
+- Organizado por: ${data.organizerName}
+` : ''}
+
+VOTAR MVP AHORA: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games
+VER ESTADÍSTICAS: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/history
+
+¿Ya votaste? Revisa el resultado en la sección de partidos o historial.
+
+---
+${this.organizationName}
+${this.organizationAddress}
+Gracias por jugar!
+Este email se envía automáticamente cuando termina un partido.
+    `.trim();
   }
 }
 
