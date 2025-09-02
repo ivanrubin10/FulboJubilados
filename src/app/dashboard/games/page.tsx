@@ -88,7 +88,8 @@ const apiClient = {
     const res = await fetch(`/api/games/${gameId}/mvp/voted`);
     if (!res.ok) throw new Error('Failed to check vote status');
     return res.json();
-  }
+  },
+
 };
 
 interface EditGameModal {
@@ -437,6 +438,329 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
   );
 }
 
+interface ParticipantManagementModalProps {
+  game: Game;
+  users: User[];
+  onSave: (updatedGame: Game) => void;
+  onClose: () => void;
+}
+
+function ParticipantManagementModal({ game, users, onSave, onClose }: ParticipantManagementModalProps) {
+  const { theme } = useTheme();
+  const [participants, setParticipants] = useState<string[]>([...game.participants]);
+  const [waitlist, setWaitlist] = useState<string[]>(game.waitlist || []);
+
+  // Get all available users (whitelisted users not in participants or waitlist)
+  const availableUsers = users.filter(user => 
+    user.isWhitelisted && 
+    !participants.includes(user.id) && 
+    !waitlist.includes(user.id)
+  );
+
+  const moveToParticipants = (userId: string, fromWaitlist = false) => {
+    if (participants.length >= 10) return;
+    
+    setParticipants(prev => [...prev, userId]);
+    if (fromWaitlist) {
+      setWaitlist(prev => prev.filter(id => id !== userId));
+    }
+  };
+
+  const moveToWaitlist = (userId: string, fromParticipants = false) => {
+    setWaitlist(prev => [...prev, userId]);
+    if (fromParticipants) {
+      setParticipants(prev => prev.filter(id => id !== userId));
+    }
+  };
+
+  const removeUser = (userId: string) => {
+    setParticipants(prev => prev.filter(id => id !== userId));
+    setWaitlist(prev => prev.filter(id => id !== userId));
+  };
+
+  const handleSave = async () => {
+    try {
+      const updatedGame: Game = {
+        ...game,
+        participants,
+        waitlist,
+        updatedAt: new Date()
+      };
+
+      // Update via API
+      const res = await fetch(`/api/games/${game.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participants, waitlist })
+      });
+
+      if (!res.ok) throw new Error('Failed to update participants');
+
+      onSave(updatedGame);
+    } catch (error) {
+      console.error('Error updating participants:', error);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-card rounded-lg shadow-xl border border-border w-full max-w-6xl max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b border-border">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Gestionar Participantes</h2>
+              <p className="text-muted-foreground">
+                {new Date(game.date).toLocaleDateString('es-ES', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-accent/20 rounded-lg"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          <div className="grid lg:grid-cols-3 gap-6">
+            
+            {/* Participants Column */}
+            <div className={`p-4 rounded-lg border-2 ${
+              theme === 'dark' 
+                ? 'bg-green-950/20 border-green-600/30' 
+                : 'bg-green-50 border-green-200'
+            }`}>
+              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-green-300' : 'text-green-800'
+              }`}>
+                <Users className="h-5 w-5" />
+                Participantes ({participants.length}/10)
+              </h3>
+              
+              <div className="space-y-2 min-h-[200px]">
+                {participants.map(userId => {
+                  const user = users.find(u => u.id === userId);
+                  if (!user) return null;
+                  
+                  return (
+                    <div key={userId} className={`flex items-center justify-between p-2 rounded ${
+                      theme === 'dark' ? 'bg-green-900/20' : 'bg-green-100/50'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {user.imageUrl && (
+                          <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                        )}
+                        <span className={theme === 'dark' ? 'text-green-300' : 'text-green-700'}>
+                          {user.nickname || user.name}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => moveToWaitlist(userId, true)}
+                          className={`p-1 rounded text-xs ${
+                            theme === 'dark' 
+                              ? 'text-yellow-400 hover:bg-yellow-900/20' 
+                              : 'text-yellow-600 hover:bg-yellow-100'
+                          }`}
+                          title="Mover a lista de espera"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={() => removeUser(userId)}
+                          className={`p-1 rounded text-xs ${
+                            theme === 'dark' 
+                              ? 'text-red-400 hover:bg-red-900/20' 
+                              : 'text-red-600 hover:bg-red-100'
+                          }`}
+                          title="Eliminar"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {participants.length === 0 && (
+                  <div className={`text-center py-8 text-sm ${
+                    theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                  }`}>
+                    Sin participantes
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Waitlist Column */}
+            <div className={`p-4 rounded-lg border-2 ${
+              theme === 'dark' 
+                ? 'bg-yellow-950/20 border-yellow-600/30' 
+                : 'bg-yellow-50 border-yellow-200'
+            }`}>
+              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'
+              }`}>
+                <Users className="h-5 w-5" />
+                Lista de Espera ({waitlist.length})
+              </h3>
+              
+              <div className="space-y-2 min-h-[200px]">
+                {waitlist.map((userId, index) => {
+                  const user = users.find(u => u.id === userId);
+                  if (!user) return null;
+                  
+                  return (
+                    <div key={userId} className={`flex items-center justify-between p-2 rounded ${
+                      theme === 'dark' ? 'bg-yellow-900/20' : 'bg-yellow-100/50'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          theme === 'dark' ? 'bg-yellow-800/40 text-yellow-200' : 'bg-yellow-200 text-yellow-800'
+                        }`}>
+                          #{index + 1}
+                        </span>
+                        {user.imageUrl && (
+                          <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                        )}
+                        <span className={theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'}>
+                          {user.nickname || user.name}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {participants.length < 10 && (
+                          <button
+                            onClick={() => moveToParticipants(userId, true)}
+                            className={`p-1 rounded text-xs ${
+                              theme === 'dark' 
+                                ? 'text-green-400 hover:bg-green-900/20' 
+                                : 'text-green-600 hover:bg-green-100'
+                            }`}
+                            title="Promover a participante"
+                          >
+                            ↑
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeUser(userId)}
+                          className={`p-1 rounded text-xs ${
+                            theme === 'dark' 
+                              ? 'text-red-400 hover:bg-red-900/20' 
+                              : 'text-red-600 hover:bg-red-100'
+                          }`}
+                          title="Eliminar"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {waitlist.length === 0 && (
+                  <div className={`text-center py-8 text-sm ${
+                    theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
+                  }`}>
+                    Lista de espera vacía
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Available Users Column */}
+            <div className={`p-4 rounded-lg border-2 ${
+              theme === 'dark' 
+                ? 'bg-blue-950/20 border-blue-600/30' 
+                : 'bg-blue-50 border-blue-200'
+            }`}>
+              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+              }`}>
+                <Users className="h-5 w-5" />
+                Jugadores Disponibles ({availableUsers.length})
+              </h3>
+              
+              <div className="space-y-2 min-h-[200px]">
+                {availableUsers.map(user => (
+                  <div key={user.id} className={`flex items-center justify-between p-2 rounded ${
+                    theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-100/50'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {user.imageUrl && (
+                        <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                      )}
+                      <span className={theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}>
+                        {user.nickname || user.name}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {participants.length < 10 && (
+                        <button
+                          onClick={() => moveToParticipants(user.id)}
+                          className={`p-1 rounded text-xs ${
+                            theme === 'dark' 
+                              ? 'text-green-400 hover:bg-green-900/20' 
+                              : 'text-green-600 hover:bg-green-100'
+                          }`}
+                          title="Agregar como participante"
+                        >
+                          ↑
+                        </button>
+                      )}
+                      <button
+                        onClick={() => moveToWaitlist(user.id)}
+                        className={`p-1 rounded text-xs ${
+                          theme === 'dark' 
+                            ? 'text-yellow-400 hover:bg-yellow-900/20' 
+                            : 'text-yellow-600 hover:bg-yellow-100'
+                        }`}
+                        title="Agregar a lista de espera"
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                {availableUsers.length === 0 && (
+                  <div className={`text-center py-8 text-sm ${
+                    theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                  }`}>
+                    No hay jugadores disponibles
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-border bg-accent/10">
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-accent/20"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600"
+            >
+              Guardar Cambios
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GamesPage() {
   const { user, isLoaded } = useUser();
   const { success, error } = useToast();
@@ -447,6 +771,7 @@ export default function GamesPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [addingResultToGame, setAddingResultToGame] = useState<Game | null>(null);
+  const [managingParticipants, setManagingParticipants] = useState<Game | null>(null);
     const [isLoading, setIsLoading] = useState(true);
   const [availability, setAvailability] = useState<MonthlyAvailability[]>([]);
   const [availabilityCache, setAvailabilityCache] = useState<{[key: string]: MonthlyAvailability[]}>({});
@@ -961,6 +1286,7 @@ export default function GamesPage() {
     }
   };
 
+
   if (!isLoaded || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -1152,6 +1478,13 @@ export default function GamesPage() {
                         </button>
                       )}
                       <button
+                        onClick={() => setManagingParticipants(existingGame)}
+                        className="bg-purple-600 dark:bg-purple-700 text-white px-4 py-2 rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 flex items-center gap-2"
+                      >
+                        <Users className="h-4 w-4" />
+                        Gestionar Participantes
+                      </button>
+                      <button
                         onClick={() => setEditingGame(existingGame)}
                         className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                       >
@@ -1254,24 +1587,6 @@ export default function GamesPage() {
                                 {player?.nickname || player?.name || 'Jugador desconocido'}
                               </span>
                             </div>
-                            {currentUser.isAdmin && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => {
-                                    // TODO: Implement remove from waitlist
-                                    console.log('Remove from waitlist:', playerId);
-                                  }}
-                                  className={`p-1 rounded text-xs ${
-                                    theme === 'dark' 
-                                      ? 'text-red-400 hover:bg-red-900/20 hover:text-red-300' 
-                                      : 'text-red-600 hover:bg-red-100 hover:text-red-800'
-                                  }`}
-                                  title="Eliminar de lista de espera"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
                           </div>
                         );
                       })}
@@ -1654,6 +1969,20 @@ export default function GamesPage() {
           users={users}
           onSave={updateGameResult}
           onClose={() => setAddingResultToGame(null)}
+        />
+      )}
+
+      {managingParticipants && (
+        <ParticipantManagementModal 
+          game={managingParticipants}
+          users={users}
+          onSave={(updatedGame) => {
+            const updatedGames = games.map(g => g.id === updatedGame.id ? updatedGame : g);
+            setGames(updatedGames);
+            setManagingParticipants(null);
+            success('Participantes actualizados', 'Los cambios se guardaron correctamente');
+          }}
+          onClose={() => setManagingParticipants(null)}
         />
       )}
 
