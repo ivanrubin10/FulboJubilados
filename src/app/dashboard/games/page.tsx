@@ -466,7 +466,9 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
     
     try {
       // Create the swap by updating participants and waitlist arrays
+      // eslint-disable-next-line prefer-const
       let newParticipants = [...(game.participants || [])];
+      // eslint-disable-next-line prefer-const
       let newWaitlist = [...(game.waitlist || [])];
       
       // Find position of player to replace
@@ -824,16 +826,14 @@ export default function GamesPage() {
         { year: currentMonth === 12 ? currentYear + 1 : currentYear, month: currentMonth === 12 ? 1 : currentMonth + 1 }
       ];
       
-      console.log(`🔍 DEBUG: Pre-fetching months:`, monthsToPreFetch);
-      
       monthsToPreFetch.forEach(({ year, month }) => {
-        console.log(`🔍 DEBUG: Fetching availability for ${month}/${year}`);
         fetchAvailabilityForMonth(year, month);
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsCurrentMonth]);
 
-  const fetchAvailabilityForMonth = async (year: number, month: number): Promise<MonthlyAvailability[]> => {
+  const fetchAvailabilityForMonth = useCallback(async (year: number, month: number): Promise<MonthlyAvailability[]> => {
     const cacheKey = `${month}-${year}`;
     
     if (availabilityCache[cacheKey]) {
@@ -858,7 +858,7 @@ export default function GamesPage() {
       console.error(`Error fetching availability for ${year}-${month}:`, error);
       return [];
     }
-  };
+  }, [availabilityCache, setAvailabilityCache]);
 
   const getAvailablePlayersForSunday = useCallback((year: number, month: number, sunday: number): User[] => {
     const cacheKey = `${month}-${year}`;

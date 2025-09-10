@@ -55,6 +55,7 @@ export interface MonthlyAvailability {
   cannotPlayAnyDay: boolean; // "No puedo ningún día" option
   hasVoted: boolean; // Track if user has submitted their availability
   updatedAt: Date;
+  votedAt?: Date; // When the user voted (from API response)
 }
 
 export interface ReminderStatus {
