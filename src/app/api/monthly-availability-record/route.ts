@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
       parseInt(year)
     );
     
+    if (!record) {
+      return NextResponse.json({ error: 'No record found' }, { status: 404 });
+    }
+    
     return NextResponse.json(record);
   } catch (error) {
     console.error('Error fetching monthly availability record:', error);

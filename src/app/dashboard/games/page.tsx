@@ -447,43 +447,53 @@ interface ParticipantManagementModalProps {
 
 function ParticipantManagementModal({ game, users, onSave, onClose }: ParticipantManagementModalProps) {
   const { theme } = useTheme();
-  const [participants, setParticipants] = useState<string[]>([...game.participants]);
-  const [waitlist, setWaitlist] = useState<string[]>(game.waitlist || []);
+  const [replacePlayer, setReplacePlayer] = useState<string>('');
+  const [withPlayer, setWithPlayer] = useState<string>('');
+  const [isSwapping, setIsSwapping] = useState(false);
 
-  // Get all available users (whitelisted users not in participants or waitlist)
+  // Get all players currently in the game (participants + waitlist)
+  const allGamePlayers = [...(game.participants || []), ...(game.waitlist || [])];
+  
+  // Get all whitelisted users NOT in the game for the "with" dropdown
   const availableUsers = users.filter(user => 
-    user.isWhitelisted && 
-    !participants.includes(user.id) && 
-    !waitlist.includes(user.id)
+    user.isWhitelisted && !allGamePlayers.includes(user.id)
   );
 
-  const moveToParticipants = (userId: string, fromWaitlist = false) => {
-    if (participants.length >= 10) return;
+  const handleSwap = async () => {
+    if (!replacePlayer || !withPlayer) return;
     
-    setParticipants(prev => [...prev, userId]);
-    if (fromWaitlist) {
-      setWaitlist(prev => prev.filter(id => id !== userId));
-    }
-  };
-
-  const moveToWaitlist = (userId: string, fromParticipants = false) => {
-    setWaitlist(prev => [...prev, userId]);
-    if (fromParticipants) {
-      setParticipants(prev => prev.filter(id => id !== userId));
-    }
-  };
-
-  const removeUser = (userId: string) => {
-    setParticipants(prev => prev.filter(id => id !== userId));
-    setWaitlist(prev => prev.filter(id => id !== userId));
-  };
-
-  const handleSave = async () => {
+    setIsSwapping(true);
+    
     try {
+      // Create the swap by updating participants and waitlist arrays
+      let newParticipants = [...(game.participants || [])];
+      let newWaitlist = [...(game.waitlist || [])];
+      
+      // Find position of player to replace
+      const replaceInParticipants = newParticipants.indexOf(replacePlayer);
+      const replaceInWaitlist = newWaitlist.indexOf(replacePlayer);
+      
+      // Since "with" player is never in the game, just replace the position
+      if (replaceInParticipants !== -1) {
+        newParticipants[replaceInParticipants] = withPlayer;
+      } else if (replaceInWaitlist !== -1) {
+        newWaitlist[replaceInWaitlist] = withPlayer;
+      }
+
+      // Update the teams if they exist
+      let updatedTeams = game.teams;
+      if (updatedTeams) {
+        updatedTeams = {
+          team1: updatedTeams.team1.map(id => id === replacePlayer ? withPlayer : id),
+          team2: updatedTeams.team2.map(id => id === replacePlayer ? withPlayer : id)
+        };
+      }
+
       const updatedGame: Game = {
         ...game,
-        participants,
-        waitlist,
+        participants: newParticipants,
+        waitlist: newWaitlist,
+        teams: updatedTeams,
         updatedAt: new Date()
       };
 
@@ -491,16 +501,25 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
       const res = await fetch(`/api/games/${game.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participants, waitlist })
+        body: JSON.stringify({ 
+          participants: newParticipants, 
+          waitlist: newWaitlist,
+          teams: updatedTeams
+        })
       });
 
-      if (!res.ok) throw new Error('Failed to update participants');
+      if (!res.ok) throw new Error('Failed to swap players');
 
       onSave(updatedGame);
+      onClose();
     } catch (error) {
-      console.error('Error updating participants:', error);
+      console.error('Error swapping players:', error);
+    } finally {
+      setIsSwapping(false);
     }
   };
+
+
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -527,216 +546,75 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
           </div>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="grid lg:grid-cols-3 gap-6">
-            
-            {/* Participants Column */}
-            <div className={`p-4 rounded-lg border-2 ${
-              theme === 'dark' 
-                ? 'bg-green-950/20 border-green-600/30' 
-                : 'bg-green-50 border-green-200'
-            }`}>
-              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
-                theme === 'dark' ? 'text-green-300' : 'text-green-800'
-              }`}>
-                <Users className="h-5 w-5" />
-                Participantes ({participants.length}/10)
-              </h3>
-              
-              <div className="space-y-2 min-h-[200px]">
-                {participants.map(userId => {
-                  const user = users.find(u => u.id === userId);
-                  if (!user) return null;
-                  
-                  return (
-                    <div key={userId} className={`flex items-center justify-between p-2 rounded ${
-                      theme === 'dark' ? 'bg-green-900/20' : 'bg-green-100/50'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        {user.imageUrl && (
-                          <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
-                        )}
-                        <span className={theme === 'dark' ? 'text-green-300' : 'text-green-700'}>
-                          {user.nickname || user.name}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => moveToWaitlist(userId, true)}
-                          className={`p-1 rounded text-xs ${
-                            theme === 'dark' 
-                              ? 'text-yellow-400 hover:bg-yellow-900/20' 
-                              : 'text-yellow-600 hover:bg-yellow-100'
-                          }`}
-                          title="Mover a lista de espera"
-                        >
-                          ↓
-                        </button>
-                        <button
-                          onClick={() => removeUser(userId)}
-                          className={`p-1 rounded text-xs ${
-                            theme === 'dark' 
-                              ? 'text-red-400 hover:bg-red-900/20' 
-                              : 'text-red-600 hover:bg-red-100'
-                          }`}
-                          title="Eliminar"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {participants.length === 0 && (
-                  <div className={`text-center py-8 text-sm ${
-                    theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                  }`}>
-                    Sin participantes
-                  </div>
-                )}
+        <div className="p-6">
+          <div className="space-y-6">
+            {/* Player Swap Interface */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Reemplazar a:
+                </label>
+                <select
+                  value={replacePlayer}
+                  onChange={(e) => setReplacePlayer(e.target.value)}
+                  className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Seleccionar jugador...</option>
+                  {allGamePlayers.map((playerId) => {
+                    const player = users.find(u => u.id === playerId);
+                    const isParticipant = (game.participants || []).includes(playerId);
+                    const position = allGamePlayers.indexOf(playerId) + 1;
+                    return (
+                      <option key={playerId} value={playerId}>
+                        #{position} {player?.nickname || player?.name} {isParticipant ? '(Participante)' : '(Suplente)'}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Por:
+                </label>
+                <select
+                  value={withPlayer}
+                  onChange={(e) => setWithPlayer(e.target.value)}
+                  className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Seleccionar jugador...</option>
+                  {availableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.nickname || user.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Waitlist Column */}
-            <div className={`p-4 rounded-lg border-2 ${
-              theme === 'dark' 
-                ? 'bg-yellow-950/20 border-yellow-600/30' 
-                : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
-                theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'
+            {/* Current Game Status */}
+            {allGamePlayers.length > 0 && (
+              <div className={`p-4 rounded-lg ${
+                theme === 'dark' ? 'bg-gray-950/40 border border-gray-600/30' : 'bg-gray-50 border border-gray-200'
               }`}>
-                <Users className="h-5 w-5" />
-                Lista de Espera ({waitlist.length})
-              </h3>
-              
-              <div className="space-y-2 min-h-[200px]">
-                {waitlist.map((userId, index) => {
-                  const user = users.find(u => u.id === userId);
-                  if (!user) return null;
-                  
-                  return (
-                    <div key={userId} className={`flex items-center justify-between p-2 rounded ${
-                      theme === 'dark' ? 'bg-yellow-900/20' : 'bg-yellow-100/50'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          theme === 'dark' ? 'bg-yellow-800/40 text-yellow-200' : 'bg-yellow-200 text-yellow-800'
-                        }`}>
-                          #{index + 1}
-                        </span>
-                        {user.imageUrl && (
-                          <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
-                        )}
-                        <span className={theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'}>
-                          {user.nickname || user.name}
-                        </span>
+                <h4 className="font-medium text-foreground mb-3">Jugadores Actuales:</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 text-sm">
+                  {allGamePlayers.map((playerId, index) => {
+                    const player = users.find(u => u.id === playerId);
+                    const isParticipant = index < 10;
+                    return (
+                      <div key={playerId} className={`px-2 py-1 rounded text-center ${
+                        isParticipant 
+                          ? (theme === 'dark' ? 'bg-green-900/20 text-green-300' : 'bg-green-100 text-green-800')
+                          : (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-300' : 'bg-yellow-100 text-yellow-800')
+                      }`}>
+                        #{index + 1} {player?.nickname || player?.name}
                       </div>
-                      <div className="flex gap-1">
-                        {participants.length < 10 && (
-                          <button
-                            onClick={() => moveToParticipants(userId, true)}
-                            className={`p-1 rounded text-xs ${
-                              theme === 'dark' 
-                                ? 'text-green-400 hover:bg-green-900/20' 
-                                : 'text-green-600 hover:bg-green-100'
-                            }`}
-                            title="Promover a participante"
-                          >
-                            ↑
-                          </button>
-                        )}
-                        <button
-                          onClick={() => removeUser(userId)}
-                          className={`p-1 rounded text-xs ${
-                            theme === 'dark' 
-                              ? 'text-red-400 hover:bg-red-900/20' 
-                              : 'text-red-600 hover:bg-red-100'
-                          }`}
-                          title="Eliminar"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {waitlist.length === 0 && (
-                  <div className={`text-center py-8 text-sm ${
-                    theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
-                  }`}>
-                    Lista de espera vacía
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-
-            {/* Available Users Column */}
-            <div className={`p-4 rounded-lg border-2 ${
-              theme === 'dark' 
-                ? 'bg-blue-950/20 border-blue-600/30' 
-                : 'bg-blue-50 border-blue-200'
-            }`}>
-              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${
-                theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
-              }`}>
-                <Users className="h-5 w-5" />
-                Jugadores Disponibles ({availableUsers.length})
-              </h3>
-              
-              <div className="space-y-2 min-h-[200px]">
-                {availableUsers.map(user => (
-                  <div key={user.id} className={`flex items-center justify-between p-2 rounded ${
-                    theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-100/50'
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      {user.imageUrl && (
-                        <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
-                      )}
-                      <span className={theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}>
-                        {user.nickname || user.name}
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {participants.length < 10 && (
-                        <button
-                          onClick={() => moveToParticipants(user.id)}
-                          className={`p-1 rounded text-xs ${
-                            theme === 'dark' 
-                              ? 'text-green-400 hover:bg-green-900/20' 
-                              : 'text-green-600 hover:bg-green-100'
-                          }`}
-                          title="Agregar como participante"
-                        >
-                          ↑
-                        </button>
-                      )}
-                      <button
-                        onClick={() => moveToWaitlist(user.id)}
-                        className={`p-1 rounded text-xs ${
-                          theme === 'dark' 
-                            ? 'text-yellow-400 hover:bg-yellow-900/20' 
-                            : 'text-yellow-600 hover:bg-yellow-100'
-                        }`}
-                        title="Agregar a lista de espera"
-                      >
-                        →
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                
-                {availableUsers.length === 0 && (
-                  <div className={`text-center py-8 text-sm ${
-                    theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-                  }`}>
-                    No hay jugadores disponibles
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -749,10 +627,11 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
               Cancelar
             </button>
             <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600"
+              onClick={handleSwap}
+              disabled={!replacePlayer || !withPlayer || isSwapping}
+              className="px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Guardar Cambios
+              {isSwapping ? 'Intercambiando...' : 'Intercambiar Jugadores'}
             </button>
           </div>
         </div>
@@ -936,8 +815,27 @@ export default function GamesPage() {
     loadData();
   }, [isLoaded, user]);
 
+  // Pre-fetch availability for current and next month when settings are loaded
+  useEffect(() => {
+    if (settingsCurrentMonth) {
+      const { month: currentMonth, year: currentYear } = settingsCurrentMonth;
+      const monthsToPreFetch = [
+        { year: currentYear, month: currentMonth },
+        { year: currentMonth === 12 ? currentYear + 1 : currentYear, month: currentMonth === 12 ? 1 : currentMonth + 1 }
+      ];
+      
+      console.log(`🔍 DEBUG: Pre-fetching months:`, monthsToPreFetch);
+      
+      monthsToPreFetch.forEach(({ year, month }) => {
+        console.log(`🔍 DEBUG: Fetching availability for ${month}/${year}`);
+        fetchAvailabilityForMonth(year, month);
+      });
+    }
+  }, [settingsCurrentMonth]);
+
   const fetchAvailabilityForMonth = async (year: number, month: number): Promise<MonthlyAvailability[]> => {
-    const cacheKey = `${year}-${month}`;
+    const cacheKey = `${month}-${year}`;
+    
     if (availabilityCache[cacheKey]) {
       return availabilityCache[cacheKey];
     }
@@ -962,7 +860,9 @@ export default function GamesPage() {
     }
   };
 
-  const getAvailablePlayersForSunday = (year: number, month: number, sunday: number): User[] => {
+  const getAvailablePlayersForSunday = useCallback((year: number, month: number, sunday: number): User[] => {
+    const cacheKey = `${month}-${year}`;
+    
     return users.filter(user => {
       // Include all whitelisted users (both admins and regular players)
       if (!user.isWhitelisted) return false;
@@ -973,7 +873,6 @@ export default function GamesPage() {
       );
       
       // If not found, check from cache for this specific month
-      const cacheKey = `${year}-${month}`;
       if (!userAvailability && availabilityCache[cacheKey]) {
         userAvailability = availabilityCache[cacheKey].find(
           a => a.userId === user.id && a.month === month && a.year === year
@@ -983,43 +882,35 @@ export default function GamesPage() {
       // Only show users who have explicitly voted for this Sunday
       return userAvailability?.availableSundays.includes(sunday) || false;
     });
-  };
+  }, [users, availability, availabilityCache]);
 
-  const getAvailablePlayersWithVotingOrder = async (year: number, month: number, sunday: number): Promise<User[]> => {
+  const getAvailablePlayersWithVotingOrder = useCallback(async (year: number, month: number, sunday: number): Promise<User[]> => {
     const availablePlayers = getAvailablePlayersForSunday(year, month, sunday);
     
-    // Get voting timestamps for each player
-    const playersWithTimestamps = await Promise.all(
-      availablePlayers.map(async (player) => {
-        try {
-          // Get the monthly record to get the voting timestamp
-          const monthlyResponse = await fetch(`/api/monthly-availability-record?userId=${player.id}&month=${month}&year=${year}`);
-          let votingTimestamp = new Date(0); // Default to epoch if not found
-          
-          if (monthlyResponse.ok) {
-            const record = await monthlyResponse.json();
-            votingTimestamp = new Date(record.updatedAt);
-          }
-          
-          return {
-            player,
-            votedAt: votingTimestamp
-          };
-        } catch (error) {
-          console.warn(`Failed to get voting timestamp for ${player.name}:`, error);
-          return {
-            player,
-            votedAt: new Date(0) // Default to epoch if error
-          };
-        }
-      })
-    );
+    // Use cached availability data instead of making individual API calls
+    const cacheKey = `${month}-${year}`;
+    const monthlyAvailability = availabilityCache[cacheKey] || [];
+    
+    const playersWithTimestamps = availablePlayers.map((player) => {
+      // Find the availability record for this player and month
+      const availabilityRecord = monthlyAvailability.find(record => record.userId === player.id);
+      
+      let votingTimestamp = new Date(0); // Default to epoch if not found
+      if (availabilityRecord && availabilityRecord.votedAt) {
+        votingTimestamp = new Date(availabilityRecord.votedAt);
+      }
+      
+      return {
+        player,
+        votedAt: votingTimestamp
+      };
+    });
     
     // Sort by voting timestamp (earliest first)
     playersWithTimestamps.sort((a, b) => a.votedAt.getTime() - b.votedAt.getTime());
     
     return playersWithTimestamps.map(p => p.player);
-  };
+  }, [getAvailablePlayersForSunday, availabilityCache]);
 
   const createGameForSunday = async (year: number, month: number, sunday: number) => {
     const gameDate = new Date(year, month - 1, sunday);
@@ -1427,6 +1318,7 @@ export default function GamesPage() {
               getAvailablePlayersWithVotingOrder={getAvailablePlayersWithVotingOrder}
               sortedPlayersCache={sortedPlayersCache}
               setSortedPlayersCache={setSortedPlayersCache}
+              availabilityCache={availabilityCache}
             />
 
             {existingGame && (
@@ -1552,47 +1444,6 @@ export default function GamesPage() {
                   </div>
                 )}
 
-                {/* Show waitlist for confirmed games */}
-                {existingGame.status === 'confirmed' && existingGame.waitlist && existingGame.waitlist.length > 0 && (
-                  <div className={`p-4 rounded-lg mb-4 ${
-                    theme === 'dark' ? 'bg-yellow-950/40 border border-yellow-600/30' : 'bg-yellow-50 border border-yellow-200'
-                  }`}>
-                    <h5 className={`font-semibold mb-3 flex items-center gap-2 ${
-                      theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'
-                    }`}>
-                      <Users className="h-5 w-5" />
-                      Lista de Espera ({existingGame.waitlist.length})
-                    </h5>
-                    <div className="space-y-2">
-                      {existingGame.waitlist.map((playerId, index) => {
-                        const player = users.find(u => u.id === playerId);
-                        return (
-                          <div key={playerId} className={`flex items-center justify-between p-2 rounded ${
-                            theme === 'dark' ? 'bg-yellow-900/20' : 'bg-yellow-100/50'
-                          }`}>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs font-medium px-2 py-1 rounded ${
-                                theme === 'dark' ? 'bg-yellow-800/40 text-yellow-200' : 'bg-yellow-200 text-yellow-800'
-                              }`}>
-                                #{index + 1}
-                              </span>
-                              {player?.imageUrl && (
-                                <img 
-                                  src={player.imageUrl} 
-                                  alt={player.name} 
-                                  className="w-6 h-6 rounded-full"
-                                />
-                              )}
-                              <span className={theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'}>
-                                {player?.nickname || player?.name || 'Jugador desconocido'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 {existingGame.result && (
                   <div className={`p-4 rounded-lg mb-4 ${
@@ -2108,6 +1959,7 @@ interface PlayersForSundayProps {
   getAvailablePlayersWithVotingOrder: (year: number, month: number, sunday: number) => Promise<User[]>;
   sortedPlayersCache: {[key: string]: User[]};
   setSortedPlayersCache: React.Dispatch<React.SetStateAction<{[key: string]: User[]}>>;
+  availabilityCache: {[key: string]: MonthlyAvailability[]};
 }
 
 function PlayersForSunday({ 
@@ -2118,18 +1970,21 @@ function PlayersForSunday({
   theme, 
   getAvailablePlayersWithVotingOrder,
   sortedPlayersCache,
-  setSortedPlayersCache 
+  setSortedPlayersCache,
+  availabilityCache
 }: PlayersForSundayProps) {
   const [sortedPlayers, setSortedPlayers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const cacheKey = `${year}-${month}-${sunday}`;
+    const availabilityCacheKey = `${month}-${year}`;
     
     if (sortedPlayersCache[cacheKey]) {
       setSortedPlayers(sortedPlayersCache[cacheKey]);
       setIsLoading(false);
-    } else {
+    } else if (availabilityCache[availabilityCacheKey]) {
+      // Only fetch if we have the availability data
       setIsLoading(true);
       getAvailablePlayersWithVotingOrder(year, month, sunday)
         .then(players => {
@@ -2141,8 +1996,11 @@ function PlayersForSunday({
           console.error('Error loading sorted players:', error);
           setIsLoading(false);
         });
+    } else {
+      // Availability data not loaded yet, keep loading state
+      setIsLoading(true);
     }
-  }, [year, month, sunday, getAvailablePlayersWithVotingOrder, sortedPlayersCache, setSortedPlayersCache]);
+  }, [year, month, sunday, getAvailablePlayersWithVotingOrder, sortedPlayersCache, setSortedPlayersCache, availabilityCache]);
 
   if (existingGame && (existingGame.status === 'confirmed' || existingGame.status === 'completed')) {
     return null;
@@ -2170,18 +2028,8 @@ function PlayersForSunday({
       </h4>
       <div className="flex flex-wrap gap-2">
         {sortedPlayers.map((player, index) => {
-          // If there's an existing game, use the actual game data to determine status
-          let isInWaitlist = false;
-          let isParticipant = false;
-          
-          if (existingGame) {
-            isParticipant = existingGame.participants?.includes(player.id) || false;
-            isInWaitlist = existingGame.waitlist?.includes(player.id) || false;
-          } else {
-            // If no game exists yet, use index-based logic (first 10 are participants)
-            isParticipant = index < 10;
-            isInWaitlist = index >= 10;
-          }
+          // Players 1-10 are participants, 11+ are substitutes (but all voted equally)
+          const isParticipant = index < 10;
           
           return (
             <span
@@ -2191,20 +2039,16 @@ function PlayersForSunday({
                   theme === 'dark' 
                     ? 'bg-green-950/40 text-green-300 border border-green-600/30' 
                     : 'bg-green-100 text-green-800'
-                ) : isInWaitlist ? (
+                ) : (
                   theme === 'dark'
                     ? 'bg-yellow-950/40 text-yellow-300 border border-yellow-600/30'
                     : 'bg-yellow-100 text-yellow-800'
-                ) : (
-                  theme === 'dark'
-                    ? 'bg-gray-950/40 text-gray-300 border border-gray-600/30'
-                    : 'bg-gray-100 text-gray-800'
                 )
               }`}
             >
               <span className="text-xs mr-1 opacity-70">#{index + 1}</span>
               {player.nickname || player.name}
-              {isInWaitlist && <span className="ml-1 text-xs">(Lista de espera)</span>}
+              {!isParticipant && <span className="ml-1 text-xs">(Suplente)</span>}
             </span>
           );
         })}

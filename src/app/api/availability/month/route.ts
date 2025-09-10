@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
           yearNum
         );
         
+        // Get voting timestamp
+        const votingRecord = await DatabaseService.getUserMonthlyAvailabilityRecord(
+          user.id,
+          monthNum,
+          yearNum
+        );
+        
         if (userAvailability.length > 0 || votingStatus.hasVoted) {
           monthlyAvailability.push({
             userId: user.id,
@@ -38,7 +45,8 @@ export async function GET(request: NextRequest) {
             year: yearNum,
             availableSundays: userAvailability,
             cannotPlayAnyDay: votingStatus.cannotPlayAnyDay,
-            hasVoted: votingStatus.hasVoted
+            hasVoted: votingStatus.hasVoted,
+            votedAt: votingRecord ? votingRecord.updatedAt : new Date()
           });
         }
       } catch {
