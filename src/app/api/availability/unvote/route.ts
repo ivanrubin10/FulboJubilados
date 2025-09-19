@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/db/service';
 
+// Helper function to clean up team assignments and ensure consistency
+function cleanupTeamAssignments(currentTeams: { team1: string[], team2: string[] } | null | undefined, validPlayerIds: string[], removedPlayerId?: string): { team1: string[], team2: string[] } | undefined {
+  if (!currentTeams) return undefined;
+  
+  // Remove the specific player who unvoted (if provided) and filter out any invalid players
+  const cleanTeam1 = currentTeams.team1?.filter(id => 
+    id !== removedPlayerId && validPlayerIds.includes(id)
+  ) || [];
+  
+  const cleanTeam2 = currentTeams.team2?.filter(id => 
+    id !== removedPlayerId && validPlayerIds.includes(id)
+  ) || [];
+  
+  return {
+    team1: cleanTeam1,
+    team2: cleanTeam2
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, month, year, unavailableSundays } = await request.json();
@@ -78,34 +97,47 @@ async function promoteFromWaitlistForUnvotedDays(month: number, year: number, un
           const updatedParticipants = currentParticipants.filter(id => id !== unvotingUserId);
           
           // Promote first person from waitlist if available
+          let updatedWaitlist = currentWaitlist;
           if (currentWaitlist.length > 0) {
             const promotedUserId = currentWaitlist[0];
-            const updatedWaitlist = currentWaitlist.slice(1);
-            
+            updatedWaitlist = currentWaitlist.slice(1);
             updatedParticipants.push(promotedUserId);
-            
-            await DatabaseService.updateGame(existingGame.id, {
-              participants: updatedParticipants,
-              waitlist: updatedWaitlist
-            });
-            
             console.log(`✅ Promoted user ${promotedUserId} from waitlist to participant for game ${existingGame.id}`);
-          } else {
-            // No one in waitlist, just remove the user
-            await DatabaseService.updateGame(existingGame.id, {
-              participants: updatedParticipants
-            });
-            
-            console.log(`📝 Removed user ${unvotingUserId} from participants, no waitlist available for game ${existingGame.id}`);
           }
+          
+          // Clean up team assignments using the helper function
+          const allValidPlayers = [...updatedParticipants, ...updatedWaitlist];
+          const updatedTeams = cleanupTeamAssignments(existingGame.teams, allValidPlayers, unvotingUserId);
+          
+          if (updatedTeams && (updatedTeams.team1.length > 0 || updatedTeams.team2.length > 0)) {
+            console.log(`🏟️ Cleaned team assignments. Team 1: ${updatedTeams.team1.length} players, Team 2: ${updatedTeams.team2.length} players`);
+          }
+          
+          await DatabaseService.updateGame(existingGame.id, {
+            participants: updatedParticipants,
+            waitlist: updatedWaitlist,
+            teams: updatedTeams
+          });
+          
+          console.log(`📝 Updated game ${existingGame.id} after user ${unvotingUserId} unvoted`);
         } else if (currentWaitlist.includes(unvotingUserId)) {
           console.log(`👤 User ${unvotingUserId} was in waitlist, removing from waitlist`);
           
           // Remove user from waitlist
           const updatedWaitlist = currentWaitlist.filter(id => id !== unvotingUserId);
           
+          // Clean up team assignments using the helper function
+          const allValidPlayers = [...currentParticipants, ...updatedWaitlist];
+          const updatedTeams = cleanupTeamAssignments(existingGame.teams, allValidPlayers, unvotingUserId);
+          
+          if (updatedTeams && (updatedTeams.team1.length > 0 || updatedTeams.team2.length > 0)) {
+            console.log(`🏟️ Cleaned team assignments after waitlist removal. Team 1: ${updatedTeams.team1.length} players, Team 2: ${updatedTeams.team2.length} players`);
+          }
+          
           await DatabaseService.updateGame(existingGame.id, {
-            waitlist: updatedWaitlist
+            participants: currentParticipants,
+            waitlist: updatedWaitlist,
+            teams: updatedTeams
           });
           
           console.log(`📝 Removed user ${unvotingUserId} from waitlist for game ${existingGame.id}`);

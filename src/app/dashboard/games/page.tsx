@@ -133,6 +133,12 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
     setEditedGame(prev => ({ ...prev, teams: newTeams }));
   };
 
+  const undoTeamsToOriginal = () => {
+    if (game.originalTeams) {
+      setEditedGame(prev => ({ ...prev, teams: game.originalTeams }));
+    }
+  };
+
   const swapPlayerBetweenTeams = (playerId: string) => {
     if (!editedGame.teams) return;
     
@@ -249,12 +255,22 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
               <h3 className="text-lg font-semibold text-foreground">
                 Organización de Equipos ({game.participants.length} jugadores)
               </h3>
-              <button
-                onClick={regenerateTeams}
-                className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 flex items-center gap-2"
-              >
-                🎲 Regenerar Equipos (Aleatorio)
-              </button>
+              <div className="flex gap-2">
+                {game.originalTeams && (
+                  <button
+                    onClick={undoTeamsToOriginal}
+                    className="bg-orange-600 dark:bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 flex items-center gap-2"
+                  >
+                    ↶ Volver a Original
+                  </button>
+                )}
+                <button
+                  onClick={regenerateTeams}
+                  className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 flex items-center gap-2"
+                >
+                  🎲 Regenerar Equipos (Aleatorio)
+                </button>
+              </div>
             </div>
             
             {editedGame.teams ? (
@@ -447,54 +463,174 @@ interface ParticipantManagementModalProps {
 
 function ParticipantManagementModal({ game, users, onSave, onClose }: ParticipantManagementModalProps) {
   const { theme } = useTheme();
-  const [replacePlayer, setReplacePlayer] = useState<string>('');
-  const [withPlayer, setWithPlayer] = useState<string>('');
-  const [isSwapping, setIsSwapping] = useState(false);
-
-  // Get all players currently in the game (participants + waitlist)
-  const allGamePlayers = [...(game.participants || []), ...(game.waitlist || [])];
+  const [isUpdating, setIsUpdating] = useState(false);
   
-  // Get all whitelisted users NOT in the game for the "with" dropdown
-  const availableUsers = users.filter(user => 
-    user.isWhitelisted && !allGamePlayers.includes(user.id)
-  );
+  // State management for participants and waitlist
+  const [participants, setParticipants] = useState<string[]>(game.participants || []);
+  const [waitlist, setWaitlist] = useState<string[]>(game.waitlist || []);
+  
+  // Get all players currently in the game (participants + waitlist)
+  const allGamePlayers = [...participants, ...waitlist];
+  const gameParticipants = participants.slice(0, 10);
+  const waitlistPlayers = waitlist;
+  
+  // Get current team assignments
+  const [team1Players, setTeam1Players] = useState<string[]>(game.teams?.team1 || []);
+  const [team2Players, setTeam2Players] = useState<string[]>(game.teams?.team2 || []);
+  const [confirmRemoveModal, setConfirmRemoveModal] = useState<{isOpen: boolean, playerId: string, playerName: string}>({isOpen: false, playerId: '', playerName: ''});
+  
+  // Helper function to get player display info
+  const getPlayerInfo = (playerId: string) => {
+    const player = users.find(u => u.id === playerId);
+    const isPlayerInGame = allGamePlayers.includes(playerId);
+    return {
+      id: playerId,
+      name: player?.nickname || player?.name || 'Jugador desconocido',
+      imageUrl: player?.imageUrl,
+      isPlayerInGame,
+      isValid: isPlayerInGame // Player should be in the game to be valid in teams
+    };
+  };
 
-  const handleSwap = async () => {
-    if (!replacePlayer || !withPlayer) return;
+  // Remove player from teams
+  const removeFromTeams = (playerId: string) => {
+    setTeam1Players(prev => prev.filter(id => id !== playerId));
+    setTeam2Players(prev => prev.filter(id => id !== playerId));
+  };
+
+  // Remove player from match completely (participants + waitlist + teams)
+  const removeFromMatch = (playerId: string) => {
+    // Remove from participants and waitlist
+    setParticipants(prev => prev.filter(id => id !== playerId));
+    setWaitlist(prev => prev.filter(id => id !== playerId));
     
-    setIsSwapping(true);
+    // Also remove from teams
+    removeFromTeams(playerId);
+  };
+
+  // Add player to team
+  const addToTeam = (playerId: string, teamNumber: 1 | 2) => {
+    // First remove from any existing team
+    removeFromTeams(playerId);
+    
+    // Then add to the specified team
+    if (teamNumber === 1) {
+      setTeam1Players(prev => [...prev, playerId]);
+    } else {
+      setTeam2Players(prev => [...prev, playerId]);
+    }
+  };
+
+  // Handle confirmed removal from match
+  const handleConfirmRemoveFromMatch = async () => {
+    if (confirmRemoveModal.playerId) {
+      await removeFromMatch(confirmRemoveModal.playerId);
+      setConfirmRemoveModal({isOpen: false, playerId: '', playerName: ''});
+    }
+  };
+
+  // Clean up teams - remove invalid players
+  const cleanupTeams = async () => {
+    const validPlayers = new Set(allGamePlayers);
+    const newTeam1 = team1Players.filter(id => validPlayers.has(id));
+    const newTeam2 = team2Players.filter(id => validPlayers.has(id));
+    
+    setTeam1Players(newTeam1);
+    setTeam2Players(newTeam2);
+    
+    // Save changes to database
+    await saveChanges();
+  };
+
+  // Undo teams to original state
+  const undoTeamsToOriginal = async () => {
+    if (game.originalTeams) {
+      setTeam1Players(game.originalTeams.team1);
+      setTeam2Players(game.originalTeams.team2);
+      // Save changes to database
+      await saveChanges();
+    }
+  };
+
+  // Sync match participants with actual voters for this day
+  const syncWithVoters = async () => {
+    setIsUpdating(true);
     
     try {
-      // Create the swap by updating participants and waitlist arrays
-      // eslint-disable-next-line prefer-const
-      let newParticipants = [...(game.participants || [])];
-      // eslint-disable-next-line prefer-const
-      let newWaitlist = [...(game.waitlist || [])];
+      const gameDate = new Date(game.date);
+      const month = gameDate.getMonth() + 1;
+      const year = gameDate.getFullYear();
+      const day = gameDate.getDate();
       
-      // Find position of player to replace
-      const replaceInParticipants = newParticipants.indexOf(replacePlayer);
-      const replaceInWaitlist = newWaitlist.indexOf(replacePlayer);
-      
-      // Since "with" player is never in the game, just replace the position
-      if (replaceInParticipants !== -1) {
-        newParticipants[replaceInParticipants] = withPlayer;
-      } else if (replaceInWaitlist !== -1) {
-        newWaitlist[replaceInWaitlist] = withPlayer;
+      // Fetch monthly availability for this month
+      const availabilityRes = await fetch(`/api/availability/month?month=${month}&year=${year}`);
+      if (!availabilityRes.ok) {
+        throw new Error('Failed to fetch availability data');
       }
+      
+      const availabilityData = await availabilityRes.json();
+      
+      // Get players who voted as available for this specific day
+      const votersForThisDay = availabilityData
+        .filter((av: MonthlyAvailability) => av.availableSundays.includes(day) && av.hasVoted)
+        .map((av: MonthlyAvailability) => av.userId)
+        .filter((userId: string) => {
+          // Only include whitelisted users
+          const user = users.find(u => u.id === userId);
+          return user?.isWhitelisted;
+        });
+      
+      // Sort by voting timestamp if available, otherwise maintain current order
+      const sortedVoters = votersForThisDay.sort((a: string, b: string) => {
+        const aData = availabilityData.find((av: MonthlyAvailability) => av.userId === a);
+        const bData = availabilityData.find((av: MonthlyAvailability) => av.userId === b);
+        
+        if (aData?.votedAt && bData?.votedAt) {
+          return new Date(aData.votedAt).getTime() - new Date(bData.votedAt).getTime();
+        }
+        return 0;
+      });
+      
+      // Update participants (first 10) and waitlist (rest)
+      const newParticipants = sortedVoters.slice(0, 10);
+      const newWaitlist = sortedVoters.slice(10);
+      
+      setParticipants(newParticipants);
+      setWaitlist(newWaitlist);
+      
+      // Clean up teams to only include players who are now in the match
+      const allNewGamePlayers = new Set([...newParticipants, ...newWaitlist]);
+      setTeam1Players(prev => prev.filter(id => allNewGamePlayers.has(id)));
+      setTeam2Players(prev => prev.filter(id => allNewGamePlayers.has(id)));
+      
+      console.log(`🔄 Synced match with ${sortedVoters.length} voters for ${day}/${month}/${year}`);
+    } catch (error) {
+      console.error('Error syncing with voters:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
-      // Update the teams if they exist
-      let updatedTeams = game.teams;
-      if (updatedTeams) {
-        updatedTeams = {
-          team1: updatedTeams.team1.map(id => id === replacePlayer ? withPlayer : id),
-          team2: updatedTeams.team2.map(id => id === replacePlayer ? withPlayer : id)
-        };
-      }
+  // Save all changes (participants, waitlist, teams)
+  const saveChanges = async () => {
+    setIsUpdating(true);
+    
+    try {
+      const updatedTeams = {
+        team1: team1Players,
+        team2: team2Players
+      };
+
+      const updateData = {
+        participants,
+        waitlist,
+        teams: updatedTeams
+      };
 
       const updatedGame: Game = {
         ...game,
-        participants: newParticipants,
-        waitlist: newWaitlist,
+        participants,
+        waitlist,
         teams: updatedTeams,
         updatedAt: new Date()
       };
@@ -503,29 +639,23 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
       const res = await fetch(`/api/games/${game.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          participants: newParticipants, 
-          waitlist: newWaitlist,
-          teams: updatedTeams
-        })
+        body: JSON.stringify(updateData)
       });
 
-      if (!res.ok) throw new Error('Failed to swap players');
-
+      if (!res.ok) throw new Error('Failed to update game');
+      
       onSave(updatedGame);
       onClose();
     } catch (error) {
-      console.error('Error swapping players:', error);
+      console.error('Error updating game:', error);
     } finally {
-      setIsSwapping(false);
+      setIsUpdating(false);
     }
   };
 
-
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-card rounded-lg shadow-xl border border-border w-full max-w-6xl max-h-[90vh] overflow-hidden">
+      <div className="bg-card rounded-lg shadow-xl border border-border w-full max-w-6xl max-h-[90vh] overflow-auto">
         <div className="p-6 border-b border-border">
           <div className="flex justify-between items-center">
             <div>
@@ -537,6 +667,11 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
                   month: 'long', 
                   day: 'numeric' 
                 })}
+                {game.status === 'confirmed' && (
+                  <span className="ml-2 text-sm text-orange-600 dark:text-orange-400">
+                    ⚠️ Partido confirmado - Los jugadores ya no pueden desvotar
+                  </span>
+                )}
               </p>
             </div>
             <button
@@ -548,75 +683,230 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="space-y-6">
-            {/* Player Swap Interface */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Reemplazar a:
-                </label>
-                <select
-                  value={replacePlayer}
-                  onChange={(e) => setReplacePlayer(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        <div className="p-6 space-y-6">
+          {/* Action buttons */}
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <h3 className="text-lg font-semibold text-foreground">Organizar Equipos y Participantes</h3>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={syncWithVoters}
+                disabled={isUpdating}
+                className="px-3 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm disabled:opacity-50"
+              >
+                🔄 Sincronizar con Votos
+              </button>
+              {game.originalTeams && (
+                <button
+                  onClick={undoTeamsToOriginal}
+                  className="px-3 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 text-sm"
                 >
-                  <option value="">Seleccionar jugador...</option>
-                  {allGamePlayers.map((playerId) => {
-                    const player = users.find(u => u.id === playerId);
-                    const isParticipant = (game.participants || []).includes(playerId);
-                    const position = allGamePlayers.indexOf(playerId) + 1;
-                    return (
-                      <option key={playerId} value={playerId}>
-                        #{position} {player?.nickname || player?.name} {isParticipant ? '(Participante)' : '(Suplente)'}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+                  ↶ Volver a Original
+                </button>
+              )}
+              <button
+                onClick={cleanupTeams}
+                className="px-3 py-2 bg-orange-600 dark:bg-orange-700 text-white rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 text-sm"
+              >
+                🧹 Limpiar Equipos
+              </button>
+            </div>
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Por:
-                </label>
-                <select
-                  value={withPlayer}
-                  onChange={(e) => setWithPlayer(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">Seleccionar jugador...</option>
-                  {availableUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.nickname || user.name}
-                    </option>
-                  ))}
-                </select>
+          {/* Team Management */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Team 1 */}
+            <div className={`p-4 rounded-lg ${
+              theme === 'dark' ? 'bg-red-950/40 border border-red-600/30' : 'bg-red-50 border border-red-200'
+            }`}>
+              <h4 className={`font-semibold mb-3 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-red-300' : 'text-red-800'
+              }`}>
+                <div className="w-4 h-4 bg-red-500 rounded"></div>
+                Equipo 1 ({team1Players.length} jugadores)
+              </h4>
+              <div className="space-y-2 min-h-[200px]">
+                {team1Players.map((playerId) => {
+                  const playerInfo = getPlayerInfo(playerId);
+                  const position = gameParticipants.indexOf(playerId) !== -1 
+                    ? gameParticipants.indexOf(playerId) + 1 
+                    : waitlistPlayers.indexOf(playerId) + 11;
+                  
+                  return (
+                    <div key={playerId} className={`flex items-center justify-between gap-2 p-2 rounded ${
+                      theme === 'dark' ? 'bg-red-900/20' : 'bg-red-100/50'
+                    } ${!playerInfo.isValid ? 'opacity-50 border-2 border-red-500' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        {playerInfo.imageUrl && (
+                          <img 
+                            src={playerInfo.imageUrl} 
+                            alt={playerInfo.name} 
+                            className="w-6 h-6 rounded-full"
+                          />
+                        )}
+                        <span className={`${theme === 'dark' ? 'text-red-300' : 'text-red-700'}`}>
+                          #{position || '?'} {playerInfo.name}
+                          {!playerInfo.isValid && ' ❌'}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => removeFromTeams(playerId)}
+                          className="w-6 h-6 flex items-center justify-center text-xs bg-orange-600 text-white rounded hover:bg-orange-700"
+                          title="Quitar del equipo solamente"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmRemoveModal({
+                              isOpen: true,
+                              playerId: playerId,
+                              playerName: playerInfo.name
+                            });
+                          }}
+                          className="w-6 h-6 flex items-center justify-center text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          title="Quitar del partido completamente"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Current Game Status */}
-            {allGamePlayers.length > 0 && (
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-950/40 border border-gray-600/30' : 'bg-gray-50 border border-gray-200'
+            {/* Team 2 */}
+            <div className={`p-4 rounded-lg ${
+              theme === 'dark' ? 'bg-blue-950/40 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
+            }`}>
+              <h4 className={`font-semibold mb-3 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
               }`}>
-                <h4 className="font-medium text-foreground mb-3">Jugadores Actuales:</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 text-sm">
-                  {allGamePlayers.map((playerId, index) => {
-                    const player = users.find(u => u.id === playerId);
-                    const isParticipant = index < 10;
-                    return (
-                      <div key={playerId} className={`px-2 py-1 rounded text-center ${
-                        isParticipant 
-                          ? (theme === 'dark' ? 'bg-green-900/20 text-green-300' : 'bg-green-100 text-green-800')
-                          : (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-300' : 'bg-yellow-100 text-yellow-800')
-                      }`}>
-                        #{index + 1} {player?.nickname || player?.name}
+                <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                Equipo 2 ({team2Players.length} jugadores)
+              </h4>
+              <div className="space-y-2 min-h-[200px]">
+                {team2Players.map((playerId) => {
+                  const playerInfo = getPlayerInfo(playerId);
+                  const position = gameParticipants.indexOf(playerId) !== -1 
+                    ? gameParticipants.indexOf(playerId) + 1 
+                    : waitlistPlayers.indexOf(playerId) + 11;
+                  
+                  return (
+                    <div key={playerId} className={`flex items-center justify-between gap-2 p-2 rounded ${
+                      theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-100/50'
+                    } ${!playerInfo.isValid ? 'opacity-50 border-2 border-red-500' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        {playerInfo.imageUrl && (
+                          <img 
+                            src={playerInfo.imageUrl} 
+                            alt={playerInfo.name} 
+                            className="w-6 h-6 rounded-full"
+                          />
+                        )}
+                        <span className={`${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                          #{position || '?'} {playerInfo.name}
+                          {!playerInfo.isValid && ' ❌'}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => removeFromTeams(playerId)}
+                          className="w-6 h-6 flex items-center justify-center text-xs bg-orange-600 text-white rounded hover:bg-orange-700"
+                          title="Quitar del equipo solamente"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmRemoveModal({
+                              isOpen: true,
+                              playerId: playerId,
+                              playerName: playerInfo.name
+                            });
+                          }}
+                          className="w-6 h-6 flex items-center justify-center text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          title="Quitar del partido completamente"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          </div>
+
+          {/* Available Players */}
+          <div className={`p-4 rounded-lg ${
+            theme === 'dark' ? 'bg-green-950/40 border border-green-600/30' : 'bg-green-50 border border-green-200'
+          }`}>
+            <h4 className={`font-semibold mb-3 flex items-center gap-2 ${
+              theme === 'dark' ? 'text-green-300' : 'text-green-800'
+            }`}>
+              <Trophy className="w-4 h-4" />
+              Jugadores Disponibles ({allGamePlayers.filter(id => !team1Players.includes(id) && !team2Players.includes(id)).length})
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {allGamePlayers
+                .filter(playerId => !team1Players.includes(playerId) && !team2Players.includes(playerId))
+                .map((playerId) => {
+                  const playerInfo = getPlayerInfo(playerId);
+                  const position = gameParticipants.indexOf(playerId) !== -1 
+                    ? gameParticipants.indexOf(playerId) + 1 
+                    : waitlistPlayers.indexOf(playerId) + 11;
+                  
+                  return (
+                    <div key={playerId} className={`p-2 rounded border ${
+                      theme === 'dark' ? 'bg-green-900/20 border-green-600/30' : 'bg-green-100 border-green-200'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {playerInfo.imageUrl && (
+                          <img 
+                            src={playerInfo.imageUrl} 
+                            alt={playerInfo.name} 
+                            className="w-5 h-5 rounded-full"
+                          />
+                        )}
+                        <span className={`text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
+                          #{position} {playerInfo.name}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => addToTeam(playerId, 1)}
+                            className="flex-1 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            → Equipo 1
+                          </button>
+                          <button
+                            onClick={() => addToTeam(playerId, 2)}
+                            className="flex-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            → Equipo 2
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setConfirmRemoveModal({
+                              isOpen: true,
+                              playerId: playerId,
+                              playerName: playerInfo.name
+                            });
+                          }}
+                          className="w-full px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          title="Quitar del partido completamente"
+                        >
+                          ✕ Quitar del Partido
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </div>
 
@@ -629,15 +919,48 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
               Cancelar
             </button>
             <button
-              onClick={handleSwap}
-              disabled={!replacePlayer || !withPlayer || isSwapping}
-              className="px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={saveChanges}
+              disabled={isUpdating}
+              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSwapping ? 'Intercambiando...' : 'Intercambiar Jugadores'}
+              {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Remove from Match */}
+      {confirmRemoveModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-card rounded-lg shadow-xl border border-border max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-destructive">
+                ⚠️ Confirmar Eliminación
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                ¿Estás seguro que quieres eliminar a <strong>{confirmRemoveModal.playerName}</strong> del partido completamente?
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Esta acción eliminará al jugador de los participantes, lista de espera y equipos.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmRemoveModal({isOpen: false, playerId: '', playerName: ''})}
+                  className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-accent/20"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmRemoveFromMatch}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1078,7 +1401,9 @@ export default function GamesPage() {
     if (!game || game.participants.length !== 10) return;
 
     const teams = generateTeams(game.participants);
-    const updatedGame = { ...game, teams, updatedAt: new Date() };
+    // Store original teams if not already stored
+    const originalTeams = game.originalTeams || teams;
+    const updatedGame = { ...game, teams, originalTeams, updatedAt: new Date() };
     
     try {
       const updatedGames = games.map(g => g.id === gameId ? updatedGame : g);

@@ -461,23 +461,216 @@ export class EmailService {
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="x-apple-disable-message-reformatting">
           <style>
-            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 30px; border-radius: 12px; text-align: center; }
-            .content { background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; }
-            .button { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px; }
-            .button-mvp { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 5px; font-size: 16px; }
-            .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 14px; }
-            .mvp-section { background: #fefce8; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }
-            .payment-section { background: #f0fdf4; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0; }
-            .details { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0; }
-            .score-display { background: #1e293b; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; }
-            .score-number { font-size: 2rem; font-weight: bold; color: #10b981; }
+            body { 
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+              line-height: 1.6; 
+              color: #334155; 
+              margin: 0; 
+              padding: 0; 
+              -webkit-text-size-adjust: 100%; 
+              -ms-text-size-adjust: 100%;
+            }
+            .container { 
+              max-width: 600px; 
+              margin: 0 auto; 
+              padding: 10px; 
+              width: 100% !important;
+            }
+            .header { 
+              background: linear-gradient(135deg, #8b5cf6, #7c3aed); 
+              color: white; 
+              padding: 20px; 
+              border-radius: 12px; 
+              text-align: center; 
+            }
+            .content { 
+              background: white; 
+              padding: 20px; 
+              border-radius: 12px; 
+              border: 1px solid #e2e8f0; 
+              margin-top: 15px; 
+            }
+            .button { 
+              background: linear-gradient(135deg, #10b981, #059669); 
+              color: white !important; 
+              padding: 12px 20px; 
+              border-radius: 8px; 
+              text-decoration: none; 
+              display: inline-block; 
+              font-weight: bold; 
+              margin: 8px 4px; 
+              font-size: 14px;
+              text-align: center;
+              min-width: 120px;
+              box-sizing: border-box;
+            }
+            .button-mvp { 
+              background: linear-gradient(135deg, #f59e0b, #d97706); 
+              color: white !important; 
+              padding: 12px 20px; 
+              border-radius: 8px; 
+              text-decoration: none; 
+              display: inline-block; 
+              font-weight: bold; 
+              margin: 8px 4px; 
+              font-size: 14px;
+              text-align: center;
+              min-width: 120px;
+              box-sizing: border-box;
+            }
+            .footer { 
+              text-align: center; 
+              margin-top: 20px; 
+              color: #64748b; 
+              font-size: 13px; 
+              padding: 0 10px;
+            }
+            .mvp-section { 
+              background: #fefce8; 
+              padding: 15px; 
+              border-radius: 8px; 
+              border-left: 4px solid #f59e0b; 
+              margin: 15px 0; 
+            }
+            .payment-section { 
+              background: #f0fdf4; 
+              padding: 15px; 
+              border-radius: 8px; 
+              border-left: 4px solid #10b981; 
+              margin: 15px 0; 
+            }
+            .details { 
+              background: #f8fafc; 
+              padding: 15px; 
+              border-radius: 8px; 
+              margin: 15px 0; 
+            }
+            .actions { 
+              text-align: center;
+              margin: 20px 0; 
+            }
+            .score-display { 
+              background: #1e293b; 
+              color: white; 
+              padding: 15px; 
+              border-radius: 8px; 
+              text-align: center; 
+              margin: 15px 0; 
+            }
+            .score-number { 
+              font-size: 1.8rem; 
+              font-weight: bold; 
+              color: #10b981; 
+              margin: 5px 0;
+            }
+            .payment-alias {
+              background: #dcfce7; 
+              padding: 8px 12px; 
+              border-radius: 6px; 
+              font-family: monospace, Courier, 'Courier New'; 
+              font-weight: bold;
+              font-size: 16px;
+              display: inline-block;
+              margin: 5px 0;
+              word-break: break-all;
+            }
+            .info-note {
+              background: #f1f5f9; 
+              padding: 12px; 
+              border-radius: 8px; 
+              margin: 15px 0; 
+              text-align: center;
+            }
+            
+            /* Mobile Responsiveness */
+            @media screen and (max-width: 600px) {
+              .container { 
+                padding: 5px !important; 
+                width: 100% !important;
+              }
+              .header { 
+                padding: 15px !important; 
+                border-radius: 8px !important;
+              }
+              .content { 
+                padding: 15px !important; 
+                border-radius: 8px !important;
+                margin-top: 10px !important;
+              }
+              .mvp-section, .payment-section, .details, .score-display, .info-note { 
+                padding: 12px !important; 
+                margin: 10px 0 !important;
+                border-radius: 6px !important;
+              }
+              .button, .button-mvp { 
+                padding: 12px 16px !important; 
+                margin: 5px 2px !important;
+                font-size: 14px !important;
+                display: block !important;
+                width: calc(100% - 8px) !important;
+                max-width: 280px !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+              }
+              .actions {
+                padding: 0 5px !important;
+              }
+              .score-number { 
+                font-size: 1.5rem !important; 
+              }
+              .header h1 {
+                font-size: 1.5rem !important;
+                margin: 5px 0 !important;
+              }
+              .header p {
+                font-size: 14px !important;
+                margin: 5px 0 !important;
+              }
+              .details h3, .mvp-section h2, .payment-section h2 {
+                font-size: 1.1rem !important;
+                margin: 0 0 10px 0 !important;
+              }
+              .details p, .mvp-section p, .payment-section p {
+                font-size: 14px !important;
+                margin: 8px 0 !important;
+              }
+              .payment-alias {
+                font-size: 14px !important;
+                padding: 6px 10px !important;
+                word-break: break-all !important;
+              }
+              ul {
+                padding-left: 20px !important;
+              }
+              li {
+                font-size: 13px !important;
+                margin: 5px 0 !important;
+              }
+            }
+            
+            /* Dark mode support */
+            @media (prefers-color-scheme: dark) {
+              .content {
+                background: #1a1a1a !important;
+                color: #e5e5e5 !important;
+                border-color: #404040 !important;
+              }
+              .details {
+                background: #2a2a2a !important;
+              }
+            }
           </style>
         </head>
         <body>
+          <!-- Email Preview Text (hidden but used by email clients) -->
+          <div style="display: none; max-height: 0; overflow: hidden;">
+            Vota MVP y ${data.cost ? `paga ARS $${costPerPerson}` : 'revisa estadísticas'} - Resultado: ${data.finalScore}
+          </div>
           <div class="container">
             <div class="header">
               <h1>Hola ${data.name}!</h1>
@@ -519,21 +712,22 @@ export class EmailService {
                 <h2 style="margin-top: 0; color: #059669;">💰 Pago del Partido</h2>
                 <p><strong>Costo total:</strong> ARS $${data.cost}</p>
                 <p><strong>Tu parte:</strong> ARS $${costPerPerson} (dividido entre 10 jugadores)</p>
-                <p><strong>Transferir a:</strong> <span style="background: #dcfce7; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;">${data.paymentAlias}</span></p>
+                <p><strong>Transferir a:</strong></p>
+                <div class="payment-alias">${data.paymentAlias}</div>
                 <p><strong>Organizado por:</strong> ${data.organizerName}</p>
               </div>
               ` : ''}
               
               <div class="actions">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" class="button-mvp" style="color: white; text-decoration: none;">
-                  Votar MVP Ahora
+                  ⭐ Votar MVP
                 </a>
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/history" class="button" style="color: white; text-decoration: none;">
-                  Ver Estadísticas
+                  📊 Estadísticas
                 </a>
               </div>
               
-              <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+              <div class="info-note">
                 <p style="margin: 0; color: #475569; font-size: 14px;">
                   <strong>🏃‍♂️ ¿Ya votaste?</strong> Revisa el resultado en la sección de partidos o historial
                 </p>

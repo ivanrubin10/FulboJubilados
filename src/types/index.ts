@@ -20,6 +20,10 @@ export interface Game {
     team1: string[];
     team2: string[];
   };
+  originalTeams?: {
+    team1: string[];
+    team2: string[];
+  };
   result?: {
     team1Score: number;
     team2Score: number;
