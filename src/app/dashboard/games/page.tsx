@@ -1376,25 +1376,37 @@ export default function GamesPage() {
     return allSundays.sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
-  const getActivePlayersWhoHaventVoted = (year: number, month: number): User[] => {
+  const getActivePlayersWhoHaventVoted = useCallback((year: number, month: number): User[] => {
     // Get all active (whitelisted) users who are not admins and exclude mock players
-    const activePlayers = users.filter(user => 
-      user.isWhitelisted && 
-      !user.isAdmin && 
+    const activePlayers = users.filter(user =>
+      user.isWhitelisted &&
+      !user.isAdmin &&
       !user.id.startsWith('mock_player_')
     );
-    
+
+    // Get monthly availability data for the specific month from cache
+    const cacheKey = `${month}-${year}`;
+    const monthlyAvailability = availabilityCache[cacheKey];
+
+    // If we don't have the data yet, trigger fetch and return empty list for now
+    // This prevents incorrect data from being shown
+    if (!monthlyAvailability) {
+      // Trigger async fetch (will update cache and cause re-render)
+      fetchAvailabilityForMonth(year, month).catch(console.error);
+      return []; // Return empty until data is loaded
+    }
+
     // Filter players who haven't voted for this month
     return activePlayers.filter(user => {
       // Check if user has voted for this specific month
-      const userAvailability = availability.find(
-        a => a.userId === user.id && a.month === month && a.year === year
+      const userAvailability = monthlyAvailability.find(
+        a => a.userId === user.id
       );
-      
-      // Return true if no availability found (hasn't voted)
-      return !userAvailability;
+
+      // Return true if user hasn't voted (check hasVoted property instead of record existence)
+      return !userAvailability || !userAvailability.hasVoted;
     });
-  };
+  }, [users, availabilityCache, fetchAvailabilityForMonth]);
 
   const organizeTeams = async (gameId: string) => {
     const game = games.find(g => g.id === gameId);
