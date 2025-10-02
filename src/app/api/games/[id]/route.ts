@@ -14,10 +14,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if user has admin permissions for game management
+    const user = await DatabaseService.getUserById(userId);
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Require admin status AND whitelist status for game updates
+    if (!user.isAdmin || !user.isWhitelisted) {
+      return NextResponse.json({
+        error: 'Unauthorized - Admin access required',
+        details: 'Only whitelisted administrators can update games'
+      }, { status: 403 });
+    }
+
     const { id: gameId } = await params;
     const updates = await request.json();
 
-    console.log(`🔄 Updating game ${gameId} with:`, updates);
+    console.log(`🔄 Admin ${user.name} updating game ${gameId} with:`, updates);
 
     // Get the game before updating to check if this is a result completion
     const gameBeforeUpdate = await DatabaseService.getGame(gameId);

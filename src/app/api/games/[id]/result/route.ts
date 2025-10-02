@@ -12,10 +12,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
+    // Check if user is admin AND whitelisted
     const user = await DatabaseService.getUserById(userId);
-    if (!user || !user.isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+    if (!user || !user.isAdmin || !user.isWhitelisted) {
+      return NextResponse.json({
+        error: 'Forbidden - Admin access required',
+        details: 'Only whitelisted administrators can manage game results'
+      }, { status: 403 });
     }
 
     const resolvedParams = await params;
@@ -87,10 +90,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
+    // Check if user is admin AND whitelisted
     const user = await DatabaseService.getUserById(userId);
-    if (!user || !user.isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+    if (!user || !user.isAdmin || !user.isWhitelisted) {
+      return NextResponse.json({
+        error: 'Forbidden - Admin access required',
+        details: 'Only whitelisted administrators can manage game results'
+      }, { status: 403 });
     }
 
     const resolvedParams = await params;

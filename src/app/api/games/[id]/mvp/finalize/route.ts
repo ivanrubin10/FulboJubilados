@@ -21,8 +21,11 @@ export async function POST(
       .where(eq(users.id, userId))
       .limit(1);
 
-    if (!currentUser.length || !currentUser[0].isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!currentUser.length || !currentUser[0].isAdmin || !currentUser[0].isWhitelisted) {
+      return NextResponse.json({
+        error: 'Admin access required',
+        details: 'Only whitelisted administrators can finalize MVP voting'
+      }, { status: 403 });
     }
 
     const { id: gameId } = await params;

@@ -4,7 +4,7 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Settings, BarChart3, Trophy, Menu, X, Lock, User } from 'lucide-react';
+import { Calendar, Settings, BarChart3, Trophy, Menu, X, Lock, User, TrendingUp } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -96,12 +96,19 @@ export default function DashboardLayout({
                   <Trophy className="h-4 w-4" />
                   Partidos
                 </Link>
-                <Link 
-                  href="/dashboard/history" 
+                <Link
+                  href="/dashboard/history"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <BarChart3 className="h-4 w-4" />
                   Historial
+                </Link>
+                <Link
+                  href="/dashboard/rankings"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Rankings
                 </Link>
                 <Link 
                   href="/dashboard/profile" 
@@ -156,13 +163,21 @@ export default function DashboardLayout({
                   <Trophy className="h-4 w-4" />
                   Partidos
                 </Link>
-                <Link 
-                  href="/dashboard/history" 
+                <Link
+                  href="/dashboard/history"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <BarChart3 className="h-4 w-4" />
                   Historial
+                </Link>
+                <Link
+                  href="/dashboard/rankings"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Rankings
                 </Link>
                 <Link 
                   href="/dashboard/profile" 

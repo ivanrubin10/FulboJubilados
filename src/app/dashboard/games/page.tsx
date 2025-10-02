@@ -94,14 +94,17 @@ const apiClient = {
 
 interface EditGameModal {
   game: Game;
-  onSave: (updatedGame: Game) => void;
+  onSave: (updatedGame: Game) => Promise<void>;
   onClose: () => void;
   users: User[];
 }
 
 function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
   const { theme } = useTheme();
+  const { success } = useToast();
+  const { confirm } = useConfirm();
   const [editedGame, setEditedGame] = useState<Game>({ ...game });
+  const [isSaving, setIsSaving] = useState(false);
   const [reservationInfo, setReservationInfo] = useState({
     location: game.reservationInfo?.location || '',
     time: game.reservationInfo?.time || '10:00',
@@ -111,21 +114,57 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
     paymentAlias: game.reservationInfo?.paymentAlias || ''
   });
 
-  const handleSave = () => {
-    const updatedGame: Game = {
-      ...editedGame,
-      participants: game.participants, // Keep original participants - no selection needed
-      reservationInfo: reservationInfo.location ? {
-        location: reservationInfo.location,
-        time: reservationInfo.time,
-        cost: reservationInfo.cost ? parseFloat(reservationInfo.cost) : undefined,
-        reservedBy: reservationInfo.reservedBy,
-        mapsLink: reservationInfo.mapsLink || undefined,
-        paymentAlias: reservationInfo.paymentAlias || undefined
-      } : undefined,
-      updatedAt: new Date()
-    };
-    onSave(updatedGame);
+  // Effect to handle status changes and offer to clear reservation data
+  useEffect(() => {
+    // If status changes from confirmed to scheduled and we have reservation data, ask if they want to clear it
+    if (editedGame.status === 'scheduled' &&
+        game.status === 'confirmed' &&
+        reservationInfo.location &&
+        reservationInfo.location.trim() !== '') {
+
+      const shouldClear = window.confirm(
+        'Has cambiado el estado de "Confirmado" a "Programado". ¿Quieres limpiar la información de reserva también?'
+      );
+
+      if (shouldClear) {
+        setReservationInfo({
+          location: '',
+          time: '10:00',
+          cost: '',
+          reservedBy: '',
+          mapsLink: '',
+          paymentAlias: ''
+        });
+      }
+    }
+  }, [editedGame.status, game.status, reservationInfo.location]);
+
+  const handleSave = async () => {
+    if (isSaving) return; // Prevent double-clicks
+
+    setIsSaving(true);
+    try {
+      // Check if reservation info has meaningful data (location is required for reservation)
+      const hasReservationData = reservationInfo.location && reservationInfo.location.trim() !== '';
+
+      const updatedGame: Game = {
+        ...editedGame,
+        participants: game.participants, // Keep original participants - no selection needed
+        reservationInfo: hasReservationData ? {
+          location: reservationInfo.location.trim(),
+          time: reservationInfo.time,
+          cost: reservationInfo.cost && reservationInfo.cost.trim() !== '' ? parseFloat(reservationInfo.cost) : undefined,
+          reservedBy: reservationInfo.reservedBy?.trim() || 'Administrador',
+          mapsLink: reservationInfo.mapsLink && reservationInfo.mapsLink.trim() !== '' ? reservationInfo.mapsLink.trim() : undefined,
+          paymentAlias: reservationInfo.paymentAlias && reservationInfo.paymentAlias.trim() !== '' ? reservationInfo.paymentAlias.trim() : undefined
+        } : undefined,
+        updatedAt: new Date()
+      };
+
+      await onSave(updatedGame);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const regenerateTeams = () => {
@@ -185,7 +224,35 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
           {/* Reservation Information */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-foreground mb-3">Información de Reserva</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold text-foreground">Información de Reserva</h3>
+              <button
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: 'Limpiar Reserva',
+                    message: '¿Estás seguro de que quieres limpiar toda la información de reserva? Esta acción no se puede deshacer.',
+                    confirmText: 'Limpiar',
+                    cancelText: 'Cancelar',
+                    type: 'danger'
+                  });
+
+                  if (confirmed) {
+                    setReservationInfo({
+                      location: '',
+                      time: '10:00',
+                      cost: '',
+                      reservedBy: '',
+                      mapsLink: '',
+                      paymentAlias: ''
+                    });
+                    success('Información limpiada', 'La información de reserva ha sido limpiada. Recuerda guardar los cambios.');
+                  }
+                }}
+                className="px-3 py-1 text-sm bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600"
+              >
+                Limpiar Reserva
+              </button>
+            </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-1">Lugar</label>
@@ -251,24 +318,26 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
 
           {/* Team Organization */}
           <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <h3 className="text-lg font-semibold text-foreground">
                 Organización de Equipos ({game.participants.length} jugadores)
               </h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {game.originalTeams && (
                   <button
                     onClick={undoTeamsToOriginal}
-                    className="bg-orange-600 dark:bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 flex items-center gap-2"
+                    className="bg-orange-600 dark:bg-orange-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
                   >
-                    ↶ Volver a Original
+                    <span className="hidden sm:inline">↶ Volver a Original</span>
+                    <span className="sm:hidden">↶ Original</span>
                   </button>
                 )}
                 <button
                   onClick={regenerateTeams}
-                  className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 flex items-center gap-2"
+                  className="bg-blue-600 dark:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
                 >
-                  🎲 Regenerar Equipos (Aleatorio)
+                  <span className="hidden sm:inline">🎲 Regenerar Equipos (Aleatorio)</span>
+                  <span className="sm:hidden">🎲 Regenerar</span>
                 </button>
               </div>
             </div>
@@ -355,7 +424,28 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
           {/* Match Result Section */}
           {editedGame.status === 'completed' && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-foreground mb-3">Resultado del Partido</h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-foreground">Resultado del Partido</h3>
+                <button
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: 'Limpiar Resultado',
+                      message: '¿Estás seguro de que quieres limpiar el resultado del partido? Esta acción no se puede deshacer.',
+                      confirmText: 'Limpiar',
+                      cancelText: 'Cancelar',
+                      type: 'danger'
+                    });
+
+                    if (confirmed) {
+                      setEditedGame(prev => ({ ...prev, result: undefined }));
+                      success('Resultado limpiado', 'El resultado del partido ha sido limpiado. Recuerda guardar los cambios.');
+                    }
+                  }}
+                  className="px-3 py-1 text-sm bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600"
+                >
+                  Limpiar Resultado
+                </button>
+              </div>
               <div className="bg-accent/20 p-4 rounded-lg">
                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                   <div>
@@ -443,9 +533,13 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
+              disabled={isSaving}
+              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Guardar Cambios
+              {isSaving && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              )}
+              {isSaving ? 'Guardando...' : 'Guardar Cambios'}
             </button>
           </div>
         </div>
@@ -693,7 +787,8 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
                 disabled={isUpdating}
                 className="px-3 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm disabled:opacity-50"
               >
-                🔄 Sincronizar con Votos
+                <span className="hidden sm:inline">🔄 Sincronizar con Votos</span>
+                <span className="sm:hidden">🔄 Sincronizar</span>
               </button>
               {game.originalTeams && (
                 <button
@@ -1288,18 +1383,22 @@ export default function GamesPage() {
 
   const handleEditGame = async (updatedGame: Game) => {
     try {
+      const payload = {
+        status: updatedGame.status,
+        teams: updatedGame.teams,
+        reservationInfo: updatedGame.reservationInfo === undefined ? null : updatedGame.reservationInfo,
+        result: updatedGame.result === undefined ? null : updatedGame.result
+      };
+
+      console.log('🔄 Sending game update:', { gameId: updatedGame.id, payload });
+
       // Use the individual game update API endpoint
       const response = await fetch(`/api/games/${updatedGame.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          status: updatedGame.status,
-          teams: updatedGame.teams,
-          reservationInfo: updatedGame.reservationInfo,
-          result: updatedGame.result
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -1660,9 +1759,9 @@ export default function GamesPage() {
 
             {existingGame && (
               <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    existingGame.status === 'confirmed' 
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                  <span className={`px-3 py-1 rounded-full text-sm self-start ${
+                    existingGame.status === 'confirmed'
                       ? (theme === 'dark' ? 'bg-green-950/40 text-green-300 border border-green-600/30' : 'bg-green-100 text-green-800')
                       : existingGame.status === 'completed'
                       ? (theme === 'dark' ? 'bg-purple-950/40 text-purple-300 border border-purple-600/30' : 'bg-purple-100 text-purple-800')
@@ -1670,52 +1769,56 @@ export default function GamesPage() {
                       ? (theme === 'dark' ? 'bg-red-950/40 text-red-300 border border-red-600/30' : 'bg-red-100 text-red-800')
                       : (theme === 'dark' ? 'bg-yellow-950/40 text-yellow-300 border border-yellow-600/30' : 'bg-yellow-100 text-yellow-800')
                   }`}>
-                    {existingGame.status === 'confirmed' ? 'Confirmado' 
+                    {existingGame.status === 'confirmed' ? 'Confirmado'
                      : existingGame.status === 'completed' ? 'Completado'
                      : existingGame.status === 'cancelled' ? 'Cancelado'
                      : 'Programado'}
                   </span>
-                  
+
                   {currentUser.isAdmin && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {existingGame.status === 'scheduled' && (
                         <button
                           onClick={() => {
                             const updatedGame = { ...existingGame, status: 'confirmed' as const };
                             handleEditGame(updatedGame);
                           }}
-                          className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
+                          className="bg-green-600 dark:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 text-sm sm:text-base"
                         >
-                          Confirmar Partido
+                          <span className="hidden sm:inline">Confirmar Partido</span>
+                          <span className="sm:hidden">Confirmar</span>
                         </button>
                       )}
                       {!existingGame.teams && existingGame.participants.length === 10 && (
                     <button
                       onClick={() => organizeTeams(existingGame.id)}
-                      className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
+                      className="bg-blue-600 dark:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm sm:text-base"
                     >
-                      Organizar Equipos
+                      <span className="hidden sm:inline">Organizar Equipos</span>
+                      <span className="sm:hidden">Organizar</span>
                     </button>
                       )}
                       {existingGame.status === 'completed' && !existingGame.result && (
                         <button
                           onClick={() => setAddingResultToGame(existingGame)}
-                          className="bg-green-600 dark:bg-green-700 text-white px-3 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 flex items-center gap-2"
+                          className="bg-green-600 dark:bg-green-700 text-white px-3 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
                         >
-                          <Trophy className="h-4 w-4" />
-                          Agregar Resultado
+                          <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">Agregar Resultado</span>
+                          <span className="sm:hidden">Resultado</span>
                         </button>
                       )}
                       <button
                         onClick={() => setManagingParticipants(existingGame)}
-                        className="bg-purple-600 dark:bg-purple-700 text-white px-4 py-2 rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 flex items-center gap-2"
+                        className="bg-purple-600 dark:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
                       >
-                        <Users className="h-4 w-4" />
-                        Gestionar Participantes
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">Gestionar Participantes</span>
+                        <span className="sm:hidden">Gestionar</span>
                       </button>
                       <button
                         onClick={() => setEditingGame(existingGame)}
-                        className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                        className="bg-gray-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-sm sm:text-base"
                       >
                         Editar
                       </button>

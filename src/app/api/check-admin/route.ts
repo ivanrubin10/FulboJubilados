@@ -56,8 +56,12 @@ export async function GET() {
       });
     }
 
-    console.log('User found, admin status:', user.isAdmin);
-    return NextResponse.json({ 
+    console.log('User found, admin status:', user.isAdmin, 'whitelisted status:', user.isWhitelisted);
+
+    // Admin access requires both isAdmin AND isWhitelisted
+    const hasAdminAccess = user.isAdmin && user.isWhitelisted;
+
+    return NextResponse.json({
       success: true,
       userId,
       user: {
@@ -67,7 +71,7 @@ export async function GET() {
         isAdmin: user.isAdmin,
         isWhitelisted: user.isWhitelisted
       },
-      isAdmin: user.isAdmin,
+      isAdmin: hasAdminAccess,
       userExists: true
     });
   } catch (error) {

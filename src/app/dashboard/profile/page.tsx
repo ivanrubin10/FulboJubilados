@@ -40,7 +40,7 @@ const ProfilePage = () => {
       try {
         const [userRes, gamesRes] = await Promise.all([
           fetch(`/api/users/${user.id}`),
-          fetch('/api/games')
+          fetch('/api/games?type=all')
         ]);
         
         if (userRes.ok) {
