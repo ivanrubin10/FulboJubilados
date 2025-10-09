@@ -708,26 +708,43 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
   // Save all changes (participants, waitlist, teams)
   const saveChanges = async () => {
     setIsUpdating(true);
-    
+
     try {
       const updatedTeams = {
         team1: team1Players,
         team2: team2Players
       };
 
+      // Sync participants with team members
+      // All players in teams should be in participants
+      const allTeamPlayers = [...team1Players, ...team2Players];
+      const syncedParticipants = [...new Set([...participants, ...allTeamPlayers])];
+
+      // Remove any participants who were removed from the match
+      const finalParticipants = syncedParticipants.filter(playerId =>
+        participants.includes(playerId)
+      );
+
       const updateData = {
-        participants,
+        participants: finalParticipants,
         waitlist,
         teams: updatedTeams
       };
 
       const updatedGame: Game = {
         ...game,
-        participants,
+        participants: finalParticipants,
         waitlist,
         teams: updatedTeams,
         updatedAt: new Date()
       };
+
+      console.log('💾 Saving game with synced participants:', {
+        originalParticipants: participants.length,
+        finalParticipants: finalParticipants.length,
+        team1: team1Players.length,
+        team2: team2Players.length
+      });
 
       // Update via API
       const res = await fetch(`/api/games/${game.id}`, {
@@ -737,7 +754,7 @@ function ParticipantManagementModal({ game, users, onSave, onClose }: Participan
       });
 
       if (!res.ok) throw new Error('Failed to update game');
-      
+
       onSave(updatedGame);
       onClose();
     } catch (error) {

@@ -381,18 +381,24 @@ export default function AdminPage() {
 
   const loadConfirmedGames = async () => {
     try {
-      const gamesResponse = await fetch('/api/games');
+      const gamesResponse = await fetch('/api/games?type=all');
       const games = await gamesResponse.json();
-      
+
+      console.log('🎮 All games fetched:', games.length);
+      console.log('🎮 Games with status confirmed:', games.filter((g: GameWithParticipants) => g.status === 'confirmed').length);
+      games.forEach((game: GameWithParticipants) => {
+        console.log(`  Game ${game.id}: status=${game.status}, participants=${game.participants?.length || 0}`);
+      });
+
       const usersResponse = await fetch('/api/users');
       const allUsers = await usersResponse.json();
       const userMap = new Map(allUsers.map((user: User) => [user.id, user]));
-      
+
       const confirmedGamesWithParticipants = games
-        .filter((game: GameWithParticipants) => 
-          game.status === 'confirmed' && 
-          game.participants && 
-          game.participants.length >= 10
+        .filter((game: GameWithParticipants) =>
+          game.status === 'confirmed' &&
+          game.participants &&
+          game.participants.length > 0
         )
         .map((game: GameWithParticipants) => ({
           ...game,
@@ -400,7 +406,9 @@ export default function AdminPage() {
             .map((participantId: string) => userMap.get(participantId))
             .filter((user): user is User => user !== undefined)
         }));
-      
+
+      console.log('✅ Confirmed games with participants:', confirmedGamesWithParticipants.length);
+
       setConfirmedGames(confirmedGamesWithParticipants);
       
       // Select all participants by default
