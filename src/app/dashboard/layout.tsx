@@ -82,12 +82,12 @@ export default function DashboardLayout({
                 <h1 className="text-lg sm:text-xl font-bold text-foreground text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
               </Link>
               <div className="hidden md:flex space-x-2">
-                <Link 
-                  href="/dashboard" 
+                <Link
+                  href="/dashboard"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                 >
                   <Calendar className="h-4 w-4" />
-                  Mi Disponibilidad
+                  Calendario
                 </Link>
                 <Link 
                   href="/dashboard/games" 
@@ -147,13 +147,13 @@ export default function DashboardLayout({
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t border-border/20">
               <div className="flex flex-col space-y-2 pt-4">
-                <Link 
-                  href="/dashboard" 
+                <Link
+                  href="/dashboard"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Calendar className="h-4 w-4" />
-                  Mi Disponibilidad
+                  Calendario
                 </Link>
                 <Link 
                   href="/dashboard/games" 
