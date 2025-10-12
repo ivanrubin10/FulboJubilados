@@ -21,9 +21,9 @@ const apiClient = {
     return res.json();
   },
 
-  async getMVPVotesData() {
-    const res = await fetch('/api/mvp/votes');
-    if (!res.ok) throw new Error('Failed to fetch MVP votes data');
+  async getAllMVPVotes() {
+    const res = await fetch('/api/mvp/all-votes');
+    if (!res.ok) throw new Error('Failed to fetch MVP votes');
     return res.json();
   }
 };
@@ -77,7 +77,7 @@ export default function RankingsPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [mvpVotesData, setMvpVotesData] = useState<{[playerId: string]: number}>({});
+  const [allMvpVotes, setAllMvpVotes] = useState<{gameId: string, votedForId: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Quarter filtering state
@@ -95,7 +95,7 @@ export default function RankingsPage() {
         const [allUsers, allGames, mvpVotesResponse] = await Promise.all([
           apiClient.getUsers(),
           apiClient.getGames(),
-          apiClient.getMVPVotesData()
+          apiClient.getAllMVPVotes()
         ]);
 
         const userData = allUsers.find((u: User) => u.id === user.id);
@@ -108,18 +108,10 @@ export default function RankingsPage() {
           updatedAt: new Date(game.updatedAt),
         }));
 
-        // Process MVP votes data
-        const votesMap: {[playerId: string]: number} = {};
-        if (mvpVotesResponse.success) {
-          mvpVotesResponse.playerVotes.forEach((voteData: {playerId: string, totalVotes: number}) => {
-            votesMap[voteData.playerId] = voteData.totalVotes;
-          });
-        }
-
         setUsers(allUsers);
         setGames(gamesWithFixedDates);
         setCurrentUser(userData || null);
-        setMvpVotesData(votesMap);
+        setAllMvpVotes(mvpVotesResponse.votes || []);
 
         // Set current quarter as default if no quarter is selected
         if (!selectedQuarter) {
@@ -154,6 +146,12 @@ export default function RankingsPage() {
       player: User;
     }> = {};
 
+    // Get game IDs from completed games in the selected quarter
+    const completedGameIds = new Set(completedGames.map(game => game.id));
+
+    // Filter MVP votes to only include those from completed games in the selected quarter
+    const quarterMvpVotes = allMvpVotes.filter(vote => completedGameIds.has(vote.gameId));
+
     completedGames.forEach(game => {
       if (!game.teams || !game.result) return;
 
@@ -163,6 +161,9 @@ export default function RankingsPage() {
       [...team1, ...team2].forEach(playerId => {
         const player = users.find(u => u.id === playerId);
         if (!stats[playerId] && player) {
+          // Count MVP votes for this player from games in the selected quarter
+          const votesForPlayer = quarterMvpVotes.filter(vote => vote.votedForId === playerId).length;
+
           stats[playerId] = {
             wins: 0,
             losses: 0,
@@ -170,7 +171,7 @@ export default function RankingsPage() {
             goalsFor: 0,
             goalsAgainst: 0,
             mvpWins: 0,
-            mvpVotesReceived: mvpVotesData[playerId] || 0,
+            mvpVotesReceived: votesForPlayer,
             player
           };
         }
