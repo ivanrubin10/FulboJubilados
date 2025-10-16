@@ -110,7 +110,8 @@ export async function POST(request: NextRequest) {
       const gameId = await DatabaseService.createGame({
         date: new Date(body.date),
         participants: body.participants || [],
-        status: 'scheduled'
+        status: 'scheduled',
+        specialMessage: body.specialMessage
       });
 
       // Check if we need to notify admins
@@ -150,7 +151,8 @@ export async function POST(request: NextRequest) {
             participants: game.participants,
             teams: game.teams,
             result: game.result,
-            reservationInfo: game.reservationInfo
+            reservationInfo: game.reservationInfo,
+            specialMessage: game.specialMessage
           });
         } else {
           // Create new game
@@ -161,7 +163,8 @@ export async function POST(request: NextRequest) {
             status: game.status || 'scheduled',
             teams: game.teams,
             result: game.result,
-            reservationInfo: game.reservationInfo
+            reservationInfo: game.reservationInfo,
+            specialMessage: game.specialMessage
           });
         }
       }

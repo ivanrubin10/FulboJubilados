@@ -222,6 +222,23 @@ function EditGameModal({ game, onSave, onClose, users }: EditGameModal) {
             </select>
           </div>
 
+          {/* Special Message */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              Mensaje Especial (opcional)
+            </label>
+            <input
+              type="text"
+              value={editedGame.specialMessage || ''}
+              onChange={(e) => setEditedGame(prev => ({ ...prev, specialMessage: e.target.value }))}
+              placeholder="Ej: ❌ No se juega el día de la madre ❌"
+              className="w-full p-2 border border-border rounded-lg text-foreground bg-background"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Este mensaje se mostrará destacado en el card del partido
+            </p>
+          </div>
+
           {/* Reservation Information */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-3">
@@ -1714,7 +1731,12 @@ export default function GamesPage() {
                 <h3 className="text-lg font-semibold text-foreground">
                   {formatDate(date)}
                 </h3>
-                <div className="flex items-center gap-2">
+                {existingGame?.specialMessage && (
+                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-950/30 border-l-4 border-red-600 text-red-700 dark:text-red-400 rounded">
+                    <p className="font-semibold text-sm">{existingGame.specialMessage}</p>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-2">
                   <Users className="h-5 w-5 text-muted-foreground" />
                   <span className="text-xl font-bold text-foreground">
                     {availablePlayers.length}/10
@@ -1722,15 +1744,67 @@ export default function GamesPage() {
                   <span className="text-sm text-muted-foreground">jugadores</span>
                 </div>
               </div>
-              
-              {!existingGame && availablePlayers.length >= 10 && (
-                <button
-                  onClick={() => createGameForSunday(year, month, sunday)}
-                  className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
-                >
-                  Confirmar Partido
-                </button>
-              )}
+
+              <div className="flex gap-2">
+                {(!existingGame || (existingGame.participants.length === 0 && !existingGame.specialMessage)) && availablePlayers.length >= 10 && (
+                  <button
+                    onClick={() => createGameForSunday(year, month, sunday)}
+                    className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
+                  >
+                    Confirmar Partido
+                  </button>
+                )}
+
+                {!existingGame && currentUser.isAdmin && (
+                  <button
+                    onClick={async () => {
+                      const message = prompt('Ingresa el mensaje especial para este domingo:');
+                      if (message !== null && message.trim() !== '') {
+                        const gameDate = new Date(year, month - 1, sunday);
+
+                        const newGame: Game = {
+                          id: `game-${Date.now()}`,
+                          date: gameDate,
+                          status: 'scheduled',
+                          participants: [],
+                          waitlist: [],
+                          specialMessage: message.trim(),
+                          createdAt: new Date(),
+                          updatedAt: new Date(),
+                        };
+
+                        try {
+                          const updatedGames = [...games, newGame];
+                          setGames(updatedGames);
+                          await apiClient.saveGames(updatedGames);
+                          success('Anuncio agregado', 'El mensaje especial ha sido agregado al domingo.');
+                        } catch (err) {
+                          console.error('Error creating announcement:', err);
+                          error('Error', 'No se pudo agregar el anuncio.');
+                        }
+                      }
+                    }}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/50 transition-colors"
+                    title="Agregar anuncio"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                      <path d="M12 2v2"/>
+                      <path d="m19.07 4.93-1.41 1.41"/>
+                    </svg>
+                  </button>
+                )}
+
+                {existingGame && existingGame.participants.length === 0 && existingGame.specialMessage && currentUser.isAdmin && (
+                  <button
+                    onClick={() => setEditingGame(existingGame)}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/50 transition-colors"
+                    title="Editar anuncio"
+                  >
+                    <Edit3 className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
               
               {existingGame && existingGame.status === 'confirmed' && existingGame.participants.length >= 10 && (
                 existingGame.participants.includes(currentUser?.id || '') ? (
@@ -1774,7 +1848,7 @@ export default function GamesPage() {
               availabilityCache={availabilityCache}
             />
 
-            {existingGame && (
+            {existingGame && existingGame.participants.length > 0 && (
               <div className="border-t pt-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                   <span className={`px-3 py-1 rounded-full text-sm self-start ${

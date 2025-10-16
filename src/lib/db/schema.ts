@@ -32,6 +32,7 @@ export const games = pgTable('games', {
   adminNotificationTimeout: timestamp('admin_notification_timeout'),
   customTime: text('custom_time'), // Custom time if not 10am
   calendarEventId: text('calendar_event_id'), // Google Calendar event ID
+  specialMessage: text('special_message'), // Special announcement for this match day
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

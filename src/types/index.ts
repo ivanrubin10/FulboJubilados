@@ -38,6 +38,7 @@ export interface Game {
     mapsLink?: string;
     paymentAlias?: string;
   };
+  specialMessage?: string; // Special announcement for this match day
   createdAt: Date;
   updatedAt: Date;
 }
