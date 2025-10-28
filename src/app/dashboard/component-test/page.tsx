@@ -192,7 +192,63 @@ export default function ComponentTestPage() {
       createdAt: new Date(),
       updatedAt: new Date(),
     },
+    mvpVotingGame: {
+      id: 'mvp-voting-game-id',
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last week
+      status: 'completed',
+      participants: ['user1', 'user2', 'user3', currentUserId, 'user5', 'user6', 'user7', 'user8', 'user9', 'user10'],
+      waitlist: [],
+      reservationInfo: {
+        location: 'Cancha Test',
+        time: '10:00',
+        cost: 200,
+        reservedBy: 'admin',
+      },
+      teams: {
+        team1: ['user1', 'user2', 'user3', currentUserId, 'user5'],
+        team2: ['user6', 'user7', 'user8', 'user9', 'user10']
+      },
+      result: {
+        team1Score: 4,
+        team2Score: 3,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   });
+
+  // MVP voting state
+  const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
+  const [hasUserVotedMVP, setHasUserVotedMVP] = useState<{[gameId: string]: boolean}>({});
+
+  const handleToggleMVPVoting = (gameId: string) => {
+    setShowMVPVoting(prev => ({
+      ...prev,
+      [gameId]: !prev[gameId]
+    }));
+  };
+
+  const handleVoteMVP = (gameId: string, playerId: string) => {
+    console.log(`Voting for player ${playerId} in game ${gameId}`);
+    setHasUserVotedMVP(prev => ({
+      ...prev,
+      [gameId]: true
+    }));
+    setShowMVPVoting(prev => ({
+      ...prev,
+      [gameId]: false
+    }));
+    alert(`✅ Votaste por ${mockUsers.find(u => u.id === playerId)?.nickname || playerId} como MVP!`);
+  };
+
+  const handleViewMVPResults = (gameId: string) => {
+    console.log(`Viewing MVP results for game ${gameId}`);
+    setShowMVPVoting(prev => ({
+      ...prev,
+      [gameId]: true
+    }));
+    alert('📊 Aquí verías los resultados de la votación MVP (funcionalidad de admin)');
+  };
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -357,6 +413,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -384,6 +441,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -411,6 +469,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -438,6 +497,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -465,6 +525,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -496,6 +557,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.scheduledGame, key: 'scheduledGame' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -526,6 +588,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.scheduledWithoutUser, key: 'scheduledWithoutUser' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -556,6 +619,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -584,6 +648,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -612,6 +677,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -642,6 +708,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.adminGame, key: 'adminGame' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -672,6 +739,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.teamsGame, key: 'teamsGame' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -704,6 +772,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTeam1Win, key: 'completedTeam1Win' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -734,6 +803,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTeam2Win, key: 'completedTeam2Win' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -764,6 +834,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTie, key: 'completedTie' })}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
           </div>
 
@@ -794,7 +865,195 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
+              disableEmailNotifications={true}
             />
+          </div>
+
+          <h2 className="text-2xl font-bold text-foreground mb-4 mt-8">⭐ MVP VOTING</h2>
+
+          {/* MVP Voting Example */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">17. Partido completado - Votación MVP activa</h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              Este ejemplo muestra la votación de MVP para un partido completado. El usuario puede votar por el mejor jugador.
+            </p>
+            <SundayCard
+              date={editableGames.mvpVotingGame.date}
+              dayNumber={1}
+              isPast={true}
+              userVoted={true}
+              userVotedNo={false}
+              userVoteTimestamp={new Date()}
+              totalVotes={10}
+              userPositionInQueue={4}
+              voters={mockVoters(10, true)}
+              noVoters={[]}
+              nonVoters={[]}
+              game={editableGames.mvpVotingGame}
+              userInGame={true}
+              userInWaitlist={false}
+              canVote={false}
+              canUnvote={false}
+              blockReason="Partido finalizado"
+              onVote={() => console.log('Vote YES')}
+              onVoteNo={() => console.log('Vote NO')}
+              onUnvote={() => console.log('Unvote')}
+              isAdmin={true}
+              onManageGame={() => setEditingGame({ game: editableGames.mvpVotingGame, key: 'mvpVotingGame' })}
+              hasUserVotedMVP={hasUserVotedMVP[editableGames.mvpVotingGame.id]}
+              showMVPVoting={showMVPVoting[editableGames.mvpVotingGame.id]}
+              onToggleMVPVoting={() => handleToggleMVPVoting(editableGames.mvpVotingGame.id)}
+              onVoteMVP={(playerId) => handleVoteMVP(editableGames.mvpVotingGame.id, playerId)}
+              onViewMVPResults={() => handleViewMVPResults(editableGames.mvpVotingGame.id)}
+              currentUserId={currentUserId}
+              disableEmailNotifications={true}
+            />
+          </div>
+
+          <h2 className="text-2xl font-bold text-foreground mb-4 mt-8">📜 HISTORY CARDS (Estilo Página de Historial)</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Estos ejemplos muestran cómo se ven las tarjetas en la página de historial con el nuevo estilo.
+          </p>
+
+          {/* History Card Example 1 - With MVP */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">18. Partido completado con MVP - Estilo Historial</h2>
+            <div className="border border-border rounded-lg p-4 bg-card">
+              <div className="mb-4">
+                <h3 className="font-semibold text-foreground">Domingo 1 de diciembre de 2024</h3>
+                <p className="text-sm text-foreground">Cancha Test - 10:00</p>
+              </div>
+
+              {/* Teams Display */}
+              <div className="mb-4 rounded-lg p-3 bg-background/70 dark:bg-background/70">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span className="font-bold text-sm text-foreground">EQUIPOS</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs font-bold mb-2 text-blue-400 dark:text-blue-400">EQUIPO 1</div>
+                    <div className="space-y-1">
+                      {['Nick1', 'Nick2', 'Tú', 'Nick4', 'Nick5'].map((nick, idx) => (
+                        <div key={idx} className={`text-xs px-2 py-1 rounded ${nick === 'Tú' ? 'bg-blue-900/60 text-blue-200 font-semibold dark:bg-blue-900/60 dark:text-blue-200' : 'bg-slate-800/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-300'}`}>
+                          {nick}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold mb-2 text-red-400 dark:text-red-400">EQUIPO 2</div>
+                    <div className="space-y-1">
+                      {['Nick6', 'Nick7', 'Nick8', 'Nick9', 'Nick10'].map((nick, idx) => (
+                        <div key={idx} className="text-xs px-2 py-1 rounded bg-slate-800/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-300">
+                          {nick}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Display */}
+              <div className="mb-4 rounded-lg p-3 bg-background/70 dark:bg-background/70">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                  <span className="font-bold text-sm text-foreground">RESULTADO</span>
+                </div>
+                <div className="flex items-center justify-center gap-4 mb-3">
+                  <div className="text-center px-4 py-2 rounded bg-green-900/40 text-green-300 dark:bg-green-900/40 dark:text-green-300">
+                    <div className="text-xs font-semibold">EQUIPO 1</div>
+                    <div className="text-2xl font-bold">5</div>
+                  </div>
+                  <div className="text-xl font-bold text-muted-foreground">-</div>
+                  <div className="text-center px-4 py-2 rounded bg-slate-800/50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-400">
+                    <div className="text-xs font-semibold">EQUIPO 2</div>
+                    <div className="text-2xl font-bold">3</div>
+                  </div>
+                </div>
+                <div className="text-center text-sm font-semibold mb-2 text-green-300 dark:text-green-300">
+                  🏆 Ganó Equipo 1
+                </div>
+              </div>
+
+              {/* MVP Display */}
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800/30">
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <svg className="h-6 w-6 text-yellow-600 dark:text-yellow-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                  <h5 className="font-bold text-yellow-800 dark:text-yellow-200 text-lg">MVP del Partido</h5>
+                  <svg className="h-6 w-6 text-yellow-600 dark:text-yellow-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="text-xl font-bold text-yellow-800 dark:text-yellow-200">Jugador 1</span>
+                    <svg className="h-6 w-6 text-yellow-500 fill-current" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* History Card Example 2 - Draw */}
+          <div className="mt-6">
+            <h2 className="text-xl font-semibold mb-3 text-foreground">19. Partido empatado - Estilo Historial</h2>
+            <div className="border border-border rounded-lg p-4 bg-card">
+              <div className="mb-4">
+                <h3 className="font-semibold text-foreground">Domingo 24 de noviembre de 2024</h3>
+                <p className="text-sm text-foreground">Cancha Test - 10:00</p>
+              </div>
+
+              {/* Teams Display */}
+              <div className="mb-4 rounded-lg p-3 bg-background/70 dark:bg-background/70">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span className="font-bold text-sm text-foreground">EQUIPOS</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs font-bold mb-2 text-blue-400 dark:text-blue-400">EQUIPO 1</div>
+                    <div className="space-y-1">
+                      {['Nick1', 'Nick2', 'Nick3', 'Nick4', 'Nick5'].map((nick, idx) => (
+                        <div key={idx} className="text-xs px-2 py-1 rounded bg-slate-800/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-300">
+                          {nick}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold mb-2 text-red-400 dark:text-red-400">EQUIPO 2</div>
+                    <div className="space-y-1">
+                      {['Nick6', 'Tú', 'Nick8', 'Nick9', 'Nick10'].map((nick, idx) => (
+                        <div key={idx} className={`text-xs px-2 py-1 rounded ${nick === 'Tú' ? 'bg-red-900/60 text-red-200 font-semibold dark:bg-red-900/60 dark:text-red-200' : 'bg-slate-800/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-300'}`}>
+                          {nick}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Display */}
+              <div className="rounded-lg p-3 bg-background/70 dark:bg-background/70">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                  <span className="font-bold text-sm text-foreground">RESULTADO</span>
+                </div>
+                <div className="flex items-center justify-center gap-4 mb-3">
+                  <div className="text-center px-4 py-2 rounded bg-yellow-900/40 text-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300">
+                    <div className="text-xs font-semibold">EQUIPO 1</div>
+                    <div className="text-2xl font-bold">3</div>
+                  </div>
+                  <div className="text-xl font-bold text-muted-foreground">-</div>
+                  <div className="text-center px-4 py-2 rounded bg-yellow-900/40 text-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300">
+                    <div className="text-xs font-semibold">EQUIPO 2</div>
+                    <div className="text-2xl font-bold">3</div>
+                  </div>
+                </div>
+                <div className="text-center text-sm font-semibold mb-2 text-yellow-300 dark:text-yellow-300">
+                  🤝 Empate
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

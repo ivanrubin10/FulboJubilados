@@ -1,8 +1,9 @@
 'use client';
 
-import { Game } from '@/types';
+import { Game, MvpResults } from '@/types';
 import { useTheme } from '@/contexts/theme-context';
 import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings, Star, Crown } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 interface VoterInfo {
   userId: string;
@@ -63,8 +64,14 @@ interface SundayCardProps {
   showMVPVoting?: boolean;
   onToggleMVPVoting?: () => void;
   onVoteMVP?: (playerId: string) => void;
+  onViewMVPResults?: () => void;
+  mvpResults?: MvpResults;
+  onFinalizeMVP?: () => void;
 
   currentUserId: string;
+
+  // Testing
+  disableEmailNotifications?: boolean;
 }
 
 export function SundayCard({
@@ -91,9 +98,14 @@ export function SundayCard({
   showMVPVoting,
   onToggleMVPVoting,
   onVoteMVP,
-  currentUserId
+  onViewMVPResults,
+  mvpResults,
+  onFinalizeMVP,
+  currentUserId,
+  disableEmailNotifications = false
 }: SundayCardProps) {
   const { theme } = useTheme();
+  const hasTriggeredEmailRef = useRef(false);
 
   const monthYear = date.toLocaleDateString('es-ES', {
     month: 'long',
@@ -101,6 +113,42 @@ export function SundayCard({
   });
 
   const fullDate = `Domingo ${dayNumber} de ${monthYear}`;
+
+  // Trigger admin email when votes reach 10
+  useEffect(() => {
+    const triggerAdminEmail = async () => {
+      if (disableEmailNotifications) return;
+
+      if (totalVotes === 10 && !hasTriggeredEmailRef.current && game && game.status !== 'confirmed' && game.status !== 'completed') {
+        hasTriggeredEmailRef.current = true;
+        console.log('🔔 10 votes reached! Triggering admin email notification...');
+
+        try {
+          const response = await fetch('/api/send-match-confirmation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              gameId: game.id,
+              date: game.date,
+              participants: game.participants,
+            }),
+          });
+
+          if (response.ok) {
+            console.log('✅ Admin email notification sent successfully');
+          } else {
+            console.error('❌ Failed to send admin email notification');
+          }
+        } catch (error) {
+          console.error('❌ Error sending admin email:', error);
+        }
+      }
+    };
+
+    triggerAdminEmail();
+  }, [totalVotes, game, disableEmailNotifications]);
 
   // Determine card state and styling
   const getCardStyle = () => {
@@ -547,6 +595,16 @@ export function SundayCard({
                       <p className="text-sm text-muted-foreground">
                         Tu voto se registró correctamente. Los resultados se mostrarán cuando termine la votación.
                       </p>
+                      {isAdmin && onViewMVPResults && (
+                        <button
+                          onClick={onViewMVPResults}
+                          className={`mt-2 text-sm font-medium ${
+                            theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                          }`}
+                        >
+                          Ver resultados (Admin)
+                        </button>
+                      )}
                     </div>
                   ) : showMVPVoting ? (
                     <div>
@@ -591,6 +649,92 @@ export function SundayCard({
                     <p className="text-sm text-muted-foreground text-center">
                       Haz clic en &quot;Votar MVP&quot; para elegir al mejor jugador del partido
                     </p>
+                  )}
+
+                  {/* Show results if available (for admins or after voting) */}
+                  {mvpResults && showMVPVoting && (
+                    <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700/30">
+                      <h6 className={`font-medium ${
+                        theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                      } mb-3`}>
+                        Resultados actuales:
+                      </h6>
+                      <div className="space-y-2">
+                        {mvpResults.voteResults.map(result => (
+                          <div key={result.playerId} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              {result.playerImageUrl && (
+                                <img
+                                  src={result.playerImageUrl}
+                                  alt={result.playerName}
+                                  className="w-6 h-6 rounded-full"
+                                />
+                              )}
+                              <span>{result.playerNickname || result.playerName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{result.voteCount} voto{result.voteCount !== 1 ? 's' : ''}</span>
+                              <span className="text-muted-foreground">({result.votePercentage}%)</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 text-xs text-muted-foreground text-center">
+                        Total votos: {mvpResults.totalVotes} / {mvpResults.totalParticipants} jugadores
+                      </div>
+
+                      {/* Admin-only: Show non-voters list */}
+                      {isAdmin && mvpResults.nonVoters && mvpResults.nonVoters.nonVotersCount > 0 && (
+                        <div className={`mt-3 p-3 rounded-lg ${
+                          theme === 'dark' ? 'bg-orange-950/40 border border-orange-600/30' : 'bg-orange-50 border border-orange-200'
+                        }`}>
+                          <h6 className={`text-sm font-medium mb-2 ${
+                            theme === 'dark' ? 'text-orange-300' : 'text-orange-800'
+                          }`}>
+                            Pendientes de votar ({mvpResults.nonVoters.nonVotersCount}):
+                          </h6>
+                          <div className="flex flex-wrap gap-2">
+                            {mvpResults.nonVoters.nonVoters.map(user => (
+                              <div key={user.id} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                                theme === 'dark' ? 'bg-orange-900/40 text-orange-200' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {user.imageUrl && (
+                                  <img
+                                    src={user.imageUrl}
+                                    alt={user.name}
+                                    className="w-4 h-4 rounded-full"
+                                  />
+                                )}
+                                <span>{user.displayName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {isAdmin && onFinalizeMVP && mvpResults.mvp && (
+                        <button
+                          onClick={onFinalizeMVP}
+                          className="mt-3 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                        >
+                          {(() => {
+                            const results = mvpResults.voteResults;
+                            if (results.length === 0) return "Finalizar MVP";
+
+                            const highestVoteCount = results[0].voteCount;
+                            const tiedPlayers = results.filter(r => r.voteCount === highestVoteCount);
+
+                            if (tiedPlayers.length === 1) {
+                              const winner = tiedPlayers[0];
+                              return `Finalizar MVP: ${winner.playerNickname || winner.playerName}`;
+                            } else {
+                              const names = tiedPlayers.map(p => p.playerNickname || p.playerName).join(", ");
+                              return `Finalizar MVP (Empate): ${names}`;
+                            }
+                          })()}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : null}

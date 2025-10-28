@@ -304,8 +304,26 @@ export default function GamesPage() {
   const handleVote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
+    // Optimistic update - immediately add the vote to local state
+    const newVote: DayVote = {
+      userId: currentUser.id,
+      day: dayNumber,
+      votedAt: new Date(),
+      voteType: 'yes'
+    };
+
+    const isCurrentMonth = year === activeYear && month === activeMonth;
+
+    if (isCurrentMonth) {
+      setCurrentMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
+    } else {
+      setNextMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
+    }
+
+    success('Voto registrado', `Votaste SÍ por el domingo ${dayNumber}`);
+
     try {
-      await fetch('/api/day-vote', {
+      const response = await fetch('/api/day-vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -317,7 +335,9 @@ export default function GamesPage() {
         })
       });
 
-      // Reload both months data
+      if (!response.ok) throw new Error('Failed to vote');
+
+      // Silently sync with server data in background
       let nextMonth = activeMonth + 1;
       let nextYear = activeYear;
       if (nextMonth > 12) {
@@ -335,10 +355,14 @@ export default function GamesPage() {
 
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
-
-      success('Voto registrado', `Votaste SÍ por el domingo ${dayNumber}`);
     } catch (err) {
       console.error('Error voting:', err);
+      // Revert optimistic update on error
+      if (isCurrentMonth) {
+        setCurrentMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+      } else {
+        setNextMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+      }
       error('Error', 'No se pudo registrar el voto');
     }
   }, [currentUser, activeMonth, activeYear, success, error]);
@@ -346,8 +370,26 @@ export default function GamesPage() {
   const handleVoteNo = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
+    // Optimistic update - immediately add the vote to local state
+    const newVote: DayVote = {
+      userId: currentUser.id,
+      day: dayNumber,
+      votedAt: new Date(),
+      voteType: 'no'
+    };
+
+    const isCurrentMonth = year === activeYear && month === activeMonth;
+
+    if (isCurrentMonth) {
+      setCurrentMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
+    } else {
+      setNextMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
+    }
+
+    success('Voto registrado', `Votaste NO por el domingo ${dayNumber}`);
+
     try {
-      await fetch('/api/day-vote', {
+      const response = await fetch('/api/day-vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -359,7 +401,9 @@ export default function GamesPage() {
         })
       });
 
-      // Reload both months data
+      if (!response.ok) throw new Error('Failed to vote');
+
+      // Silently sync with server data in background
       let nextMonth = activeMonth + 1;
       let nextYear = activeYear;
       if (nextMonth > 12) {
@@ -377,10 +421,14 @@ export default function GamesPage() {
 
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
-
-      success('Voto registrado', `Votaste NO por el domingo ${dayNumber}`);
     } catch (err) {
       console.error('Error voting:', err);
+      // Revert optimistic update on error
+      if (isCurrentMonth) {
+        setCurrentMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+      } else {
+        setNextMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+      }
       error('Error', 'No se pudo registrar el voto');
     }
   }, [currentUser, activeMonth, activeYear, success, error]);
@@ -388,12 +436,30 @@ export default function GamesPage() {
   const handleUnvote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
+    const isCurrentMonth = year === activeYear && month === activeMonth;
+
+    // Store previous vote for rollback if needed
+    const previousVote = isCurrentMonth
+      ? currentMonthDayVotes.find(v => v.userId === currentUser.id && v.day === dayNumber)
+      : nextMonthDayVotes.find(v => v.userId === currentUser.id && v.day === dayNumber);
+
+    // Optimistic update - immediately remove the vote from local state
+    if (isCurrentMonth) {
+      setCurrentMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+    } else {
+      setNextMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
+    }
+
+    success('Voto eliminado', `Removiste tu voto del domingo ${dayNumber}`);
+
     try {
-      await fetch(`/api/day-vote?userId=${currentUser.id}&year=${year}&month=${month}&day=${dayNumber}`, {
+      const response = await fetch(`/api/day-vote?userId=${currentUser.id}&year=${year}&month=${month}&day=${dayNumber}`, {
         method: 'DELETE'
       });
 
-      // Reload both months data
+      if (!response.ok) throw new Error('Failed to unvote');
+
+      // Silently sync with server data in background
       let nextMonth = activeMonth + 1;
       let nextYear = activeYear;
       if (nextMonth > 12) {
@@ -411,13 +477,19 @@ export default function GamesPage() {
 
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
-
-      success('Voto eliminado', `Removiste tu voto del domingo ${dayNumber}`);
     } catch (err) {
       console.error('Error unvoting:', err);
+      // Revert optimistic update on error
+      if (previousVote) {
+        if (isCurrentMonth) {
+          setCurrentMonthDayVotes(prev => [...prev, previousVote]);
+        } else {
+          setNextMonthDayVotes(prev => [...prev, previousVote]);
+        }
+      }
       error('Error', 'No se pudo eliminar el voto');
     }
-  }, [currentUser, activeMonth, activeYear, success, error]);
+  }, [currentUser, activeMonth, activeYear, currentMonthDayVotes, nextMonthDayVotes, success, error]);
 
   // Game management handlers
   const handleManageGame = useCallback((game: Game) => {
