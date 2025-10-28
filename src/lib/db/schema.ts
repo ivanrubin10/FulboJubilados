@@ -106,6 +106,7 @@ export const dayVotes = pgTable('day_votes', {
   year: integer('year').notNull(),
   month: integer('month').notNull(),
   day: integer('day').notNull(),
+  voteType: text('vote_type', { enum: ['yes', 'no'] }).default('yes').notNull(),
   votedAt: timestamp('voted_at').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

@@ -151,10 +151,11 @@ export class DatabaseService {
     try {
       // Check for confirmed games that would prevent availability
       const filteredSundays = cannotPlayAnyDay ? [] : await this.filterAvailableSundays(availableSundays);
-      
+
       // Calculate voting status: user has voted if they have days selected OR marked as cannot play
       const hasVoted = filteredSundays.length > 0 || cannotPlayAnyDay;
-      
+
+      // Update monthly_availability table (summary)
       await db.insert(monthlyAvailability)
         .values({
           userId,
@@ -174,6 +175,30 @@ export class DatabaseService {
             updatedAt: new Date(),
           }
         });
+
+      // Sync day_votes table (individual vote timestamps)
+      // Get existing day votes for this user/month
+      const existingVotes = await this.getDayVotesForMonth(year, month);
+      const existingYesVotes = existingVotes.filter(v => v.userId === userId && v.voteType === 'yes');
+      const existingYesDays = new Set(existingYesVotes.map(v => v.day));
+
+      const newDays = new Set(filteredSundays);
+
+      // Add new day votes (only for newly selected Sundays)
+      for (const day of filteredSundays) {
+        if (!existingYesDays.has(day)) {
+          // New vote - record with current timestamp
+          await this.recordDayVote(userId, year, month, day, 'yes');
+        }
+        // If day already exists, do nothing - preserve original timestamp
+      }
+
+      // Remove YES day votes for unselected Sundays (but keep NO votes)
+      for (const day of existingYesDays) {
+        if (!newDays.has(day)) {
+          await this.removeDayVote(userId, year, month, day);
+        }
+      }
 
       // Stop reminders if user has voted
       if (hasVoted) {
@@ -246,17 +271,24 @@ export class DatabaseService {
   }
 
   // Day vote management
-  static async recordDayVote(userId: string, year: number, month: number, day: number): Promise<void> {
+  static async recordDayVote(userId: string, year: number, month: number, day: number, voteType: 'yes' | 'no' = 'yes'): Promise<void> {
     await db.insert(dayVotes)
       .values({
         userId,
         year,
         month,
         day,
+        voteType,
         votedAt: new Date(),
         createdAt: new Date()
       })
-      .onConflictDoNothing(); // Don't update if already exists - preserve original voting time
+      .onConflictDoUpdate({
+        target: [dayVotes.userId, dayVotes.year, dayVotes.month, dayVotes.day],
+        set: {
+          voteType,
+          votedAt: new Date() // Update timestamp when changing vote type
+        }
+      });
   }
 
   static async removeDayVote(userId: string, year: number, month: number, day: number): Promise<void> {
@@ -269,10 +301,11 @@ export class DatabaseService {
       ));
   }
 
-  static async getDayVotesForDay(year: number, month: number, day: number): Promise<Array<{ userId: string; votedAt: Date }>> {
+  static async getDayVotesForDay(year: number, month: number, day: number): Promise<Array<{ userId: string; votedAt: Date; voteType: 'yes' | 'no' }>> {
     const result = await db.select({
       userId: dayVotes.userId,
-      votedAt: dayVotes.votedAt
+      votedAt: dayVotes.votedAt,
+      voteType: dayVotes.voteType
     })
       .from(dayVotes)
       .where(and(
@@ -284,8 +317,48 @@ export class DatabaseService {
 
     return result.map(row => ({
       userId: row.userId,
-      votedAt: new Date(row.votedAt)
+      votedAt: new Date(row.votedAt),
+      voteType: row.voteType as 'yes' | 'no'
     }));
+  }
+
+  static async getDayVotesForMonth(year: number, month: number): Promise<Array<{ userId: string; day: number; votedAt: Date; voteType: 'yes' | 'no' }>> {
+    const result = await db.select({
+      userId: dayVotes.userId,
+      day: dayVotes.day,
+      votedAt: dayVotes.votedAt,
+      voteType: dayVotes.voteType
+    })
+      .from(dayVotes)
+      .where(and(
+        eq(dayVotes.year, year),
+        eq(dayVotes.month, month)
+      ))
+      .orderBy(dayVotes.votedAt); // Order by voting time (earliest first)
+
+    return result.map(row => ({
+      userId: row.userId,
+      day: row.day,
+      votedAt: new Date(row.votedAt),
+      voteType: row.voteType as 'yes' | 'no'
+    }));
+  }
+
+  static async getUserDayVote(userId: string, year: number, month: number, day: number): Promise<{ votedAt: Date; voteType: 'yes' | 'no' } | null> {
+    const result = await db.select({
+      votedAt: dayVotes.votedAt,
+      voteType: dayVotes.voteType
+    })
+      .from(dayVotes)
+      .where(and(
+        eq(dayVotes.userId, userId),
+        eq(dayVotes.year, year),
+        eq(dayVotes.month, month),
+        eq(dayVotes.day, day)
+      ))
+      .limit(1);
+
+    return result.length > 0 ? { votedAt: new Date(result[0].votedAt), voteType: result[0].voteType as 'yes' | 'no' } : null;
   }
 
   // Reminder status management
@@ -456,21 +529,33 @@ export class DatabaseService {
 
   static async updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'createdAt'>>): Promise<void> {
     console.log('🔄 updateGame called:', { gameId, updates });
-    
+
     try {
       const result = await db.update(games)
         .set({ ...updates, updatedAt: new Date() })
         .where(eq(games.id, gameId))
         .returning({ id: games.id, status: games.status });
-      
+
       console.log('💾 Database update result:', result);
-      
+
       // Verify the update worked
       const updatedGame = await this.getGame(gameId);
       console.log('🔍 Game after update:', updatedGame);
-      
+
     } catch (error) {
       console.error('❌ Error updating game:', error);
+      throw error;
+    }
+  }
+
+  static async deleteGame(gameId: string): Promise<void> {
+    console.log('🗑️ deleteGame called:', { gameId });
+
+    try {
+      await db.delete(games).where(eq(games.id, gameId));
+      console.log('✅ Game deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting game:', error);
       throw error;
     }
   }

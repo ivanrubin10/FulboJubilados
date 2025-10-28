@@ -1,0 +1,1001 @@
+'use client';
+
+import { useUser } from '@clerk/nextjs';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { getSundaysInMonth, formatDate, getCapitalizedMonthName, getCapitalizedMonthYear } from '@/lib/utils';
+import { User, Game } from '@/types';
+import { useToast } from '@/components/ui/toast';
+import { useTheme } from '@/contexts/theme-context';
+import { Calendar, ChevronLeft, ChevronRight, Clock, User as UserIcon, AlertCircle, Lock, CheckCircle, Ban, CalendarCheck, Trophy, X } from 'lucide-react';
+
+// API helper functions
+const apiClient = {
+  async getCurrentActiveMonth() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    return res.json();
+  },
+  
+  async getUserById(id: string) {
+    const res = await fetch(`/api/users/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch user');
+    const user = await res.json();
+    return user === null ? undefined : user;
+  },
+  
+  async addUser(user: User) {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error('Failed to add user');
+    return res.json();
+  },
+  
+  async getUserMonthlyAvailability(userId: string, month: number, year: number) {
+    const res = await fetch(`/api/availability?type=user&userId=${userId}&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch user availability');
+    return res.json();
+  },
+  
+  async getUserVotingStatus(userId: string, month: number, year: number) {
+    const res = await fetch(`/api/availability?type=voting&userId=${userId}&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch voting status');
+    return res.json();
+  },
+  
+  async getBlockedSundays(month: number, year: number) {
+    const res = await fetch(`/api/availability?type=blocked&month=${month}&year=${year}`);
+    if (!res.ok) throw new Error('Failed to fetch blocked sundays');
+    return res.json();
+  },
+  
+  async getGames() {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('Failed to fetch games');
+    return res.json();
+  },
+  
+  async updateMonthlyAvailability(userId: string, month: number, year: number, availableSundays: number[], cannotPlayAnyDay: boolean) {
+    const res = await fetch('/api/availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, month, year, availableSundays, cannotPlayAnyDay })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(`Failed to update availability: ${errorData.error || res.statusText} (${res.status})`);
+    }
+    return res.json();
+  }
+};
+
+export default function Dashboard() {
+  const { user, isLoaded } = useUser();
+  const router = useRouter();
+  const { warning } = useToast();
+  const { theme } = useTheme();
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [activeMonth, setActiveMonth] = useState<number>(new Date().getMonth() + 1);
+  const [activeYear, setActiveYear] = useState<number>(new Date().getFullYear());
+  const [availableSundays, setAvailableSundays] = useState<number[]>([]);
+  const [sundaysInMonth, setSundaysInMonth] = useState<number[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [cannotPlayAnyDay, setCannotPlayAnyDay] = useState(false);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [blockedSundays, setBlockedSundays] = useState<number[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number, seconds: number} | null>(null);
+
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (!isLoaded || !user) return;
+      
+      setIsLoading(true);
+      try {
+        // Get active month from database
+        const activeMonthData = await apiClient.getCurrentActiveMonth();
+        setActiveMonth(activeMonthData.month);
+        setActiveYear(activeMonthData.year);
+        setSelectedMonth(activeMonthData.month);
+        setSelectedYear(activeMonthData.year);
+
+        // Check if user exists, create if not
+        const existingUser = await apiClient.getUserById(user.id);
+        let currentUserData = existingUser;
+        
+        if (!existingUser) {
+          const userEmail = user.emailAddresses[0]?.emailAddress || '';
+          const newUser: User = {
+            id: user.id,
+            email: userEmail,
+            name: user.fullName || user.firstName || 'Usuario',
+            imageUrl: user.imageUrl,
+            isAdmin: userEmail === 'ivanrubin10@gmail.com',
+            isWhitelisted: true, // Auto-whitelist new users (admins can remove later)
+            createdAt: new Date(),
+          };
+          await apiClient.addUser(newUser);
+          setCurrentUser(newUser);
+          currentUserData = newUser;
+        } else {
+          setCurrentUser(existingUser);
+          currentUserData = existingUser;
+        }
+
+        // Check if current user (new or existing) needs nickname setup
+        if (!currentUserData?.nickname) {
+          router.push('/setup-nickname');
+          return;
+        }
+
+        // Load user's availability for the active month
+        await loadUserAvailability(user.id, activeMonthData.month, activeMonthData.year);
+        
+        // Load games data
+        const allGames = await apiClient.getGames();
+        const gamesWithFixedDates = allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt),
+        }));
+        setGames(gamesWithFixedDates);
+        
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [isLoaded, user, router]);
+
+  // Load user availability when month changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user || !currentUser) return;
+      
+      await loadUserAvailability(user.id, selectedMonth, selectedYear);
+    };
+    
+    loadData();
+  }, [user, currentUser, selectedMonth, selectedYear]);
+
+  // Helper function to get next confirmed match for current user
+  const getNextConfirmedMatch = useCallback((): Game | null => {
+    if (!currentUser) return null;
+    
+    const now = new Date();
+    const userConfirmedGames = games.filter(game => 
+      game.status === 'confirmed' && 
+      game.participants.includes(currentUser.id) &&
+      new Date(game.date) > now
+    );
+    
+    if (userConfirmedGames.length === 0) return null;
+    
+    // Sort by date and return the earliest one
+    return userConfirmedGames.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    )[0];
+  }, [currentUser, games]);
+
+  // Helper function to calculate time remaining
+  const calculateTimeLeft = useCallback((targetDate: Date) => {
+    const now = new Date();
+    const difference = targetDate.getTime() - now.getTime();
+    
+    if (difference <= 0) return null;
+    
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+    
+    return { days, hours, minutes, seconds };
+  }, []);
+
+  // Get next match data
+  const nextMatch = useMemo(() => getNextConfirmedMatch(), [getNextConfirmedMatch]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!nextMatch) {
+      setTimeLeft(null);
+      return;
+    }
+
+    // Create match date with time (assume 10:00 AM if no time specified)
+    const matchDate = new Date(nextMatch.date);
+    const matchTime = nextMatch.reservationInfo?.time || '10:00';
+    const [hours, minutes] = matchTime.split(':');
+    matchDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+    const updateCountdown = () => {
+      const time = calculateTimeLeft(matchDate);
+      setTimeLeft(time);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextMatch, calculateTimeLeft]);
+
+  // Helper function to get confirmed game for a specific Sunday
+  const getConfirmedGameForSunday = (year: number, month: number, sunday: number): Game | undefined => {
+    const date = new Date(year, month - 1, sunday);
+    return games.find(game => {
+      const gameDate = game.date instanceof Date ? game.date : new Date(game.date);
+      return gameDate.getFullYear() === date.getFullYear() &&
+             gameDate.getMonth() === date.getMonth() &&
+             gameDate.getDate() === date.getDate() &&
+             game.status === 'confirmed';
+    });
+  };
+
+  // Helper function to check if current user is confirmed in a game
+  const isUserInConfirmedGame = (year: number, month: number, sunday: number): boolean => {
+    const confirmedGame = getConfirmedGameForSunday(year, month, sunday);
+    return confirmedGame ? confirmedGame.participants.includes(currentUser?.id || '') : false;
+  };
+
+  // Helper function to check if user has any confirmed matches in the month
+  const hasConfirmedMatchesInMonth = (year: number, month: number): boolean => {
+    if (!currentUser) return false;
+    return sundaysInMonth.some(sunday => isUserInConfirmedGame(year, month, sunday));
+  };
+
+
+  // Update Sundays when month changes
+  useEffect(() => {
+    setSundaysInMonth(getSundaysInMonth(selectedYear, selectedMonth));
+  }, [selectedMonth, selectedYear]);
+
+  // Helper function to check if a month is beyond the 3-month voting limit
+  const isMonthBeyondVotingLimit = (month: number, year: number) => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    // Calculate 3 months from current date
+    let maxMonth = currentMonth + 3;
+    let maxYear = currentYear;
+    
+    if (maxMonth > 12) {
+      maxMonth = maxMonth - 12;
+      maxYear = maxYear + 1;
+    }
+    
+    return year > maxYear || (year === maxYear && month > maxMonth);
+  };
+
+  const loadUserAvailability = async (userId: string, month: number, year: number) => {
+    try {
+      const [userAvailability, votingStatus, blocked] = await Promise.all([
+        apiClient.getUserMonthlyAvailability(userId, month, year),
+        apiClient.getUserVotingStatus(userId, month, year),
+        apiClient.getBlockedSundays(month, year)
+      ]);
+      
+      setAvailableSundays(userAvailability);
+      setCannotPlayAnyDay(votingStatus.cannotPlayAnyDay);
+      setHasVoted(votingStatus.hasVoted);
+      setBlockedSundays(blocked);
+    } catch (error) {
+      console.error('Error loading user availability:', error);
+    }
+  };
+
+  const toggleSundayAvailability = async (sunday: number) => {
+    if (!user || cannotPlayAnyDay) return;
+
+    // Check if this is a past month (before active month)
+    const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+    if (isPastMonth) {
+      warning(
+        'Mes cerrado',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
+      );
+      return;
+    }
+
+    // Check if this specific date has passed
+    const sundayDate = new Date(selectedYear, selectedMonth - 1, sunday);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+    sundayDate.setHours(0, 0, 0, 0); // Ensure sunday date is also normalized
+    
+    
+    if (sundayDate <= today) {
+      warning(
+        'Fecha pasada',
+        `${sunday} de ${getCapitalizedMonthName(selectedYear, selectedMonth)} ya ha pasado. No puedes votar por fechas que ya han ocurrido.`
+      );
+      return;
+    }
+
+    // Check if this month is beyond the 3-month voting limit
+    if (isMonthBeyondVotingLimit(selectedMonth, selectedYear)) {
+      warning(
+        'Fuera del período de votación',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: Solo puedes votar hasta 3 meses en el futuro. Este límite mantiene la flexibilidad del sistema.`
+      );
+      return;
+    }
+
+    // Check if this day is blocked (has confirmed game with 10 players)
+    const isBlocked = blockedSundays.includes(sunday);
+    
+    // If trying to add a blocked day, show warning and prevent selection
+    if (!availableSundays.includes(sunday) && isBlocked) {
+      warning(
+        'Día completo',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado con 10 jugadores. Este día está completo y no acepta más jugadores.`
+      );
+      return;
+    }
+
+    // If trying to remove a blocked day, show different messages based on user's confirmation status
+    if (availableSundays.includes(sunday) && isBlocked) {
+      const isUserConfirmed = isUserInConfirmedGame(selectedYear, selectedMonth, sunday);
+      if (isUserConfirmed) {
+        warning(
+          'Estás confirmado',
+          `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Estás confirmado en este partido. No puedes desvotar una vez que el partido ha sido confirmado.`
+        );
+      } else {
+        warning(
+          'No se puede desvotar',
+          `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${sunday}: Ya hay un partido confirmado. No puedes cambiar tu voto una vez que el partido ha sido confirmado.`
+        );
+      }
+      return;
+    }
+
+    const newAvailability = availableSundays.includes(sunday)
+      ? availableSundays.filter(s => s !== sunday)
+      : [...availableSundays, sunday];
+
+    // Filter out any past dates before sending to API to avoid validation errors
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    
+    const filteredAvailability = newAvailability.filter(day => {
+      const dayDate = new Date(selectedYear, selectedMonth - 1, day);
+      dayDate.setHours(0, 0, 0, 0);
+      return dayDate > currentDate; // Only include future dates
+    });
+
+
+    // Update UI immediately for better UX
+    setAvailableSundays(newAvailability);
+    setCannotPlayAnyDay(false);
+    
+    try {
+      await apiClient.updateMonthlyAvailability(
+        user.id,
+        selectedMonth,
+        selectedYear,
+        filteredAvailability,
+        false
+      );
+      
+      // Update UI state to match what was actually saved (remove past dates)
+      setAvailableSundays(filteredAvailability);
+      
+      // Update hasVoted state based on backend logic after successful update
+      const newHasVoted = filteredAvailability.length > 0 || false; // false because cannotPlayAnyDay is set to false
+      setHasVoted(newHasVoted);
+      
+      // Refresh blocked Sundays after voting (voting might create new games)
+      const updatedBlocked = await apiClient.getBlockedSundays(selectedMonth, selectedYear);
+      setBlockedSundays(updatedBlocked);
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      // Revert UI changes on error
+      setAvailableSundays(availableSundays);
+      setHasVoted(availableSundays.length > 0 || cannotPlayAnyDay);
+    }
+  };
+
+  const toggleCannotPlayAnyDay = async () => {
+    if (!user) return;
+
+    // Check if this is a past month (before active month)
+    const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+    if (isPastMonth) {
+      warning(
+        'Mes cerrado',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: No puedes votar en meses anteriores al mes activo. El mes activo actual es ${getCapitalizedMonthYear(activeYear, activeMonth)}.`
+      );
+      return;
+    }
+
+    // Check if this entire month has passed
+    const currentDate = new Date();
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0);
+    currentDate.setHours(0, 0, 0, 0);
+    lastDayOfMonth.setHours(23, 59, 59, 999);
+    
+    if (lastDayOfMonth < currentDate) {
+      warning(
+        'Mes pasado',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear} ya ha terminado. No puedes votar por meses que ya han pasado completamente.`
+      );
+      return;
+    }
+
+    // Check if this month is beyond the 3-month voting limit
+    if (isMonthBeyondVotingLimit(selectedMonth, selectedYear)) {
+      warning(
+        'Fuera del período de votación',
+        `${getCapitalizedMonthName(selectedYear, selectedMonth)} ${selectedYear}: Solo puedes votar hasta 3 meses en el futuro. Este límite mantiene la flexibilidad del sistema.`
+      );
+      return;
+    }
+
+    // Check if user is confirmed in any matches this month when trying to mark as unavailable
+    if (!cannotPlayAnyDay && currentUser) {
+      const userConfirmedDays = sundaysInMonth.filter(sunday => 
+        isUserInConfirmedGame(selectedYear, selectedMonth, sunday)
+      );
+      
+      if (userConfirmedDays.length > 0) {
+        const daysList = userConfirmedDays.length === 1 
+          ? `el domingo ${userConfirmedDays[0]}`
+          : `los domingos ${userConfirmedDays.slice(0, -1).join(', ')} y ${userConfirmedDays.slice(-1)[0]}`;
+        
+        warning(
+          'No podés marcarte como no disponible',
+          `Estás confirmado para ${daysList} de ${getCapitalizedMonthName(selectedYear, selectedMonth)}. No podés desanotarte de partidos ya confirmados.`
+        );
+        return;
+      }
+    }
+
+    const newCannotPlayAnyDay = !cannotPlayAnyDay;
+    const newAvailableSundays = newCannotPlayAnyDay ? [] : availableSundays;
+    
+    // Update UI immediately
+    setCannotPlayAnyDay(newCannotPlayAnyDay);
+    if (newCannotPlayAnyDay) {
+      setAvailableSundays([]);
+    }
+    
+    try {
+      await apiClient.updateMonthlyAvailability(
+        user.id,
+        selectedMonth,
+        selectedYear,
+        newAvailableSundays,
+        newCannotPlayAnyDay
+      );
+      
+      // Update hasVoted state based on backend logic after successful update
+      const newHasVoted = newAvailableSundays.length > 0 || newCannotPlayAnyDay;
+      setHasVoted(newHasVoted);
+      
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      // Revert UI changes on error
+      setCannotPlayAnyDay(!newCannotPlayAnyDay);
+      if (newCannotPlayAnyDay) {
+        setAvailableSundays(availableSundays);
+      }
+      setHasVoted(availableSundays.length > 0 || cannotPlayAnyDay);
+    }
+  };
+
+
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !currentUser) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-muted-foreground">No se pudo cargar el usuario</p>
+      </div>
+    );
+  }
+
+  const nextMonth = () => {
+    // Calculate the next month
+    let nextSelectedMonth, nextSelectedYear;
+    if (selectedMonth === 12) {
+      nextSelectedMonth = 1;
+      nextSelectedYear = selectedYear + 1;
+    } else {
+      nextSelectedMonth = selectedMonth + 1;
+      nextSelectedYear = selectedYear;
+    }
+
+    // Check if the next month would be beyond the 3-month limit
+    if (isMonthBeyondVotingLimit(nextSelectedMonth, nextSelectedYear)) {
+      warning(
+        'Límite alcanzado',
+        'Solo puedes votar hasta 3 meses en el futuro. Este límite evita la planificación excesiva y mantiene la flexibilidad del sistema.'
+      );
+      return;
+    }
+
+    setSelectedMonth(nextSelectedMonth);
+    setSelectedYear(nextSelectedYear);
+  };
+
+  const prevMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <UserIcon className="h-8 w-8 text-muted-foreground" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+              Hola, {currentUser.nickname || currentUser.name}
+            </h1>
+          </div>
+          <p className="text-sm sm:text-base text-muted-foreground ml-11">
+            Marca los domingos que puedes jugar
+          </p>
+        </div>
+
+
+        {/* Non-whitelisted User Warning */}
+        {!currentUser.isWhitelisted && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-red-950/40 border border-red-600/30' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <AlertCircle className={`h-5 w-5 ${
+                theme === 'dark' ? 'text-red-400' : 'text-red-600'
+              }`} />
+              <p className={`font-semibold text-sm ${
+                theme === 'dark' ? 'text-red-300' : 'text-red-800'
+              }`}>
+                Usuario no habilitado
+              </p>
+            </div>
+            <p className={`text-sm ml-8 ${
+              theme === 'dark' ? 'text-red-400' : 'text-red-700'
+            }`}>
+              Tu voto no está siendo contado para la creación de partidos. Necesitas ser habilitado por un administrador primero. 
+              Los votos de usuarios no habilitados no contribuyen al sistema de organización de partidos.
+            </p>
+          </div>
+        )}
+
+
+        {/* Month Navigation */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            {selectedYear > activeYear || (selectedYear === activeYear && selectedMonth > activeMonth) ? (
+              <button
+                onClick={prevMonth}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-muted-foreground rounded-lg transition-colors duration-200"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">Anterior</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2 opacity-0">
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">Anterior</span>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-lg sm:text-xl font-bold text-foreground text-center">
+                {new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString('es-ES', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                }).replace(/^\w/, c => c.toUpperCase())}
+              </h2>
+            </div>
+            
+            <button
+              onClick={nextMonth}
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-muted-foreground rounded-lg transition-colors duration-200"
+            >
+              <span className="hidden sm:inline text-sm font-medium">Siguiente</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Cannot Play Toggle */}
+          {(() => {
+            const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+            
+            if (isPastMonth) {
+              return (
+                <div className={`flex flex-col items-center justify-center gap-4 mb-6 p-4 rounded-lg ${
+                  theme === 'dark' 
+                    ? 'bg-amber-950/40 border border-amber-600/30'
+                    : 'bg-amber-50 border border-amber-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <Lock className={`h-5 w-5 ${
+                      theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+                    }`} />
+                    <span className={`text-sm font-semibold ${
+                      theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+                    }`}>
+                      Mes cerrado para votación
+                    </span>
+                  </div>
+                  <p className={`text-sm text-center ${
+                    theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
+                  }`}>
+                    No puedes votar en meses anteriores al mes activo ({getCapitalizedMonthYear(activeYear, activeMonth)})
+                  </p>
+                </div>
+              );
+            }
+            
+            const userHasConfirmedMatches = hasConfirmedMatchesInMonth(selectedYear, selectedMonth);
+            
+            // If user has confirmed matches and is not already marked as unavailable, don't show the button
+            if (userHasConfirmedMatches && !cannotPlayAnyDay) {
+              return (
+                <div className={`flex items-center justify-center gap-3 mb-6 p-4 rounded-lg ${
+                  theme === 'dark' 
+                    ? 'bg-blue-950/40 border border-blue-600/30'
+                    : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  <Trophy className={`h-5 w-5 ${
+                    theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                  }`} />
+                  <span className={`text-sm font-semibold ${
+                    theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                  }`}>
+                    Tenés partidos confirmados este mes
+                  </span>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 p-4 bg-accent/20 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">
+                  ¿No puedes jugar ningún domingo este mes?
+                </span>
+                <button
+                  onClick={toggleCannotPlayAnyDay}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${
+                    cannotPlayAnyDay
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-accent text-muted-foreground hover:bg-accent/80'
+                  }`}
+                >
+                  <Ban className="h-4 w-4" />
+                  {cannotPlayAnyDay ? 'No puedo jugar este mes' : 'Marcar como no disponible'}
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Sundays Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            {sundaysInMonth.map((sunday) => {
+              const date = new Date(selectedYear, selectedMonth - 1, sunday);
+              const isSelected = availableSundays.includes(sunday);
+              const isDisabled = cannotPlayAnyDay;
+              const isBlocked = blockedSundays.includes(sunday);
+              const isPastMonth = selectedYear < activeYear || (selectedYear === activeYear && selectedMonth < activeMonth);
+              const isUserConfirmed = isUserInConfirmedGame(selectedYear, selectedMonth, sunday);
+              
+              // Check if this specific date has passed
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const normalizedDate = new Date(date);
+              normalizedDate.setHours(0, 0, 0, 0);
+              const isPastDate = normalizedDate <= today;
+              
+              const shouldDisableClick = isDisabled || isBlocked || isPastMonth || isPastDate;
+
+              return (
+                <div
+                  key={sunday}
+                  onClick={() => !shouldDisableClick && toggleSundayAvailability(sunday)}
+                  className={`p-4 rounded-xl transition-all duration-200 ${
+                    isPastMonth || isPastDate
+                      ? 'opacity-40 cursor-not-allowed bg-accent/20 border-2 border-border'
+                      : isDisabled
+                        ? 'opacity-50 cursor-not-allowed bg-accent border-2 border-border'
+                        : isBlocked && isUserConfirmed
+                          ? `${
+                            theme === 'dark' 
+                              ? 'bg-blue-950/40 border-2 border-blue-600/30'
+                              : 'bg-blue-50 border-2 border-blue-200'
+                          } cursor-not-allowed`
+                        : isBlocked && !isUserConfirmed
+                          ? `cursor-not-allowed ${
+                            theme === 'dark' 
+                              ? 'bg-orange-950/40 border-2 border-orange-600/30'
+                              : 'bg-orange-50 border-2 border-orange-200'
+                          }`
+                        : `cursor-pointer hover:shadow-md ${isSelected
+                              ? `${
+                                theme === 'dark' 
+                                  ? 'bg-emerald-950/40 border-2 border-emerald-600/30'
+                                  : 'bg-emerald-50 border-2 border-emerald-200'
+                              }`
+                              : 'bg-card border-2 border-border hover:border-muted-foreground'
+                            }`
+                  }`}
+                >
+                  <div className="mb-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isPastMonth || isPastDate ? (
+                          <Lock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        ) : isBlocked && isUserConfirmed ? (
+                          <Trophy className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                        ) : isSelected ? (
+                          <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                        ) : isBlocked && !isSelected ? (
+                          <Ban className="h-5 w-5 text-orange-400 flex-shrink-0" />
+                        ) : (
+                          <Calendar className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {isPastMonth || isPastDate ? (
+                          <span className="text-xs bg-accent text-muted-foreground px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block">
+                            {isPastDate ? 'Pasado' : 'Cerrado'}
+                          </span>
+                        ) : isBlocked && !isUserConfirmed ? (
+                          <span className={`text-xs px-1.5 py-0.5 rounded text-center min-w-[50px] inline-block ${
+                            theme === 'dark' 
+                              ? 'bg-orange-900/40 text-orange-300'
+                              : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            Completo
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {(isBlocked && isUserConfirmed && !shouldDisableClick) || (isSelected && !shouldDisableClick) ? (
+                      <div className="flex justify-center">
+                        {isBlocked && isUserConfirmed ? (
+                          <span className={`font-semibold text-xs px-2 py-1 rounded-full ${
+                            theme === 'dark' 
+                              ? 'text-blue-200 bg-blue-900/40'
+                              : 'text-blue-700 bg-blue-100'
+                          }`}>
+                            CONFIRMADO
+                          </span>
+                        ) : (
+                          <span className={`font-semibold text-xs px-2 py-1 rounded-full ${
+                            theme === 'dark' 
+                              ? 'text-green-200 bg-green-900/40'
+                              : 'text-green-700 bg-green-100'
+                          }`}>
+                            DISPONIBLE
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                  
+                  <h3 className={`text-lg sm:text-xl font-bold mb-1 ${
+                    isPastMonth || isPastDate ? 'text-muted-foreground' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-300' : 'text-blue-700') :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-200' : 'text-emerald-700') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-300' : 'text-orange-700') : 'text-foreground'
+                  }`}>
+                    {sunday}
+                  </h3>
+                  
+                  <p className={`text-sm font-medium mb-2 ${
+                    isPastMonth || isPastDate ? 'text-muted-foreground' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600') :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-300' : 'text-emerald-600') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-600') : 'text-muted-foreground'
+                  }`}>
+                    {isPastMonth ? 'Mes cerrado' : isPastDate ? 'Fecha pasada' : isBlocked && isUserConfirmed ? '¡Estás confirmado!' : isBlocked && !isSelected ? 'Partido confirmado' : formatDate(date)}
+                  </p>
+                  
+                  <p className={`text-xs ${
+                    isPastMonth || isPastDate ? 'text-muted-foreground/60' :
+                    isBlocked && isUserConfirmed ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-500') :
+                    isSelected ? (theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500') :
+                    isBlocked ? (theme === 'dark' ? 'text-orange-400' : 'text-orange-500') : 'text-muted-foreground'
+                  }`}>
+                    {isPastMonth ? 'No se puede votar' :
+                     isPastDate ? 'Fecha ya pasada' :
+                     isBlocked && isUserConfirmed ? 'Vas a jugar este domingo' :
+                     isBlocked && !isUserConfirmed ? 'Partido confirmado - No se puede votar' :
+                     isSelected ? 'Toca para desmarcar' : 
+                     'Toca para marcar disponibilidad'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Status Message */}
+          <div className="text-center">
+            {selectedMonth === activeMonth && selectedYear === activeYear ? (
+              // Show voting status only for active month
+              (hasVoted || availableSundays.length > 0 || cannotPlayAnyDay) ? (
+                <div className={`flex items-center justify-center gap-3 p-4 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-600/30'
+                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                }`}>
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {cannotPlayAnyDay 
+                      ? 'Marcado como no disponible para este mes'
+                      : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className={`flex items-center justify-center gap-3 p-4 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'text-amber-300 bg-amber-950/40 border border-amber-600/30'
+                    : 'text-amber-700 bg-amber-50 border border-amber-200'
+                }`}>
+                  <Clock className="h-5 w-5" />
+                  <span className="font-semibold">Aún no has votado para este mes</span>
+                </div>
+              )
+            ) : (
+              // For non-active months, show current selection status
+              (availableSundays.length > 0 || cannotPlayAnyDay) ? (
+                <div className="flex items-center justify-center gap-3 text-muted-foreground bg-accent/20 p-4 rounded-xl border border-border">
+                  <CalendarCheck className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {cannotPlayAnyDay 
+                      ? 'Marcado como no disponible'
+                      : `Disponible ${availableSundays.length} domingo${availableSundays.length !== 1 ? 's' : ''}`
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-muted-foreground bg-accent/20 p-4 rounded-xl border border-border">
+                  <Calendar className="h-5 w-5" />
+                  <span className="font-semibold">Sin disponibilidad marcada</span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Floating Countdown Timer */}
+        {timeLeft && showCountdown && (
+          <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 ${
+            theme === 'dark' 
+              ? 'bg-blue-950/95 border border-blue-600/30 backdrop-blur-sm'
+              : 'bg-blue-50/95 border border-blue-200 backdrop-blur-sm'
+          } rounded-xl shadow-lg p-3 sm:p-4 max-w-[280px] sm:max-w-sm`}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Trophy className={`h-4 w-4 ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                }`} />
+                <h3 className={`text-sm font-semibold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                }`}>
+                  Próximo Partido
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCountdown(false)}
+                className={`p-1 rounded-lg hover:bg-blue-100/50 transition-colors ${
+                  theme === 'dark' 
+                    ? 'text-blue-400 hover:bg-blue-900/30' 
+                    : 'text-blue-600 hover:bg-blue-100'
+                }`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            
+            <div className={`text-xs mb-3 ${
+              theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+            }`}>
+              {(() => {
+                if (!nextMatch) return '';
+                const date = formatDate(new Date(nextMatch.date));
+                const time = nextMatch.reservationInfo?.time || '10:00';
+                return `${date} • ${time}`;
+              })()}
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className={`${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              } rounded-lg p-2`}>
+                <div className={`text-lg sm:text-xl font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  {timeLeft.days}
+                </div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                }`}>
+                  días
+                </div>
+              </div>
+              <div className={`${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              } rounded-lg p-2`}>
+                <div className={`text-lg sm:text-xl font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  {timeLeft.hours}
+                </div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                }`}>
+                  hrs
+                </div>
+              </div>
+              <div className={`${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              } rounded-lg p-2`}>
+                <div className={`text-lg sm:text-xl font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  {timeLeft.minutes}
+                </div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                }`}>
+                  min
+                </div>
+              </div>
+              <div className={`${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              } rounded-lg p-2`}>
+                <div className={`text-lg sm:text-xl font-bold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  {timeLeft.seconds}
+                </div>
+                <div className={`text-xs ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                }`}>
+                  seg
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

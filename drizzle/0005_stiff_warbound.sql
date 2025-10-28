@@ -1,0 +1,1 @@
+ALTER TABLE "day_votes" ADD COLUMN "vote_type" text DEFAULT 'yes' NOT NULL;

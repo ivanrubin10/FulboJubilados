@@ -16,7 +16,10 @@
       "Bash(timeout 10 npm run dev)",
       "Bash(rg:*)",
       "WebSearch",
-      "Bash(npx drizzle-kit:*)"
+      "Bash(npx drizzle-kit:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(/bashes)",
+      "Bash(timeout 120 npm run build:*)"
     ],
     "deny": []
   }

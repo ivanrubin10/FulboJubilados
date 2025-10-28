@@ -103,17 +103,6 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <h3 className="text-2xl font-bold text-foreground mb-8 text-center">Navegación Rápida</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {/* Calendario */}
-              <Link href="/dashboard" className="group">
-                <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 transform hover:-translate-y-1 text-center">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 mx-auto">
-                    <Calendar className="h-7 w-7 text-blue-600 dark:text-blue-300" />
-                  </div>
-                  <h4 className="text-lg font-bold text-foreground mb-2">Calendario</h4>
-                  <p className="text-sm text-muted-foreground">Votá tu disponibilidad mensual</p>
-                </div>
-              </Link>
-
               {/* Partidos */}
               <Link href="/dashboard/games" className="group">
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-lg hover:border-emerald-500/50 transition-all duration-300 transform hover:-translate-y-1 text-center">
