@@ -2,7 +2,7 @@
 
 import { Game } from '@/types';
 import { useTheme } from '@/contexts/theme-context';
-import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings } from 'lucide-react';
+import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings, Star, Crown } from 'lucide-react';
 
 interface VoterInfo {
   userId: string;
@@ -58,6 +58,12 @@ interface SundayCardProps {
   isAdmin?: boolean;
   onManageGame?: () => void;
 
+  // MVP Voting
+  hasUserVotedMVP?: boolean;
+  showMVPVoting?: boolean;
+  onToggleMVPVoting?: () => void;
+  onVoteMVP?: (playerId: string) => void;
+
   currentUserId: string;
 }
 
@@ -81,6 +87,10 @@ export function SundayCard({
   onUnvote,
   isAdmin,
   onManageGame,
+  hasUserVotedMVP,
+  showMVPVoting,
+  onToggleMVPVoting,
+  onVoteMVP,
   currentUserId
 }: SundayCardProps) {
   const { theme } = useTheme();
@@ -419,31 +429,171 @@ export function SundayCard({
                     : '🤝 Empate'}
               </div>
 
-              {/* MVP Display */}
-              {game.result.mvp && (
-                <div className={`mt-2 p-2 rounded-lg text-center ${
+              {/* MVP Display/Voting */}
+              {game.result.mvp ? (
+                // Show MVP Result - Bigger Display
+                <div className={`mt-4 p-4 rounded-lg border ${
                   theme === 'dark'
-                    ? 'bg-amber-900/40 border border-amber-600/30'
-                    : 'bg-amber-50 border border-amber-300'
+                    ? 'bg-gradient-to-r from-yellow-950/20 to-amber-950/20 border-yellow-800/30'
+                    : 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200'
                 }`}>
-                  <div className="flex items-center justify-center gap-2">
-                    <Trophy className="h-4 w-4 text-amber-500" />
-                    <span className={`text-xs font-bold ${
-                      theme === 'dark' ? 'text-amber-300' : 'text-amber-700'
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <Crown className={`h-6 w-6 ${
+                      theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
+                    }`} />
+                    <h5 className={`font-bold text-lg ${
+                      theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'
                     }`}>
-                      MVP: {(() => {
-                        const mvpIds = Array.isArray(game.result.mvp) ? game.result.mvp : [game.result.mvp];
-                        const mvpPlayers = mvpIds.map(id => {
-                          const player = voters.find(v => v.userId === id);
-                          return player?.nickname || player?.name || 'Jugador';
-                        });
-                        return mvpPlayers.join(', ');
-                      })()}
-                      {game.result.mvp === currentUserId || (Array.isArray(game.result.mvp) && game.result.mvp.includes(currentUserId)) ? ' (Tú)' : ''}
-                    </span>
+                      MVP del Partido
+                    </h5>
+                    <Crown className={`h-6 w-6 ${
+                      theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
+                    }`} />
+                  </div>
+                  <div className="text-center">
+                    {(() => {
+                      const mvpIds = Array.isArray(game.result.mvp) ? game.result.mvp : [game.result.mvp];
+                      const mvpPlayers = mvpIds.map(id => {
+                        const player = voters.find(v => v.userId === id);
+                        return player;
+                      }).filter(Boolean);
+
+                      if (mvpIds.length > 1) {
+                        return (
+                          <div className="space-y-2">
+                            <p className={`text-sm font-medium mb-3 ${
+                              theme === 'dark' ? 'text-yellow-300' : 'text-yellow-700'
+                            }`}>
+                              Empate en votación - {mvpIds.length} MVPs
+                            </p>
+                            <div className="flex items-center justify-center gap-4 flex-wrap">
+                              {mvpPlayers.map((mvpPlayer, index) => (
+                                <div key={mvpPlayer?.userId || index} className="flex items-center gap-2">
+                                  {mvpPlayer?.imageUrl && (
+                                    <img
+                                      src={mvpPlayer.imageUrl}
+                                      alt={mvpPlayer.name}
+                                      className="w-10 h-10 rounded-full border-2 border-yellow-400"
+                                    />
+                                  )}
+                                  <span className={`text-lg font-bold ${
+                                    theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'
+                                  }`}>
+                                    {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador'}
+                                    {mvpPlayer?.userId === currentUserId && ' (Tú)'}
+                                  </span>
+                                  <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        const mvpPlayer = mvpPlayers[0];
+                        return (
+                          <div className="flex items-center justify-center gap-3">
+                            {mvpPlayer?.imageUrl && (
+                              <img
+                                src={mvpPlayer.imageUrl}
+                                alt={mvpPlayer.name}
+                                className="w-14 h-14 rounded-full border-2 border-yellow-400"
+                              />
+                            )}
+                            <span className={`text-2xl font-bold ${
+                              theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'
+                            }`}>
+                              {mvpPlayer?.nickname || mvpPlayer?.name || 'Jugador'}
+                              {mvpPlayer?.userId === currentUserId && ' (Tú)'}
+                            </span>
+                            <Star className="h-6 w-6 text-yellow-500 fill-current" />
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
-              )}
+              ) : userInGame && game.status === 'completed' && onVoteMVP && onToggleMVPVoting ? (
+                // Show MVP Voting for Participants
+                <div className={`mt-4 p-4 rounded-lg border ${
+                  theme === 'dark' ? 'bg-blue-950/40 border-blue-600/30' : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className={`font-semibold flex items-center gap-2 ${
+                      theme === 'dark' ? 'text-blue-300' : 'text-blue-800'
+                    }`}>
+                      <Star className="h-5 w-5" />
+                      Votación MVP
+                    </h5>
+                    {!hasUserVotedMVP && (
+                      <button
+                        onClick={onToggleMVPVoting}
+                        className={`text-sm font-medium ${
+                          theme === 'dark' ? 'text-blue-400 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'
+                        }`}
+                      >
+                        {showMVPVoting ? 'Ocultar votación' : 'Votar MVP'}
+                      </button>
+                    )}
+                  </div>
+
+                  {hasUserVotedMVP ? (
+                    <div className="text-center">
+                      <div className={`flex items-center justify-center gap-2 mb-2 ${
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      }`}>
+                        <Trophy className="h-5 w-5" />
+                        <span className="font-medium">¡Ya votaste!</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Tu voto se registró correctamente. Los resultados se mostrarán cuando termine la votación.
+                      </p>
+                    </div>
+                  ) : showMVPVoting ? (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Vota por el mejor jugador del partido (votación anónima):
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {game.participants
+                          .map(participantId => voters.find(v => v.userId === participantId))
+                          .filter(Boolean)
+                          .map(player => (
+                            <button
+                              key={player!.userId}
+                              onClick={() => onVoteMVP(player!.userId)}
+                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                theme === 'dark'
+                                  ? 'border-blue-700/30 hover:bg-blue-900/20'
+                                  : 'border-blue-200 hover:bg-blue-100'
+                              }`}
+                            >
+                              {player!.imageUrl && (
+                                <img
+                                  src={player!.imageUrl}
+                                  alt={player!.name}
+                                  className="w-8 h-8 rounded-full"
+                                />
+                              )}
+                              <span className={`font-medium ${
+                                theme === 'dark' ? 'text-blue-200' : 'text-blue-800'
+                              }`}>
+                                {player!.nickname || player!.name}
+                              </span>
+                              <Star className={`h-4 w-4 ml-auto ${
+                                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                              }`} />
+                            </button>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">
+                      Haz clic en &quot;Votar MVP&quot; para elegir al mejor jugador del partido
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

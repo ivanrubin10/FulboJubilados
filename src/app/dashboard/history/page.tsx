@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/utils';
 import { Game, User, MvpResults } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useTheme } from '@/contexts/theme-context';
-import { Trophy, Star, Crown } from 'lucide-react';
+import { Trophy, Star, Crown, Users } from 'lucide-react';
 
 // API helper functions
 const apiClient = {
@@ -443,66 +443,144 @@ export default function HistoryPage() {
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map(game => (
                 <div key={game.id} className="border border-border rounded-lg p-4">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{formatDate(new Date(game.date))}</h3>
-                      {game.reservationInfo && (
-                        <p className="text-sm text-foreground">
-                          {game.reservationInfo.location} - {game.reservationInfo.time}
-                        </p>
-                      )}
-                    </div>
-
-                    {game.result && (
-                      <div className="text-left sm:text-right">
-                        <div className="text-2xl font-bold text-foreground">
-                          {game.result.team1Score} - {game.result.team2Score}
-                        </div>
-                        <div className="text-sm text-foreground">
-                          {game.result.team1Score > game.result.team2Score
-                            ? 'Victoria Equipo 1'
-                            : game.result.team2Score > game.result.team1Score
-                              ? 'Victoria Equipo 2'
-                              : 'Empate'
-                          }
-                        </div>
-                      </div>
+                  {/* Header with Date and Location */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-foreground">{formatDate(new Date(game.date))}</h3>
+                    {game.reservationInfo && (
+                      <p className="text-sm text-foreground">
+                        {game.reservationInfo.location} - {game.reservationInfo.time}
+                      </p>
                     )}
                   </div>
 
+                  {/* Display Teams if arranged - Matching SundayCard Style */}
                   {game.teams && (
-                    <div className="grid md:grid-cols-2 gap-4 mb-4">
-                      <div className={`p-3 rounded ${
-                        game.result && game.result.team1Score > game.result.team2Score 
-                          ? (theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200')
-                          : (theme === 'dark' ? 'bg-red-900/20 border border-red-500/30' : 'bg-red-50 border border-red-200')
-                      }`}>
-                        <h4 className={`font-medium mb-2 ${
-                          theme === 'dark' ? 'text-red-300' : 'text-red-700'
-                        }`}>
-                          Equipo 1 {game.result && `(${game.result.team1Score})`}
-                        </h4>
-                        <ul className="text-sm text-foreground">
-                          {game.teams.team1.map(playerId => (
-                            <li key={playerId}>{getPlayerName(playerId)}</li>
-                          ))}
-                        </ul>
+                    <div className={`mb-4 rounded-lg p-3 ${
+                      theme === 'dark' ? 'bg-background/70' : 'bg-white/70'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-bold text-sm text-foreground">EQUIPOS</span>
                       </div>
-                      <div className={`p-3 rounded ${
-                        game.result && game.result.team2Score > game.result.team1Score 
-                          ? (theme === 'dark' ? 'bg-green-900/20 border border-green-500/30' : 'bg-green-50 border border-green-200')
-                          : (theme === 'dark' ? 'bg-blue-900/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200')
-                      }`}>
-                        <h4 className={`font-medium mb-2 ${
-                          theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Team 1 */}
+                        <div>
+                          <div className={`text-xs font-bold mb-2 ${
+                            theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                          }`}>
+                            EQUIPO 1
+                          </div>
+                          <div className="space-y-1">
+                            {game.teams.team1.map((playerId, index) => {
+                              const player = users.find(u => u.id === playerId);
+                              return (
+                                <div key={playerId} className={`text-xs px-2 py-1 rounded ${
+                                  playerId === currentUser?.id
+                                    ? theme === 'dark'
+                                      ? 'bg-blue-900/60 text-blue-200 font-semibold'
+                                      : 'bg-blue-200 text-blue-900 font-semibold'
+                                    : theme === 'dark'
+                                      ? 'bg-slate-800/50 text-slate-300'
+                                      : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {player?.nickname || player?.name || `Jugador ${index + 1}`}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {/* Team 2 */}
+                        <div>
+                          <div className={`text-xs font-bold mb-2 ${
+                            theme === 'dark' ? 'text-red-400' : 'text-red-600'
+                          }`}>
+                            EQUIPO 2
+                          </div>
+                          <div className="space-y-1">
+                            {game.teams.team2.map((playerId, index) => {
+                              const player = users.find(u => u.id === playerId);
+                              return (
+                                <div key={playerId} className={`text-xs px-2 py-1 rounded ${
+                                  playerId === currentUser?.id
+                                    ? theme === 'dark'
+                                      ? 'bg-red-900/60 text-red-200 font-semibold'
+                                      : 'bg-red-200 text-red-900 font-semibold'
+                                    : theme === 'dark'
+                                      ? 'bg-slate-800/50 text-slate-300'
+                                      : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {player?.nickname || player?.name || `Jugador ${index + 1}`}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display Results if game is completed - Matching SundayCard Style */}
+                  {game.result && (
+                    <div className={`mb-4 rounded-lg p-3 ${
+                      theme === 'dark' ? 'bg-background/70' : 'bg-white/70'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Trophy className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-bold text-sm text-foreground">RESULTADO</span>
+                      </div>
+
+                      {/* Score Display */}
+                      <div className="flex items-center justify-center gap-4 mb-3">
+                        <div className={`text-center px-4 py-2 rounded ${
+                          game.result.team1Score > game.result.team2Score
+                            ? theme === 'dark'
+                              ? 'bg-green-900/40 text-green-300'
+                              : 'bg-green-100 text-green-700'
+                            : game.result.team1Score < game.result.team2Score
+                              ? theme === 'dark'
+                                ? 'bg-slate-800/50 text-slate-400'
+                                : 'bg-slate-100 text-slate-600'
+                              : theme === 'dark'
+                                ? 'bg-yellow-900/40 text-yellow-300'
+                                : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          Equipo 2 {game.result && `(${game.result.team2Score})`}
-                        </h4>
-                        <ul className="text-sm text-foreground">
-                          {game.teams.team2.map(playerId => (
-                            <li key={playerId}>{getPlayerName(playerId)}</li>
-                          ))}
-                        </ul>
+                          <div className="text-xs font-semibold">EQUIPO 1</div>
+                          <div className="text-2xl font-bold">{game.result.team1Score}</div>
+                        </div>
+                        <div className="text-xl font-bold text-muted-foreground">-</div>
+                        <div className={`text-center px-4 py-2 rounded ${
+                          game.result.team2Score > game.result.team1Score
+                            ? theme === 'dark'
+                              ? 'bg-green-900/40 text-green-300'
+                              : 'bg-green-100 text-green-700'
+                            : game.result.team2Score < game.result.team1Score
+                              ? theme === 'dark'
+                                ? 'bg-slate-800/50 text-slate-400'
+                                : 'bg-slate-100 text-slate-600'
+                              : theme === 'dark'
+                                ? 'bg-yellow-900/40 text-yellow-300'
+                                : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          <div className="text-xs font-semibold">EQUIPO 2</div>
+                          <div className="text-2xl font-bold">{game.result.team2Score}</div>
+                        </div>
+                      </div>
+
+                      {/* Winner/Draw Message */}
+                      <div className={`text-center text-sm font-semibold mb-2 ${
+                        game.result.team1Score === game.result.team2Score
+                          ? theme === 'dark'
+                            ? 'text-yellow-300'
+                            : 'text-yellow-700'
+                          : theme === 'dark'
+                            ? 'text-green-300'
+                            : 'text-green-700'
+                      }`}>
+                        {game.result.team1Score > game.result.team2Score
+                          ? '🏆 Ganó Equipo 1'
+                          : game.result.team2Score > game.result.team1Score
+                            ? '🏆 Ganó Equipo 2'
+                            : '🤝 Empate'}
                       </div>
                     </div>
                   )}
@@ -543,9 +621,9 @@ export default function HistoryPage() {
                                       {mvpPlayers.map((mvpPlayer, index) => (
                                         <div key={mvpPlayer?.id || index} className="flex items-center gap-2">
                                           {mvpPlayer?.imageUrl && (
-                                            <img 
-                                              src={mvpPlayer.imageUrl} 
-                                              alt={mvpPlayer.name} 
+                                            <img
+                                              src={mvpPlayer.imageUrl}
+                                              alt={mvpPlayer.name}
                                               className="w-10 h-10 rounded-full border-2 border-yellow-400"
                                             />
                                           )}
@@ -563,9 +641,9 @@ export default function HistoryPage() {
                                 return (
                                   <div className="flex items-center justify-center gap-3">
                                     {mvpPlayer?.imageUrl && (
-                                      <img 
-                                        src={mvpPlayer.imageUrl} 
-                                        alt={mvpPlayer.name} 
+                                      <img
+                                        src={mvpPlayer.imageUrl}
+                                        alt={mvpPlayer.name}
                                         className="w-12 h-12 rounded-full border-2 border-yellow-400"
                                       />
                                     )}
