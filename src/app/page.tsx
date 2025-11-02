@@ -38,7 +38,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             {isLoaded && isSignedIn && (
-              <Link href="/dashboard">
+              <Link href="/dashboard/games">
                 <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 shadow-sm transition-all duration-200">
                   Marcá tu disponibilidad
                 </button>
@@ -88,7 +88,7 @@ export default function Home() {
                   </SignUpButton>
                 </>
               ) : (
-                <Link href="/dashboard">
+                <Link href="/dashboard/games">
                   <button className="bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold hover:bg-primary/90 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
                     Marcá tu disponibilidad
                   </button>

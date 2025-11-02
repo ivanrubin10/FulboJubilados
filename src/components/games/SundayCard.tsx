@@ -2,8 +2,8 @@
 
 import { Game, MvpResults } from '@/types';
 import { useTheme } from '@/contexts/theme-context';
-import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings, Star, Crown } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings, Star, Crown, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface VoterInfo {
   userId: string;
@@ -106,6 +106,7 @@ export function SundayCard({
 }: SundayCardProps) {
   const { theme } = useTheme();
   const hasTriggeredEmailRef = useRef(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const monthYear = date.toLocaleDateString('es-ES', {
     month: 'long',
@@ -269,23 +270,39 @@ export function SundayCard({
         <div className={`rounded-lg p-4 mb-4 ${
           theme === 'dark' ? 'bg-background/50' : 'bg-white/50'
         }`}>
-          <div className="flex items-center gap-2 mb-3">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            <span className="font-bold text-foreground">
-              {game.status === 'confirmed' ? 'PARTIDO CONFIRMADO' : 'PARTIDO PROGRAMADO'}
-            </span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              <span className="font-bold text-foreground">
+                {game.status === 'confirmed' ? 'PARTIDO CONFIRMADO' : 'PARTIDO PROGRAMADO'}
+              </span>
+            </div>
+            {game.reservationInfo && (
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-blue-900/40 text-blue-300 hover:bg-blue-900/60'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                {showDetails ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Ocultar detalles
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Ver detalles
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>
-                {game.participants.length} jugadores
-                {game.waitlist && game.waitlist.length > 0 && ` + ${game.waitlist.length} en lista de espera`}
-              </span>
-            </div>
-
-            {game.reservationInfo && (
+            {game.reservationInfo && showDetails && (
               <>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
