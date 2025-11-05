@@ -47,6 +47,15 @@ export async function POST(request: NextRequest) {
         updatedSundays,
         false // cannotPlayAnyDay is false for individual yes votes
       );
+
+      // Check if this day now has 10+ players and create game/send admin notification
+      console.log(`🗳️ User ${userId} voted YES for ${day}/${month}/${year}`);
+      try {
+        await checkAndCreateGameForDay(month, year, day);
+      } catch (gameError) {
+        console.error('❌ Error checking for full game:', gameError);
+        // Don't fail the main request if game creation fails
+      }
     } else {
       // If it's a "no" vote, remove from monthly availability if present
       const currentAvailability = await DatabaseService.getUserMonthlyAvailability(userId, month, year);
@@ -103,5 +112,152 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Error removing day vote:', error);
     return NextResponse.json({ error: 'Failed to remove day vote' }, { status: 500 });
+  }
+}
+
+// Helper function to check if a specific day reached 10+ players and create game
+async function checkAndCreateGameForDay(month: number, year: number, day: number) {
+  try {
+    console.log(`🔍 Checking for full game on ${day}/${month}/${year}`);
+
+    // Get all users and filter to only whitelisted users
+    const allUsers = await DatabaseService.getUsers();
+    const whitelistedUsers = allUsers.filter(user => user.isWhitelisted);
+
+    console.log(`📊 Found ${allUsers.length} total users, ${whitelistedUsers.length} whitelisted users`);
+
+    // Get users from database with availability (only whitelisted users)
+    const dbAvailability = [];
+    for (const user of whitelistedUsers) {
+      try {
+        const userAvailability = await DatabaseService.getUserMonthlyAvailability(user.id, month, year);
+        const votingStatus = await DatabaseService.getUserVotingStatus(user.id, month, year);
+        const monthlyRecord = await DatabaseService.getUserMonthlyAvailabilityRecord(user.id, month, year);
+
+        if (userAvailability.length > 0 || votingStatus.hasVoted) {
+          dbAvailability.push({
+            userId: user.id,
+            month,
+            year,
+            availableSundays: userAvailability,
+            cannotPlayAnyDay: votingStatus.cannotPlayAnyDay,
+            hasVoted: votingStatus.hasVoted,
+            votedAt: monthlyRecord?.updatedAt || new Date(0) // Use epoch if no record found
+          });
+        }
+      } catch {
+        // User doesn't have availability in DB, skip
+      }
+    }
+
+    console.log(`🧮 Database availability: ${dbAvailability.length} total entries for ${month}/${year}`);
+
+    // Get all players available for this specific day
+    const playersAvailableOnSunday = dbAvailability.filter(
+      entry => entry.availableSundays.includes(day) && !entry.cannotPlayAnyDay
+    );
+
+    // Sort by voting timestamp (earliest votes first)
+    playersAvailableOnSunday.sort((a, b) => a.votedAt.getTime() - b.votedAt.getTime());
+
+    console.log(`📅 Day ${day}/${month}/${year}: ${playersAvailableOnSunday.length} players available`);
+    console.log(`👥 Players (by voting order): ${playersAvailableOnSunday.map((p, index) => `${index + 1}. ${p.userId}`).join(', ')}`);
+
+    if (playersAvailableOnSunday.length >= 10) {
+      console.log(`🎯 THRESHOLD REACHED! ${playersAvailableOnSunday.length} >= 10 players for ${day}/${month}/${year}`);
+      // Check if game already exists for this date
+      const gameDate = new Date(year, month - 1, day, 10, 0, 0, 0);
+      const existingGames = await DatabaseService.getAllGames();
+      const gameExists = existingGames.some(game => {
+        const existingGameDate = new Date(game.date);
+        // Compare only year, month, and day (ignore time)
+        return existingGameDate.getFullYear() === gameDate.getFullYear() &&
+               existingGameDate.getMonth() === gameDate.getMonth() &&
+               existingGameDate.getDate() === gameDate.getDate();
+      });
+
+      if (!gameExists) {
+        // Create a new game with the first 10 available players and remaining in waitlist
+        const allPotentialParticipants = playersAvailableOnSunday.map(p => p.userId);
+
+        // Double-check that all participants are whitelisted users
+        const whitelistedUserIds = new Set(whitelistedUsers.map(u => u.id));
+        const allValidParticipants = allPotentialParticipants.filter(userId => whitelistedUserIds.has(userId));
+
+        // Split into participants (first 10) and waitlist (remaining)
+        const participants = allValidParticipants.slice(0, 10);
+        const waitlist = allValidParticipants.slice(10);
+
+        console.log(`🎮 Creating game for ${day}/${month}/${year} with ${participants.length} participants and ${waitlist.length} in waitlist`);
+        console.log(`🎮 Participants (first 10 voters): ${participants.join(', ')}`);
+        console.log(`⏳ Waitlist (voters 11+): ${waitlist.join(', ')}`);
+
+        // Ensure we still have enough players after filtering
+        if (participants.length < 10) {
+          console.log(`⚠️ Not enough whitelisted players (${participants.length}/10) after filtering. Skipping game creation.`);
+          return;
+        }
+
+        const gameId = await DatabaseService.createGame({
+          date: gameDate,
+          participants,
+          waitlist,
+          status: 'scheduled'
+        });
+
+        console.log(`✅ Game created with ID: ${gameId}`);
+
+        // Trigger admin notifications for this specific game
+        console.log(`📧 Triggering admin notifications for game ${gameId}...`);
+        await DatabaseService.checkAndNotifyAdminsForSpecificGame(gameId);
+
+        console.log('✅ Admin notifications triggered successfully!');
+      } else {
+        console.log(`Game already exists for ${day}/${month}/${year} - checking for waitlist updates`);
+        // Update existing game's waitlist if new players voted
+        const existingGame = existingGames.find(game => {
+          const existingGameDate = new Date(game.date);
+          return existingGameDate.getFullYear() === gameDate.getFullYear() &&
+                 existingGameDate.getMonth() === gameDate.getMonth() &&
+                 existingGameDate.getDate() === gameDate.getDate();
+        });
+
+        if (existingGame && playersAvailableOnSunday.length > 10) {
+          const allPotentialParticipants = playersAvailableOnSunday.map(p => p.userId);
+          const whitelistedUserIds = new Set(whitelistedUsers.map(u => u.id));
+          const allValidParticipants = allPotentialParticipants.filter(userId => whitelistedUserIds.has(userId));
+
+          // Re-evaluate the entire participant and waitlist structure based on voting order
+          const currentParticipants = existingGame.participants || [];
+          const currentWaitlist = existingGame.waitlist || [];
+          const allCurrentUsers = new Set([...currentParticipants, ...currentWaitlist]);
+
+          // Find new users who weren't previously in the game at all
+          const newUsers = allValidParticipants.filter(userId => !allCurrentUsers.has(userId));
+
+          if (newUsers.length > 0) {
+            // Re-sort all users (existing + new) by voting order to maintain proper order
+            const allUsersForThisDay = playersAvailableOnSunday.filter(p =>
+              allValidParticipants.includes(p.userId)
+            ).map(p => p.userId);
+
+            // Split into participants (first 10) and waitlist (remaining)
+            const newParticipants = allUsersForThisDay.slice(0, 10);
+            const newWaitlist = allUsersForThisDay.slice(10);
+
+            await DatabaseService.updateGame(existingGame.id, {
+              participants: newParticipants,
+              waitlist: newWaitlist
+            });
+            console.log(`📝 Re-ordered participants and waitlist for existing game ${existingGame.id}`);
+            console.log(`🎮 New participants (first 10 voters): ${newParticipants.join(', ')}`);
+            console.log(`⏳ New waitlist (voters 11+): ${newWaitlist.join(', ')}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in checkAndCreateGameForDay:', error);
+    throw error;
   }
 }

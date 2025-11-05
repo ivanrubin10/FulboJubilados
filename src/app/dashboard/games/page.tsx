@@ -71,7 +71,7 @@ export default function GamesPage() {
   const [nextMonthDayVotes, setNextMonthDayVotes] = useState<DayVote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [editingGame, setEditingGame] = useState<{ game: Game; noVoters: string[] } | null>(null);
 
   const [currentMonthSundaysData, setCurrentMonthSundaysData] = useState<SundayData[]>([]);
   const [nextMonthSundaysData, setNextMonthSundaysData] = useState<SundayData[]>([]);
@@ -111,12 +111,42 @@ export default function GamesPage() {
         setCurrentUser(userData || null);
 
         // Check admin status
-        setIsAdmin(userData?.isAdmin || false);
+        const userIsAdmin = userData?.isAdmin || false;
+        setIsAdmin(userIsAdmin);
 
         // Check if user needs nickname setup
         if (!userData?.nickname) {
           router.push('/setup-nickname');
           return;
+        }
+
+        // If admin, check for any Sundays with 10+ votes that need games created
+        if (userIsAdmin) {
+          try {
+            console.log('🔄 Admin detected - checking for games that need to be created...');
+            const checkRes = await fetch('/api/admin/check-and-create-games', {
+              method: 'POST'
+            });
+            if (checkRes.ok) {
+              const result = await checkRes.json();
+              if (result.gamesCreated > 0 || result.gamesUpdated > 0) {
+                console.log(`✅ Created ${result.gamesCreated} games, updated ${result.gamesUpdated} games`);
+                // Reload games if any were created/updated
+                const newGamesRes = await fetch('/api/games');
+                const newGames = await newGamesRes.json();
+                const newGamesWithDates = newGames.map((game: Game) => ({
+                  ...game,
+                  date: new Date(game.date),
+                  createdAt: new Date(game.createdAt),
+                  updatedAt: new Date(game.updatedAt)
+                }));
+                setGames(newGamesWithDates);
+              }
+            }
+          } catch (err) {
+            console.error('Error checking for games to create:', err);
+            // Don't fail the page load if this fails
+          }
         }
 
       } catch (err) {
@@ -252,7 +282,9 @@ export default function GamesPage() {
         const userInWaitlist = game?.waitlist?.includes(currentUser.id) || false;
 
         // Determine if user can vote/unvote
+        // Users can vote/unvote on scheduled games, but not on confirmed games
         const isConfirmedGame = game?.status === 'confirmed';
+        const isScheduledGame = game?.status === 'scheduled';
 
         let canVote = !isPast && !userVoted && !userVotedNo;
         let canUnvote = (userVoted || userVotedNo) && !isConfirmedGame;
@@ -271,6 +303,7 @@ export default function GamesPage() {
           canUnvote = false;
           blockReason = 'Partido confirmado';
         }
+        // Allow voting on scheduled games - no blocking needed
 
         return {
           date,
@@ -492,8 +525,8 @@ export default function GamesPage() {
   }, [currentUser, activeMonth, activeYear, currentMonthDayVotes, nextMonthDayVotes, success, error]);
 
   // Game management handlers
-  const handleManageGame = useCallback((game: Game) => {
-    setEditingGame(game);
+  const handleManageGame = useCallback((game: Game, noVoters: string[]) => {
+    setEditingGame({ game, noVoters });
   }, []);
 
   const handleSaveGame = useCallback(async (updatedGame: Game) => {
@@ -607,7 +640,7 @@ export default function GamesPage() {
                   onVoteNo={() => handleVoteNo(sunday.dayNumber, activeYear, activeMonth)}
                   onUnvote={() => handleUnvote(sunday.dayNumber, activeYear, activeMonth)}
                   isAdmin={isAdmin}
-                  onManageGame={sunday.game ? () => handleManageGame(sunday.game!) : undefined}
+                  onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
                   currentUserId={currentUser.id}
                 />
               ))}
@@ -633,7 +666,7 @@ export default function GamesPage() {
                   onVoteNo={() => handleVoteNo(sunday.dayNumber, nextYear, nextMonth)}
                   onUnvote={() => handleUnvote(sunday.dayNumber, nextYear, nextMonth)}
                   isAdmin={isAdmin}
-                  onManageGame={sunday.game ? () => handleManageGame(sunday.game!) : undefined}
+                  onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
                   currentUserId={currentUser.id}
                 />
               ))}
@@ -652,11 +685,12 @@ export default function GamesPage() {
       {/* Edit Game Modal */}
       {editingGame && (
         <EditGameModal
-          game={editingGame}
+          game={editingGame.game}
           users={users}
           onSave={handleSaveGame}
           onClose={() => setEditingGame(null)}
           currentUserId={currentUser.id}
+          noVoters={editingGame.noVoters}
         />
       )}
     </div>

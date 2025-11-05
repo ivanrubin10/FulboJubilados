@@ -12,11 +12,12 @@ interface EditGameModalProps {
   onSave: (updatedGame: Game) => void;
   onClose: () => void;
   currentUserId: string;
+  noVoters?: string[]; // User IDs who voted "No" for this date
 }
 
 type TabType = 'info' | 'players' | 'teams';
 
-export function EditGameModal({ game, users, onSave, onClose, currentUserId }: EditGameModalProps) {
+export function EditGameModal({ game, users, onSave, onClose, currentUserId, noVoters = [] }: EditGameModalProps) {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [editedGame, setEditedGame] = useState<Game>({ ...game });
@@ -92,7 +93,8 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId }: E
   const availableUsers = users.filter(user =>
     user.isWhitelisted &&
     !participants.includes(user.id) &&
-    !waitlist.includes(user.id)
+    !waitlist.includes(user.id) &&
+    !noVoters.includes(user.id) // Don't show users who voted "No"
   );
 
   const moveToParticipants = (userId: string, fromWaitlist = false) => {

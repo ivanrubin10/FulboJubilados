@@ -413,7 +413,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -441,7 +441,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -469,7 +469,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -497,7 +497,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -525,7 +525,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -557,7 +557,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.scheduledGame, key: 'scheduledGame' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -579,16 +579,16 @@ export default function ComponentTestPage() {
               game={editableGames.scheduledWithoutUser}
               userInGame={false}
               userInWaitlist={false}
-              canVote={false}
+              canVote={true}
               canUnvote={false}
-              blockReason="Partido programado"
+              blockReason=""
               onVote={() => console.log('Vote YES')}
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.scheduledWithoutUser, key: 'scheduledWithoutUser' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -619,7 +619,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -648,7 +648,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -677,7 +677,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -708,7 +708,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.adminGame, key: 'adminGame' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -739,7 +739,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.teamsGame, key: 'teamsGame' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -772,7 +772,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTeam1Win, key: 'completedTeam1Win' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -803,7 +803,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTeam2Win, key: 'completedTeam2Win' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -834,7 +834,7 @@ export default function ComponentTestPage() {
               isAdmin={true}
               onManageGame={() => setEditingGame({ game: editableGames.completedTie, key: 'completedTie' })}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -865,7 +865,7 @@ export default function ComponentTestPage() {
               onVoteNo={() => console.log('Vote NO')}
               onUnvote={() => console.log('Unvote')}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -906,7 +906,7 @@ export default function ComponentTestPage() {
               onVoteMVP={(playerId) => handleVoteMVP(editableGames.mvpVotingGame.id, playerId)}
               onViewMVPResults={() => handleViewMVPResults(editableGames.mvpVotingGame.id)}
               currentUserId={currentUserId}
-              disableEmailNotifications={true}
+
             />
           </div>
 
@@ -1066,6 +1066,7 @@ export default function ComponentTestPage() {
           onSave={handleSaveGame}
           onClose={() => setEditingGame(null)}
           currentUserId={currentUserId}
+          noVoters={[]}
         />
       )}
     </div>

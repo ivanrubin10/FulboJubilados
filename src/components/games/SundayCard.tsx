@@ -3,7 +3,7 @@
 import { Game, MvpResults } from '@/types';
 import { useTheme } from '@/contexts/theme-context';
 import { Calendar, Users, Trophy, Clock, MapPin, DollarSign, CheckCircle, Ban, Lock, AlertCircle, Settings, Star, Crown, ChevronDown, ChevronUp } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 interface VoterInfo {
   userId: string;
@@ -69,9 +69,6 @@ interface SundayCardProps {
   onFinalizeMVP?: () => void;
 
   currentUserId: string;
-
-  // Testing
-  disableEmailNotifications?: boolean;
 }
 
 export function SundayCard({
@@ -101,11 +98,9 @@ export function SundayCard({
   onViewMVPResults,
   mvpResults,
   onFinalizeMVP,
-  currentUserId,
-  disableEmailNotifications = false
+  currentUserId
 }: SundayCardProps) {
   const { theme } = useTheme();
-  const hasTriggeredEmailRef = useRef(false);
   const [showDetails, setShowDetails] = useState(false);
 
   const monthYear = date.toLocaleDateString('es-ES', {
@@ -114,42 +109,6 @@ export function SundayCard({
   });
 
   const fullDate = `Domingo ${dayNumber} de ${monthYear}`;
-
-  // Trigger admin email when votes reach 10
-  useEffect(() => {
-    const triggerAdminEmail = async () => {
-      if (disableEmailNotifications) return;
-
-      if (totalVotes === 10 && !hasTriggeredEmailRef.current && game && game.status !== 'confirmed' && game.status !== 'completed') {
-        hasTriggeredEmailRef.current = true;
-        console.log('🔔 10 votes reached! Triggering admin email notification...');
-
-        try {
-          const response = await fetch('/api/send-match-confirmation', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              gameId: game.id,
-              date: game.date,
-              participants: game.participants,
-            }),
-          });
-
-          if (response.ok) {
-            console.log('✅ Admin email notification sent successfully');
-          } else {
-            console.error('❌ Failed to send admin email notification');
-          }
-        } catch (error) {
-          console.error('❌ Error sending admin email:', error);
-        }
-      }
-    };
-
-    triggerAdminEmail();
-  }, [totalVotes, game, disableEmailNotifications]);
 
   // Determine card state and styling
   const getCardStyle = () => {
@@ -204,8 +163,8 @@ export function SundayCard({
           </h3>
         </div>
 
-        {/* Vote Buttons on Right */}
-        {!isPast && (!game || (game.status !== 'scheduled' && game.status !== 'confirmed' && game.status !== 'completed')) ? (
+        {/* Vote Buttons on Right - Show for no game, scheduled, or any non-confirmed/non-completed status */}
+        {!isPast && (!game || (game.status !== 'confirmed' && game.status !== 'completed')) ? (
           <div className="flex flex-col gap-2 min-w-[140px]">
             <div className="flex gap-2">
               <button
