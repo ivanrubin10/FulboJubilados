@@ -236,7 +236,8 @@ export function SundayCard({
                 {game.status === 'confirmed' ? 'PARTIDO CONFIRMADO' : 'PARTIDO PROGRAMADO'}
               </span>
             </div>
-            {game.reservationInfo && (
+            {/* Toggle button - only show for non-confirmed games */}
+            {game.reservationInfo && game.status !== 'confirmed' && (
               <button
                 onClick={() => setShowDetails(!showDetails)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -261,7 +262,8 @@ export function SundayCard({
           </div>
 
           <div className="space-y-2 text-sm">
-            {game.reservationInfo && showDetails && (
+            {/* Always show details for confirmed games, otherwise respect showDetails toggle */}
+            {game.reservationInfo && (game.status === 'confirmed' || showDetails) && (
               <>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
@@ -790,8 +792,8 @@ export function SundayCard({
         </div>
       )}
 
-      {/* Non-voters list */}
-      {!isPast && nonVoters.length > 0 && (
+      {/* Non-voters list - only show when no game exists or game is not scheduled/confirmed/completed */}
+      {!isPast && nonVoters.length > 0 && !game && (
         <div className={`rounded-lg p-4 mt-4 ${
           theme === 'dark' ? 'bg-background/50' : 'bg-white/50'
         }`}>
