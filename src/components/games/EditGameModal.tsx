@@ -93,8 +93,7 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
   const availableUsers = users.filter(user =>
     user.isWhitelisted &&
     !participants.includes(user.id) &&
-    !waitlist.includes(user.id) &&
-    !noVoters.includes(user.id) // Don't show users who voted "No"
+    !waitlist.includes(user.id)
   );
 
   const moveToParticipants = (userId: string, fromWaitlist = false) => {
