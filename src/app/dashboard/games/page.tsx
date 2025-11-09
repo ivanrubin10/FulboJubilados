@@ -4,7 +4,7 @@ import { useUser } from '@clerk/nextjs';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, getCapitalizedMonthYear } from '@/lib/utils';
-import { Game, User } from '@/types';
+import { Game, User, MvpResults } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useTheme } from '@/contexts/theme-context';
 import { SundayCard } from '@/components/games/SundayCard';
@@ -75,6 +75,12 @@ export default function GamesPage() {
 
   const [currentMonthSundaysData, setCurrentMonthSundaysData] = useState<SundayData[]>([]);
   const [nextMonthSundaysData, setNextMonthSundaysData] = useState<SundayData[]>([]);
+
+  // MVP voting state
+  const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
+  const [mvpResults, setMvpResults] = useState<{[gameId: string]: MvpResults}>({});
+  const [votedGames, setVotedGames] = useState<{[gameId: string]: boolean}>({});
+  const [voteStatusLoading, setVoteStatusLoading] = useState<{[gameId: string]: boolean}>({});
 
   // Load initial data
   useEffect(() => {
@@ -193,6 +199,23 @@ export default function GamesPage() {
 
     loadMonthsData();
   }, [currentUser, activeMonth, activeYear]);
+
+  // Load vote status for completed games on initial load
+  useEffect(() => {
+    if (currentUser && games.length > 0) {
+      const completedGamesWithResults = games.filter(game =>
+        game.status === 'completed' &&
+        game.result &&
+        game.participants.includes(currentUser.id)
+      );
+
+      completedGamesWithResults.forEach(game => {
+        if (votedGames[game.id] === undefined) {
+          loadVoteStatus(game.id);
+        }
+      });
+    }
+  }, [currentUser, games, votedGames]);
 
   // Build Sunday data for both months
   useEffect(() => {
@@ -556,6 +579,151 @@ export default function GamesPage() {
     }
   }, [success, error]);
 
+  const handleAddResult = useCallback(async (gameId: string, team1Score: number, team2Score: number, notes: string) => {
+    try {
+      const updates = {
+        status: 'completed' as const,
+        result: {
+          team1Score,
+          team2Score,
+          notes,
+        },
+        updatedAt: new Date()
+      };
+
+      const res = await fetch(`/api/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      if (!res.ok) throw new Error('Failed to add result');
+
+      // Update local state
+      setGames(prev => prev.map(game =>
+        game.id === gameId ? { ...game, ...updates } : game
+      ));
+
+      success('Resultado guardado', 'El resultado del partido se ha guardado correctamente');
+
+      // Reload to refresh all data
+      window.location.reload();
+    } catch (err) {
+      console.error('Error adding result:', err);
+      error('Error al guardar', 'No se pudo guardar el resultado del partido');
+    }
+  }, [success, error]);
+
+  // MVP voting helper functions
+  const hasUserVotedForGame = (gameId: string): boolean => {
+    return votedGames[gameId] === true;
+  };
+
+  const loadVoteStatus = async (gameId: string) => {
+    setVoteStatusLoading(prev => ({ ...prev, [gameId]: true }));
+    try {
+      const res = await fetch(`/api/games/${gameId}/mvp/voted`);
+      if (!res.ok) throw new Error('Failed to check vote status');
+      const result = await res.json();
+      setVotedGames(prev => ({ ...prev, [gameId]: result.hasVoted }));
+    } catch (error) {
+      console.error('Error loading vote status:', error);
+      setVotedGames(prev => ({ ...prev, [gameId]: false }));
+    } finally {
+      setVoteStatusLoading(prev => ({ ...prev, [gameId]: false }));
+    }
+  };
+
+  const loadMVPResults = async (gameId: string) => {
+    try {
+      const res = await fetch(`/api/games/${gameId}/mvp/results`);
+      if (!res.ok) throw new Error('Failed to fetch MVP results');
+      const results = await res.json();
+      setMvpResults(prev => ({ ...prev, [gameId]: results }));
+    } catch (error) {
+      console.error('Error loading MVP results:', error);
+    }
+  };
+
+  const submitMVPVote = async (gameId: string, votedForId: string) => {
+    try {
+      const res = await fetch(`/api/games/${gameId}/mvp/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ votedForId })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to submit MVP vote');
+      }
+
+      setVotedGames(prev => ({ ...prev, [gameId]: true }));
+      success('Voto enviado', 'Tu voto para MVP se envió correctamente');
+
+      // Refresh MVP results
+      await loadMVPResults(gameId);
+
+      // Hide voting UI
+      setShowMVPVoting(prev => ({ ...prev, [gameId]: false }));
+    } catch (err) {
+      console.error('Error voting MVP:', err);
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo enviar el voto para MVP';
+      error('Error al votar', errorMessage);
+    }
+  };
+
+  const finalizeMVP = async (gameId: string) => {
+    try {
+      const res = await fetch(`/api/games/${gameId}/mvp/finalize`, {
+        method: 'POST'
+      });
+
+      if (!res.ok) throw new Error('Failed to finalize MVP');
+
+      success('MVP finalizado', 'El MVP se ha establecido correctamente');
+
+      // Refresh games to get updated result with MVP
+      const gamesRes = await fetch('/api/games');
+      const allGames = await gamesRes.json();
+
+      const gamesWithFixedDates = allGames.map((game: Game) => ({
+        ...game,
+        date: new Date(game.date),
+        createdAt: new Date(game.createdAt),
+        updatedAt: new Date(game.updatedAt),
+      }));
+
+      setGames(gamesWithFixedDates);
+
+      // Refresh MVP results
+      await loadMVPResults(gameId);
+    } catch (err) {
+      console.error('Error finalizing MVP:', err);
+      error('Error al finalizar MVP', 'No se pudo establecer el MVP');
+    }
+  };
+
+  const handleToggleMVPVoting = useCallback((gameId: string) => {
+    setShowMVPVoting(prev => ({
+      ...prev,
+      [gameId]: !prev[gameId]
+    }));
+  }, []);
+
+  const handleViewMVPResults = useCallback(async (gameId: string) => {
+    try {
+      await loadMVPResults(gameId);
+      setShowMVPVoting(prev => ({
+        ...prev,
+        [gameId]: true
+      }));
+    } catch (err) {
+      console.error('Error loading MVP results:', err);
+      error('Error', 'No se pudieron cargar los resultados');
+    }
+  }, [error]);
+
 
   if (!isLoaded || isLoading) {
     return (
@@ -641,6 +809,14 @@ export default function GamesPage() {
                   onUnvote={() => handleUnvote(sunday.dayNumber, activeYear, activeMonth)}
                   isAdmin={isAdmin}
                   onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
+                  onAddResult={sunday.game ? (team1Score, team2Score, notes) => handleAddResult(sunday.game!.id, team1Score, team2Score, notes) : undefined}
+                  hasUserVotedMVP={sunday.game ? hasUserVotedForGame(sunday.game.id) : false}
+                  showMVPVoting={sunday.game ? showMVPVoting[sunday.game.id] : false}
+                  onToggleMVPVoting={sunday.game ? () => handleToggleMVPVoting(sunday.game!.id) : undefined}
+                  onVoteMVP={sunday.game ? (playerId) => submitMVPVote(sunday.game!.id, playerId) : undefined}
+                  onViewMVPResults={sunday.game ? () => handleViewMVPResults(sunday.game!.id) : undefined}
+                  mvpResults={sunday.game ? mvpResults[sunday.game.id] : undefined}
+                  onFinalizeMVP={sunday.game ? () => finalizeMVP(sunday.game!.id) : undefined}
                   currentUserId={currentUser.id}
                 />
               ))}
@@ -667,6 +843,14 @@ export default function GamesPage() {
                   onUnvote={() => handleUnvote(sunday.dayNumber, nextYear, nextMonth)}
                   isAdmin={isAdmin}
                   onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
+                  onAddResult={sunday.game ? (team1Score, team2Score, notes) => handleAddResult(sunday.game!.id, team1Score, team2Score, notes) : undefined}
+                  hasUserVotedMVP={sunday.game ? hasUserVotedForGame(sunday.game.id) : false}
+                  showMVPVoting={sunday.game ? showMVPVoting[sunday.game.id] : false}
+                  onToggleMVPVoting={sunday.game ? () => handleToggleMVPVoting(sunday.game!.id) : undefined}
+                  onVoteMVP={sunday.game ? (playerId) => submitMVPVote(sunday.game!.id, playerId) : undefined}
+                  onViewMVPResults={sunday.game ? () => handleViewMVPResults(sunday.game!.id) : undefined}
+                  mvpResults={sunday.game ? mvpResults[sunday.game.id] : undefined}
+                  onFinalizeMVP={sunday.game ? () => finalizeMVP(sunday.game!.id) : undefined}
                   currentUserId={currentUser.id}
                 />
               ))}

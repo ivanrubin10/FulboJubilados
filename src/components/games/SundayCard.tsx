@@ -58,6 +58,7 @@ interface SundayCardProps {
   // Admin
   isAdmin?: boolean;
   onManageGame?: () => void;
+  onAddResult?: (team1Score: number, team2Score: number, notes: string) => void;
 
   // MVP Voting
   hasUserVotedMVP?: boolean;
@@ -91,6 +92,7 @@ export function SundayCard({
   onUnvote,
   isAdmin,
   onManageGame,
+  onAddResult,
   hasUserVotedMVP,
   showMVPVoting,
   onToggleMVPVoting,
@@ -102,6 +104,12 @@ export function SundayCard({
 }: SundayCardProps) {
   const { theme } = useTheme();
   const [showDetails, setShowDetails] = useState(false);
+  const [showResultForm, setShowResultForm] = useState(false);
+  const [resultForm, setResultForm] = useState({
+    team1Score: 0,
+    team2Score: 0,
+    notes: '',
+  });
 
   const monthYear = date.toLocaleDateString('es-ES', {
     month: 'long',
@@ -109,6 +117,36 @@ export function SundayCard({
   });
 
   const fullDate = `Domingo ${dayNumber} de ${monthYear}`;
+
+  // Check if we should show add result button (same day after match hour)
+  const shouldShowAddResult = () => {
+    if (!game || !isAdmin || !onAddResult) return false;
+    if (game.status === 'completed') return false;
+    if (game.status !== 'confirmed') return false;
+
+    const now = new Date();
+    const gameDate = new Date(game.date);
+
+    // Check if it's the same day
+    const isSameDay = now.getDate() === gameDate.getDate() &&
+                      now.getMonth() === gameDate.getMonth() &&
+                      now.getFullYear() === gameDate.getFullYear();
+
+    if (!isSameDay) return false;
+
+    // Parse game time and check if current time is after match time
+    if (game.reservationInfo?.time) {
+      const [hours, minutes] = game.reservationInfo.time.split(':').map(Number);
+      const matchTime = new Date(gameDate);
+      matchTime.setHours(hours, minutes, 0, 0);
+
+      return now >= matchTime;
+    }
+
+    return false;
+  };
+
+  const canAddResult = shouldShowAddResult();
 
   // Determine card state and styling
   const getCardStyle = () => {
@@ -233,7 +271,8 @@ export function SundayCard({
             <div className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
               <span className="font-bold text-foreground">
-                {game.status === 'confirmed' ? 'PARTIDO CONFIRMADO' : 'PARTIDO PROGRAMADO'}
+                {game.status === 'completed' ? 'PARTIDO COMPLETADO' :
+                 game.status === 'confirmed' ? 'PARTIDO CONFIRMADO' : 'PARTIDO PROGRAMADO'}
               </span>
             </div>
             {/* Toggle button - only show for non-confirmed games */}
@@ -454,6 +493,22 @@ export function SundayCard({
                     ? '🏆 Ganó Equipo 2'
                     : '🤝 Empate'}
               </div>
+
+              {/* Notes Display */}
+              {game.result.notes && (
+                <div className={`mt-3 p-3 rounded-lg border ${
+                  theme === 'dark'
+                    ? 'bg-slate-900/40 border-slate-700/30'
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="text-xs font-semibold text-muted-foreground mb-1">
+                    Notas del partido:
+                  </div>
+                  <div className="text-sm text-foreground whitespace-pre-wrap">
+                    {game.result.notes}
+                  </div>
+                </div>
+              )}
 
               {/* MVP Display/Voting */}
               {game.result.mvp ? (
@@ -739,19 +794,119 @@ export function SundayCard({
             </div>
           )}
 
-          {/* Admin Game Management Button */}
-          {isAdmin && onManageGame && (
-            <button
-              onClick={onManageGame}
-              className={`mt-4 w-full px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                theme === 'dark'
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              <Settings className="h-4 w-4" />
-              Gestionar Partido
-            </button>
+          {/* Admin Game Management Buttons */}
+          {isAdmin && (
+            <div className="mt-4 space-y-2">
+              {/* Add Result Button - Show on same day after match hour */}
+              {canAddResult && !showResultForm && (
+                <button
+                  onClick={() => setShowResultForm(true)}
+                  className={`w-full px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                    theme === 'dark'
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                >
+                  <Trophy className="h-4 w-4" />
+                  Agregar Resultado
+                </button>
+              )}
+
+              {/* Result Form */}
+              {showResultForm && canAddResult && (
+                <div className={`p-4 rounded-lg border ${
+                  theme === 'dark' ? 'bg-background/70 border-border' : 'bg-white border-gray-200'
+                }`}>
+                  <h4 className="font-medium mb-3 text-foreground">Agregar resultado</h4>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Goles Equipo 1
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={resultForm.team1Score}
+                        onChange={(e) => setResultForm(prev => ({
+                          ...prev,
+                          team1Score: parseInt(e.target.value) || 0
+                        }))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Goles Equipo 2
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={resultForm.team2Score}
+                        onChange={(e) => setResultForm(prev => ({
+                          ...prev,
+                          team2Score: parseInt(e.target.value) || 0
+                        }))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Notas (opcional)
+                    </label>
+                    <textarea
+                      value={resultForm.notes}
+                      onChange={(e) => setResultForm(prev => ({ ...prev, notes: e.target.value }))}
+                      className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
+                      rows={3}
+                      placeholder="Comentarios sobre el partido..."
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (onAddResult) {
+                          onAddResult(resultForm.team1Score, resultForm.team2Score, resultForm.notes);
+                          setShowResultForm(false);
+                          setResultForm({ team1Score: 0, team2Score: 0, notes: '' });
+                        }
+                      }}
+                      className="flex-1 bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
+                    >
+                      Guardar Resultado
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowResultForm(false);
+                        setResultForm({ team1Score: 0, team2Score: 0, notes: '' });
+                      }}
+                      className="flex-1 bg-accent text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent/80"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Manage Game Button - Only show for non-completed games */}
+              {onManageGame && game?.status !== 'completed' && (
+                <button
+                  onClick={onManageGame}
+                  className={`w-full px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                    theme === 'dark'
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  <Settings className="h-4 w-4" />
+                  Gestionar Partido
+                </button>
+              )}
+            </div>
           )}
         </div>
       ) : totalVotes > 0 ? (

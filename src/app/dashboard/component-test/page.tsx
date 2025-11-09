@@ -21,6 +21,77 @@ export default function ComponentTestPage() {
 
   // Initialize editable games state
   const [editableGames, setEditableGames] = useState<Record<string, Game>>({
+    sameDayBeforeMatch: {
+      id: 'same-day-before-id',
+      date: (() => {
+        const sameDayDate = new Date(today);
+        sameDayDate.setHours(18, 0, 0, 0); // Match at 6 PM today
+        return sameDayDate;
+      })(),
+      status: 'confirmed',
+      participants: ['user1', 'user2', 'user3', currentUserId, 'user5', 'user6', 'user7', 'user8', 'user9', 'user10'],
+      waitlist: [],
+      reservationInfo: {
+        location: 'Cancha Test',
+        time: '18:00',
+        cost: 200,
+        reservedBy: 'admin',
+      },
+      teams: {
+        team1: ['user1', 'user2', 'user3', currentUserId, 'user5'],
+        team2: ['user6', 'user7', 'user8', 'user9', 'user10']
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    sameDayAfterMatch: {
+      id: 'same-day-after-id',
+      date: (() => {
+        const sameDayDate = new Date(today);
+        sameDayDate.setHours(10, 0, 0, 0); // Match was at 10 AM today (already passed)
+        return sameDayDate;
+      })(),
+      status: 'confirmed',
+      participants: ['user1', 'user2', 'user3', currentUserId, 'user5', 'user6', 'user7', 'user8', 'user9', 'user10'],
+      waitlist: [],
+      reservationInfo: {
+        location: 'Cancha Test',
+        time: '10:00',
+        cost: 200,
+        reservedBy: 'admin',
+      },
+      teams: {
+        team1: ['user1', 'user2', 'user3', currentUserId, 'user5'],
+        team2: ['user6', 'user7', 'user8', 'user9', 'user10']
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    completedWithNotes: {
+      id: 'completed-with-notes-id',
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last week
+      status: 'completed',
+      participants: ['user1', 'user2', 'user3', currentUserId, 'user5', 'user6', 'user7', 'user8', 'user9', 'user10'],
+      waitlist: [],
+      reservationInfo: {
+        location: 'Cancha Test',
+        time: '10:00',
+        cost: 200,
+        reservedBy: 'admin',
+      },
+      teams: {
+        team1: ['user1', 'user2', 'user3', currentUserId, 'user5'],
+        team2: ['user6', 'user7', 'user8', 'user9', 'user10']
+      },
+      result: {
+        team1Score: 6,
+        team2Score: 4,
+        notes: 'Gran partido! Muchos goles y buena actitud de todos los jugadores. El equipo 1 dominó en el segundo tiempo.',
+        mvp: 'user1'
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
     scheduledGame: {
       id: 'threshold-game-id',
       date: new Date(nextSunday),
@@ -248,6 +319,26 @@ export default function ComponentTestPage() {
       [gameId]: true
     }));
     alert('📊 Aquí verías los resultados de la votación MVP (funcionalidad de admin)');
+  };
+
+  const handleAddResult = (gameKey: string, team1Score: number, team2Score: number, notes: string) => {
+    console.log(`Adding result for game ${gameKey}: ${team1Score}-${team2Score}`, notes);
+
+    setEditableGames(prev => ({
+      ...prev,
+      [gameKey]: {
+        ...prev[gameKey],
+        status: 'completed',
+        result: {
+          team1Score,
+          team2Score,
+          notes
+        },
+        updatedAt: new Date()
+      }
+    }));
+
+    alert(`✅ Resultado agregado: Equipo 1 ${team1Score} - ${team2Score} Equipo 2${notes ? '\n\nNotas: ' + notes : ''}`);
   };
 
   useEffect(() => {
@@ -743,11 +834,82 @@ export default function ComponentTestPage() {
             />
           </div>
 
+          <h2 className="text-2xl font-bold text-foreground mb-4 mt-8">📝 AGREGAR RESULTADO (mismo día después de la hora del partido)</h2>
+
+          {/* Add Result Test - Before Match Time */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">13. Mismo día ANTES de la hora del partido - NO muestra botón de resultado</h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              El partido es HOY a las 18:00. Como aún no es hora del partido, el botón &quot;Agregar Resultado&quot; NO aparece.
+            </p>
+            <SundayCard
+              date={editableGames.sameDayBeforeMatch.date}
+              dayNumber={editableGames.sameDayBeforeMatch.date.getDate()}
+              isPast={false}
+              userVoted={true}
+              userVotedNo={false}
+              userVoteTimestamp={new Date()}
+              totalVotes={10}
+              userPositionInQueue={3}
+              voters={mockVoters(10, true)}
+              noVoters={[]}
+              nonVoters={[]}
+              game={editableGames.sameDayBeforeMatch}
+              userInGame={true}
+              userInWaitlist={false}
+              canVote={false}
+              canUnvote={false}
+              blockReason="Estás confirmado en este partido"
+              onVote={() => console.log('Vote YES')}
+              onVoteNo={() => console.log('Vote NO')}
+              onUnvote={() => console.log('Unvote')}
+              isAdmin={true}
+              onManageGame={() => setEditingGame({ game: editableGames.sameDayBeforeMatch, key: 'sameDayBeforeMatch' })}
+              onAddResult={(team1Score, team2Score, notes) => handleAddResult('sameDayBeforeMatch', team1Score, team2Score, notes)}
+              currentUserId={currentUserId}
+            />
+          </div>
+
+          {/* Add Result Test - After Match Time */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">14. Mismo día DESPUÉS de la hora del partido - Muestra botón &quot;Agregar Resultado&quot;</h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              El partido era HOY a las 10:00. Como ya pasó la hora, el botón verde &quot;Agregar Resultado&quot; aparece para el admin.
+              Haz clic para agregar el resultado y ver cómo cambia el estado del partido.
+            </p>
+            <SundayCard
+              date={editableGames.sameDayAfterMatch.date}
+              dayNumber={editableGames.sameDayAfterMatch.date.getDate()}
+              isPast={false}
+              userVoted={true}
+              userVotedNo={false}
+              userVoteTimestamp={new Date()}
+              totalVotes={10}
+              userPositionInQueue={3}
+              voters={mockVoters(10, true)}
+              noVoters={[]}
+              nonVoters={[]}
+              game={editableGames.sameDayAfterMatch}
+              userInGame={true}
+              userInWaitlist={false}
+              canVote={false}
+              canUnvote={false}
+              blockReason="Estás confirmado en este partido"
+              onVote={() => console.log('Vote YES')}
+              onVoteNo={() => console.log('Vote NO')}
+              onUnvote={() => console.log('Unvote')}
+              isAdmin={true}
+              onManageGame={() => setEditingGame({ game: editableGames.sameDayAfterMatch, key: 'sameDayAfterMatch' })}
+              onAddResult={(team1Score, team2Score, notes) => handleAddResult('sameDayAfterMatch', team1Score, team2Score, notes)}
+              currentUserId={currentUserId}
+            />
+          </div>
+
           <h2 className="text-2xl font-bold text-foreground mb-4 mt-8">🏆 PARTIDOS COMPLETADOS (con resultados)</h2>
 
-          {/* State 13: Completed game - Team 1 won */}
+          {/* State 15: Completed game - Team 1 won */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">13. Partido COMPLETADO - Equipo 1 ganó 5-3</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">15. Partido COMPLETADO - Equipo 1 ganó 5-3</h2>
             <SundayCard
               date={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
               dayNumber={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).getDate()}
@@ -776,9 +938,41 @@ export default function ComponentTestPage() {
             />
           </div>
 
-          {/* State 14: Completed game - Team 2 won - User was MVP */}
+          {/* State 16: Completed game with notes */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">14. Partido COMPLETADO - Equipo 2 ganó 4-2 - Usuario fue MVP</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">16. Partido COMPLETADO - Con NOTAS del partido</h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              Este ejemplo muestra cómo se ven las notas del partido cuando se agregan resultados.
+            </p>
+            <SundayCard
+              date={editableGames.completedWithNotes.date}
+              dayNumber={editableGames.completedWithNotes.date.getDate()}
+              isPast={false}
+              userVoted={true}
+              userVotedNo={false}
+              userVoteTimestamp={new Date()}
+              totalVotes={10}
+              userPositionInQueue={3}
+              voters={mockVoters(10, true)}
+              noVoters={[]}
+              nonVoters={[]}
+              game={editableGames.completedWithNotes}
+              userInGame={true}
+              userInWaitlist={false}
+              canVote={false}
+              canUnvote={false}
+              blockReason=""
+              onVote={() => console.log('Vote YES')}
+              onVoteNo={() => console.log('Vote NO')}
+              onUnvote={() => console.log('Unvote')}
+              isAdmin={true}
+              currentUserId={currentUserId}
+            />
+          </div>
+
+          {/* State 17: Completed game - Team 2 won - User was MVP */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">17. Partido COMPLETADO - Equipo 2 ganó 4-2 - Usuario fue MVP</h2>
             <SundayCard
               date={new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)}
               dayNumber={new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).getDate()}
@@ -807,9 +1001,9 @@ export default function ComponentTestPage() {
             />
           </div>
 
-          {/* State 15: Completed game - Tie */}
+          {/* State 18: Completed game - Tie */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">15. Partido COMPLETADO - Empate 3-3</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">18. Partido COMPLETADO - Empate 3-3</h2>
             <SundayCard
               date={new Date(Date.now() - 21 * 24 * 60 * 60 * 1000)}
               dayNumber={new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).getDate()}
@@ -840,9 +1034,9 @@ export default function ComponentTestPage() {
 
           <h2 className="text-2xl font-bold text-foreground mb-4 mt-8">🕒 PARTIDO PASADO (sin resultado)</h2>
 
-          {/* State 16: Past game without results */}
+          {/* State 19: Past game without results */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">16. Partido pasado sin resultado (Gris)</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">19. Partido pasado sin resultado (Gris)</h2>
             <SundayCard
               date={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
               dayNumber={1}
@@ -873,7 +1067,7 @@ export default function ComponentTestPage() {
 
           {/* MVP Voting Example */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">17. Partido completado - Votación MVP activa</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">20. Partido completado - Votación MVP activa</h2>
             <p className="text-sm text-muted-foreground mb-3">
               Este ejemplo muestra la votación de MVP para un partido completado. El usuario puede votar por el mejor jugador.
             </p>
@@ -917,7 +1111,7 @@ export default function ComponentTestPage() {
 
           {/* History Card Example 1 - With MVP */}
           <div>
-            <h2 className="text-xl font-semibold mb-3 text-foreground">18. Partido completado con MVP - Estilo Historial</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">21. Partido completado con MVP - Estilo Historial</h2>
             <div className="border border-border rounded-lg p-4 bg-card">
               <div className="mb-4">
                 <h3 className="font-semibold text-foreground">Domingo 1 de diciembre de 2024</h3>
@@ -995,7 +1189,7 @@ export default function ComponentTestPage() {
 
           {/* History Card Example 2 - Draw */}
           <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-3 text-foreground">19. Partido empatado - Estilo Historial</h2>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">22. Partido empatado - Estilo Historial</h2>
             <div className="border border-border rounded-lg p-4 bg-card">
               <div className="mb-4">
                 <h3 className="font-semibold text-foreground">Domingo 24 de noviembre de 2024</h3>

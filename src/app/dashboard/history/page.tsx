@@ -245,24 +245,24 @@ export default function HistoryPage() {
     new Date(game.date) < new Date()
   );
 
-  const addResult = async (gameId: string) => {
+  const addResult = async (gameId: string, team1Score?: number, team2Score?: number, notes?: string) => {
     try {
       const updates = {
         status: 'completed' as const,
         result: {
-          team1Score: resultForm.team1Score,
-          team2Score: resultForm.team2Score,
-          notes: resultForm.notes,
+          team1Score: team1Score !== undefined ? team1Score : resultForm.team1Score,
+          team2Score: team2Score !== undefined ? team2Score : resultForm.team2Score,
+          notes: notes !== undefined ? notes : resultForm.notes,
         },
         updatedAt: new Date()
       };
-      
+
       await apiClient.updateGame(gameId, updates);
-      
-      const updatedGames = games.map(game => 
+
+      const updatedGames = games.map(game =>
         game.id === gameId ? { ...game, ...updates } : game
       );
-      
+
       setGames(updatedGames);
       setSelectedGame(null);
       setResultForm({ team1Score: 0, team2Score: 0, notes: '' });
@@ -393,10 +393,11 @@ export default function HistoryPage() {
                           type="number"
                           min="0"
                           value={resultForm.team1Score}
-                          onChange={(e) => setResultForm(prev => ({ 
-                            ...prev, 
-                            team1Score: parseInt(e.target.value) || 0 
+                          onChange={(e) => setResultForm(prev => ({
+                            ...prev,
+                            team1Score: parseInt(e.target.value) || 0
                           }))}
+                          onFocus={(e) => e.target.select()}
                           placeholder="0"
                           className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
                         />
@@ -409,10 +410,11 @@ export default function HistoryPage() {
                           type="number"
                           min="0"
                           value={resultForm.team2Score}
-                          onChange={(e) => setResultForm(prev => ({ 
-                            ...prev, 
-                            team2Score: parseInt(e.target.value) || 0 
+                          onChange={(e) => setResultForm(prev => ({
+                            ...prev,
+                            team2Score: parseInt(e.target.value) || 0
                           }))}
+                          onFocus={(e) => e.target.select()}
                           placeholder="0"
                           className="w-full border border-border rounded-md px-3 py-2 text-foreground bg-background placeholder:text-muted-foreground"
                         />
@@ -432,7 +434,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => addResult(game.id)}
+                        onClick={() => addResult(game.id, undefined, undefined, undefined)}
                         className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-700 dark:hover:bg-green-600"
                       >
                         Guardar Resultado
@@ -481,7 +483,7 @@ export default function HistoryPage() {
                     key={game.id}
                     date={gameDate}
                     dayNumber={gameDate.getDate()}
-                    isPast={true}
+                    isPast={false}
                     userVoted={game.participants.includes(currentUser?.id || '')}
                     userVotedNo={false}
                     userVoteTimestamp={null}
@@ -495,7 +497,7 @@ export default function HistoryPage() {
                     userInWaitlist={false}
                     canVote={false}
                     canUnvote={false}
-                    blockReason="Partido finalizado"
+                    blockReason=""
                     onVote={() => {}}
                     onVoteNo={() => {}}
                     onUnvote={() => {}}
