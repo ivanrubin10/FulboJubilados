@@ -143,10 +143,10 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 mt-6">
+          <div className="flex flex-wrap gap-2 mt-6">
             <button
               onClick={() => setActiveTab('info')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-base transition-all ${
                 activeTab === 'info'
                   ? theme === 'dark'
                     ? 'bg-blue-600 text-white'
@@ -155,11 +155,12 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
               }`}
             >
               <Info className="h-4 w-4" />
-              Información
+              <span className="hidden sm:inline">Información</span>
+              <span className="sm:hidden">Info</span>
             </button>
             <button
               onClick={() => setActiveTab('players')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-base transition-all ${
                 activeTab === 'players'
                   ? theme === 'dark'
                     ? 'bg-blue-600 text-white'
@@ -168,11 +169,12 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
               }`}
             >
               <Users className="h-4 w-4" />
-              Jugadores ({participants.length}/10)
+              <span className="hidden sm:inline">Jugadores ({participants.length}/10)</span>
+              <span className="sm:hidden">Jugad. ({participants.length}/10)</span>
             </button>
             <button
               onClick={() => setActiveTab('teams')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-base transition-all ${
                 activeTab === 'teams'
                   ? theme === 'dark'
                     ? 'bg-blue-600 text-white'
@@ -181,7 +183,8 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
               }`}
             >
               <Trophy className="h-4 w-4" />
-              Equipos
+              <span className="hidden sm:inline">Equipos</span>
+              <span className="sm:hidden">Equip.</span>
             </button>
           </div>
         </div>

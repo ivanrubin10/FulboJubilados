@@ -377,34 +377,34 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        <div className="p-8">
-          <div className="flex items-center justify-between p-6 bg-accent/20 rounded-xl border border-border">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+        <div className="p-4 sm:p-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-6 bg-accent/20 rounded-xl border border-border">
+            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                 theme === 'dark' ? 'bg-slate-700' : 'bg-amber-100'
               }`}>
                 {theme === 'dark' ? (
-                  <Moon className="h-6 w-6 text-slate-300" />
+                  <Moon className="h-5 w-5 sm:h-6 sm:w-6 text-slate-300" />
                 ) : (
-                  <Sun className="h-6 w-6 text-amber-600" />
+                  <Sun className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
                 )}
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base sm:text-lg font-semibold text-foreground">
                   Modo {theme === 'dark' ? 'Oscuro' : 'Claro'}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  {theme === 'dark' 
-                    ? 'Interfaz oscura para reducir la fatiga visual' 
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {theme === 'dark'
+                    ? 'Interfaz oscura para reducir la fatiga visual'
                     : 'Interfaz clara y brillante'
                   }
                 </p>
               </div>
             </div>
-            
+
             <button
               onClick={toggleTheme}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background flex-shrink-0 ${
                 theme === 'dark' ? 'bg-primary' : 'bg-gray-300'
               }`}
             >
