@@ -11,6 +11,10 @@ export interface EmailNotificationData {
   html: string;
   text?: string;
   from?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+  }>;
 }
 
 export class EmailService {
@@ -72,6 +76,7 @@ export class EmailService {
         subject: data.subject,
         html: data.html,
         text: data.text,
+        attachments: data.attachments,
         headers: {
           'List-Unsubscribe': `<${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
@@ -270,13 +275,13 @@ export class EmailService {
     }, 'voting_reminder');
   }
 
-  async sendMatchConfirmation(data: { 
-    to: string; 
-    name: string; 
-    gameDate: Date; 
-    location: string; 
-    time: string; 
-    cost?: number; 
+  async sendMatchConfirmation(data: {
+    to: string;
+    name: string;
+    gameDate: Date;
+    location: string;
+    time: string;
+    cost?: number;
     reservedBy: string;
     mapsLink?: string;
     paymentAlias?: string;
@@ -284,12 +289,27 @@ export class EmailService {
     const subject = `Partido confirmado - ${data.gameDate.toLocaleDateString('es-ES')}`;
     const html = this.generateIndividualMatchConfirmationEmail(data);
     const text = this.generateIndividualMatchConfirmationEmailText(data);
-    
+
+    // Generate ICS calendar file
+    const icsContent = calendarService.generateMatchICS(
+      data.gameDate,
+      data.time,
+      data.location,
+      data.to,
+      data.mapsLink
+    );
+
     return this.sendEmail({
       to: [data.to],
       subject,
       html,
       text,
+      attachments: [
+        {
+          filename: 'partido-futbol.ics',
+          content: icsContent
+        }
+      ]
     }, 'match_confirmation');
   }
 
@@ -425,12 +445,17 @@ export class EmailService {
                 ${data.paymentAlias ? `<p><strong>💳 Alias para transferir:</strong> ${data.paymentAlias}${data.cost ? ` <span style="color: #059669; font-weight: bold; margin-left: 10px;">(ARS $${(data.cost / 10).toFixed(0)} por persona)</span>` : ''}</p>` : ''}
               </div>
               
+              <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+                <h4 style="margin-top: 0; color: #1e40af;">📅 Invitación de Calendario Adjunta</h4>
+                <p style="margin-bottom: 0; color: #1e40af;">Este email incluye un archivo de calendario adjunto (partido-futbol.ics). Haz clic en el archivo adjunto para agregar automáticamente el partido a tu calendario con un recordatorio de 1 hora antes.</p>
+              </div>
+
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games" style="background: linear-gradient(135deg, #059669, #047857); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin-right: 10px; border: 1px solid #047857;">
                   Ver Detalles del Partido
                 </a>
                 <a href="${this.generateCalendarLink(data)}" target="_blank" style="background: linear-gradient(135deg, #d97706, #b45309); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; border: 1px solid #b45309;">
-                  📅 Agregar al Calendario
+                  📅 Abrir en Google Calendar
                 </a>
               </div>
             </div>
@@ -847,8 +872,12 @@ ${data.cost ? `- Costo: ARS $${data.cost}` : ''}
 - Reservado por: ${data.reservedBy}
 ${data.paymentAlias ? `- Alias para transferir: ${data.paymentAlias}${costPerPerson ? ` (ARS $${costPerPerson} por persona)` : ''}` : ''}
 
+📅 INVITACIÓN DE CALENDARIO ADJUNTA:
+Este email incluye un archivo de calendario adjunto (partido-futbol.ics).
+Haz clic en el archivo adjunto para agregar automáticamente el partido a tu calendario con un recordatorio de 1 hora antes.
+
 Ver detalles del partido: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard/games
-Agregar al calendario: ${this.generateCalendarLink(data)}
+Abrir en Google Calendar: ${this.generateCalendarLink(data)}
 
 ---
 ${this.organizationName}

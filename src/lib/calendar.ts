@@ -62,7 +62,7 @@ export class CalendarService {
     }
   }
 
-  private generateICS(event: CalendarEvent): string {
+  public generateICS(event: CalendarEvent): string {
     const formatDate = (date: Date): string => {
       // Format date in local timezone for ICS
       const year = date.getFullYear();
@@ -71,30 +71,70 @@ export class CalendarService {
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
       const seconds = String(date.getSeconds()).padStart(2, '0');
-      
+
       return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     };
+
+    const now = new Date();
+    const dtstamp = formatDate(now);
 
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Futbol Organizer//ES',
+      'CALSCALE:GREGORIAN',
+      'METHOD:REQUEST',
       'BEGIN:VEVENT',
       `UID:${event.id}@futbol-organizer.com`,
+      `DTSTAMP:${dtstamp}`,
       `DTSTART:${formatDate(event.startTime)}`,
       `DTEND:${formatDate(event.endTime)}`,
       `SUMMARY:${event.title}`,
       `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
       event.location ? `LOCATION:${event.location}` : '',
-      `ORGANIZER:mailto:admin@futbol-organizer.com`,
-      ...event.attendees.map(email => `ATTENDEE:mailto:${email}`),
+      `ORGANIZER;CN=Fulbo Jubilados:mailto:admin@futbol-organizer.com`,
+      ...event.attendees.map(email => `ATTENDEE;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:${email}`),
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
+      'TRANSP:OPAQUE',
+      `BEGIN:VALARM`,
+      `TRIGGER:-PT1H`,
+      `ACTION:DISPLAY`,
+      `DESCRIPTION:Recordatorio: Partido de Fútbol en 1 hora`,
+      `END:VALARM`,
       'END:VEVENT',
       'END:VCALENDAR'
     ].filter(line => line.length > 0).join('\r\n');
 
     return icsContent;
+  }
+
+  // Generate ICS file for match confirmation
+  public generateMatchICS(
+    gameDate: Date,
+    time: string,
+    location: string,
+    attendeeEmail: string,
+    mapsLink?: string
+  ): string {
+    const [hours, minutes] = time.split(':').map(Number);
+    const startTime = new Date(gameDate);
+    startTime.setHours(hours, minutes, 0, 0);
+
+    const endTime = new Date(startTime);
+    endTime.setHours(startTime.getHours() + 1);
+
+    const event: CalendarEvent = {
+      id: `futbol_${Date.now()}_${gameDate.getTime()}`,
+      title: 'Partido de Fútbol',
+      description: `Partido confirmado de Fulbo Jubilados.\\n\\nUbicación: ${location}${mapsLink ? `\\nMapa: ${mapsLink}` : ''}`,
+      startTime,
+      endTime,
+      location: mapsLink ? `${location} - ${mapsLink}` : location,
+      attendees: [attendeeEmail]
+    };
+
+    return this.generateICS(event);
   }
 
   async updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<boolean> {
