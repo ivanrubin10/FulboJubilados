@@ -88,7 +88,7 @@ export default function RankingsPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!isLoaded || !user) return;
+      if (!isLoaded) return;
 
       setIsLoading(true);
       try {
@@ -98,7 +98,7 @@ export default function RankingsPage() {
           apiClient.getAllMVPVotes()
         ]);
 
-        const userData = allUsers.find((u: User) => u.id === user.id);
+        const userData = user ? allUsers.find((u: User) => u.id === user.id) : null;
 
         // Fix dates that might be serialized as strings
         const gamesWithFixedDates = allGames.map((game: Game) => ({
@@ -240,10 +240,6 @@ export default function RankingsPage() {
         </div>
       </div>
     );
-  }
-
-  if (!currentUser) {
-    return <div className="flex justify-center items-center min-h-screen">Usuario no encontrado</div>;
   }
 
   const teamStats = getTeamStats();

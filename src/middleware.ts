@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 
 // Define which routes require authentication
 const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
+  '/dashboard/games(.*)',
+  '/dashboard/profile(.*)',
+  '/dashboard/component-test(.*)',
+  '/dashboard$',
   '/setup-nickname',
 ]);
 

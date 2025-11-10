@@ -1,10 +1,9 @@
 'use client';
 
-import { UserButton, useUser } from '@clerk/nextjs';
+import { UserButton, useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Settings, BarChart3, Trophy, Menu, X, Lock, User, TrendingUp } from 'lucide-react';
+import { Settings, BarChart3, Trophy, Menu, X, User, TrendingUp } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -12,7 +11,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [, setIsCheckingAdmin] = useState(true);
@@ -20,7 +18,7 @@ export default function DashboardLayout({
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!isLoaded || !user) return;
-      
+
       setIsCheckingAdmin(true);
       try {
         const response = await fetch('/api/check-admin');
@@ -53,22 +51,6 @@ export default function DashboardLayout({
     );
   }
 
-  // Redirect to home page if not authenticated
-  if (!isSignedIn) {
-    router.push('/');
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary flex items-center justify-center">
-        <div className="bg-card/70 backdrop-blur-sm rounded-2xl shadow-lg border border-border p-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-200 to-orange-200 dark:from-red-800 dark:to-orange-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Lock className="h-8 w-8 text-red-600 dark:text-red-300" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">Acceso Requerido</h2>
-          <p className="text-muted-foreground font-medium mb-4">Redirigiendo a la página principal...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary">
       <nav className="glass-morphism border-b border-white/20 sticky top-0 z-50">
@@ -82,13 +64,15 @@ export default function DashboardLayout({
                 <h1 className="text-lg sm:text-xl font-bold text-foreground text-shadow-soft tracking-tight">Fulbo Jubilados</h1>
               </Link>
               <div className="hidden md:flex space-x-2">
-                <Link
-                  href="/dashboard/games"
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
-                >
-                  <Trophy className="h-4 w-4" />
-                  Partidos
-                </Link>
+                {isSignedIn && (
+                  <Link
+                    href="/dashboard/games"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  >
+                    <Trophy className="h-4 w-4" />
+                    Partidos
+                  </Link>
+                )}
                 <Link
                   href="/dashboard/history"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
@@ -103,16 +87,18 @@ export default function DashboardLayout({
                   <TrendingUp className="h-4 w-4" />
                   Rankings
                 </Link>
-                <Link 
-                  href="/dashboard/profile" 
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
-                >
-                  <User className="h-4 w-4" />
-                  Perfil
-                </Link>
+                {isSignedIn && (
+                  <Link
+                    href="/dashboard/profile"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
+                  >
+                    <User className="h-4 w-4" />
+                    Perfil
+                  </Link>
+                )}
                 {isAdmin && (
-                  <Link 
-                    href="/dashboard/admin" 
+                  <Link
+                    href="/dashboard/admin"
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-4 py-2 rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm text-sm"
                   >
                     <Settings className="h-4 w-4" />
@@ -132,7 +118,15 @@ export default function DashboardLayout({
                   <Menu className="h-6 w-6" />
                 )}
               </button>
-              <UserButton />
+              {isSignedIn ? (
+                <UserButton />
+              ) : (
+                <SignInButton mode="modal">
+                  <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300">
+                    Iniciar Sesión
+                  </button>
+                </SignInButton>
+              )}
             </div>
           </div>
           
@@ -140,14 +134,16 @@ export default function DashboardLayout({
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t border-border/20">
               <div className="flex flex-col space-y-2 pt-4">
-                <Link
-                  href="/dashboard/games"
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Trophy className="h-4 w-4" />
-                  Partidos
-                </Link>
+                {isSignedIn && (
+                  <Link
+                    href="/dashboard/games"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Trophy className="h-4 w-4" />
+                    Partidos
+                  </Link>
+                )}
                 <Link
                   href="/dashboard/history"
                   className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
@@ -164,17 +160,19 @@ export default function DashboardLayout({
                   <TrendingUp className="h-4 w-4" />
                   Rankings
                 </Link>
-                <Link 
-                  href="/dashboard/profile" 
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="h-4 w-4" />
-                  Perfil
-                </Link>
+                {isSignedIn && (
+                  <Link
+                    href="/dashboard/profile"
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <User className="h-4 w-4" />
+                    Perfil
+                  </Link>
+                )}
                 {isAdmin && (
-                  <Link 
-                    href="/dashboard/admin" 
+                  <Link
+                    href="/dashboard/admin"
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 px-3 py-2 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >

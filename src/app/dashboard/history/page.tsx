@@ -97,8 +97,8 @@ export default function HistoryPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!isLoaded || !user) return;
-      
+      if (!isLoaded) return;
+
       setIsLoading(true);
       try {
         const [allUsers, allGames, mvpVotesResponse] = await Promise.all([
@@ -106,9 +106,9 @@ export default function HistoryPage() {
           apiClient.getGames(),
           apiClient.getMVPVotesData()
         ]);
-        
-        const userData = allUsers.find((u: User) => u.id === user.id);
-        
+
+        const userData = user ? allUsers.find((u: User) => u.id === user.id) : null;
+
         // Fix dates that might be serialized as strings
         const gamesWithFixedDates = allGames.map((game: Game) => ({
           ...game,
@@ -116,7 +116,7 @@ export default function HistoryPage() {
           createdAt: new Date(game.createdAt),
           updatedAt: new Date(game.updatedAt),
         }));
-        
+
         // Process MVP votes data
         const votesMap: {[playerId: string]: number} = {};
         if (mvpVotesResponse.success) {
@@ -124,7 +124,7 @@ export default function HistoryPage() {
             votesMap[voteData.playerId] = voteData.totalVotes;
           });
         }
-        
+
         setUsers(allUsers);
         setGames(gamesWithFixedDates);
         setCurrentUser(userData || null);
@@ -310,10 +310,6 @@ export default function HistoryPage() {
     );
   }
 
-  if (!currentUser) {
-    return <div className="flex justify-center items-center min-h-screen">Usuario no encontrado</div>;
-  }
-
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="bg-card rounded-lg shadow-md p-6 mb-6">
@@ -341,7 +337,7 @@ export default function HistoryPage() {
                     )}
                   </div>
 
-                  {currentUser.isAdmin && (
+                  {currentUser?.isAdmin && (
                     <button
                       onClick={() => setSelectedGame(game.id)}
                       className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm sm:text-base w-full sm:w-auto"
