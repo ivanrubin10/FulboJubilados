@@ -19,7 +19,8 @@
       "Bash(npx drizzle-kit:*)",
       "Bash(timeout 5 node:*)",
       "Bash(/bashes)",
-      "Bash(timeout 120 npm run build:*)"
+      "Bash(timeout 120 npm run build:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }

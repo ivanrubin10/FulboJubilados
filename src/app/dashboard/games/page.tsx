@@ -1,7 +1,7 @@
 'use client';
 
 import { useUser } from '@clerk/nextjs';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSundaysInMonth, getCapitalizedMonthYear } from '@/lib/utils';
 import { Game, User, MvpResults } from '@/types';
@@ -81,6 +81,40 @@ export default function GamesPage() {
   const [mvpResults, setMvpResults] = useState<{[gameId: string]: MvpResults}>({});
   const [votedGames, setVotedGames] = useState<{[gameId: string]: boolean}>({});
   const [voteStatusLoading, setVoteStatusLoading] = useState<{[gameId: string]: boolean}>({});
+
+  // Calculate effective month/year - ensure we don't show past months
+  const { effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear } = useMemo(() => {
+    const today = new Date();
+    const realMonth = today.getMonth() + 1;
+    const realYear = today.getFullYear();
+
+    const settingsDate = new Date(activeYear, activeMonth - 1, 1);
+    const realMonthDate = new Date(realYear, realMonth - 1, 1);
+
+    let effMonth = activeMonth;
+    let effYear = activeYear;
+
+    if (settingsDate < realMonthDate) {
+      // Settings point to a past month, use real current month instead
+      effMonth = realMonth;
+      effYear = realYear;
+    }
+
+    // Calculate next month
+    let nextM = effMonth + 1;
+    let nextY = effYear;
+    if (nextM > 12) {
+      nextM = 1;
+      nextY += 1;
+    }
+
+    return {
+      effectiveMonth: effMonth,
+      effectiveYear: effYear,
+      effectiveNextMonth: nextM,
+      effectiveNextYear: nextY
+    };
+  }, [activeMonth, activeYear]);
 
   // Load initial data
   useEffect(() => {
@@ -172,18 +206,10 @@ export default function GamesPage() {
       if (!currentUser) return;
 
       try {
-        // Calculate next month
-        let nextMonth = activeMonth + 1;
-        let nextYear = activeYear;
-        if (nextMonth > 12) {
-          nextMonth = 1;
-          nextYear += 1;
-        }
-
-        // Fetch day votes for both months
+        // Fetch day votes for both months using effective months
         const [currentMonthVotesRes, nextMonthVotesRes] = await Promise.all([
-          fetch(`/api/day-votes?year=${activeYear}&month=${activeMonth}`),
-          fetch(`/api/day-votes?year=${nextYear}&month=${nextMonth}`)
+          fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
+          fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
         ]);
 
         const currentVotes = await currentMonthVotesRes.json();
@@ -198,7 +224,7 @@ export default function GamesPage() {
     };
 
     loadMonthsData();
-  }, [currentUser, activeMonth, activeYear]);
+  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear]);
 
   // Load vote status for completed games on initial load
   useEffect(() => {
@@ -223,14 +249,6 @@ export default function GamesPage() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    // Calculate next month
-    let nextMonth = activeMonth + 1;
-    let nextYear = activeYear;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear += 1;
-    }
 
     // Build data for current month
     const buildMonthData = (year: number, month: number, monthDayVotes: DayVote[]) => {
@@ -350,12 +368,12 @@ export default function GamesPage() {
       });
     };
 
-    const currentData = buildMonthData(activeYear, activeMonth, currentMonthDayVotes);
-    const nextData = buildMonthData(nextYear, nextMonth, nextMonthDayVotes);
+    const currentData = buildMonthData(effectiveYear, effectiveMonth, currentMonthDayVotes);
+    const nextData = buildMonthData(effectiveNextYear, effectiveNextMonth, nextMonthDayVotes);
 
     setCurrentMonthSundaysData(currentData);
     setNextMonthSundaysData(nextData);
-  }, [currentUser, users, games, currentMonthDayVotes, nextMonthDayVotes, activeMonth, activeYear]);
+  }, [currentUser, users, games, currentMonthDayVotes, nextMonthDayVotes, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear]);
 
   const handleVote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
@@ -368,7 +386,7 @@ export default function GamesPage() {
       voteType: 'yes'
     };
 
-    const isCurrentMonth = year === activeYear && month === activeMonth;
+    const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
 
     if (isCurrentMonth) {
       setCurrentMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
@@ -394,16 +412,9 @@ export default function GamesPage() {
       if (!response.ok) throw new Error('Failed to vote');
 
       // Silently sync with server data in background
-      let nextMonth = activeMonth + 1;
-      let nextYear = activeYear;
-      if (nextMonth > 12) {
-        nextMonth = 1;
-        nextYear += 1;
-      }
-
       const [currentVotesRes, nextVotesRes] = await Promise.all([
-        fetch(`/api/day-votes?year=${activeYear}&month=${activeMonth}`),
-        fetch(`/api/day-votes?year=${nextYear}&month=${nextMonth}`)
+        fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
+        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
       ]);
 
       const currentVotes = await currentVotesRes.json();
@@ -421,7 +432,7 @@ export default function GamesPage() {
       }
       error('Error', 'No se pudo registrar el voto');
     }
-  }, [currentUser, activeMonth, activeYear, success, error]);
+  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, success, error]);
 
   const handleVoteNo = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
@@ -434,7 +445,7 @@ export default function GamesPage() {
       voteType: 'no'
     };
 
-    const isCurrentMonth = year === activeYear && month === activeMonth;
+    const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
 
     if (isCurrentMonth) {
       setCurrentMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
@@ -460,16 +471,9 @@ export default function GamesPage() {
       if (!response.ok) throw new Error('Failed to vote');
 
       // Silently sync with server data in background
-      let nextMonth = activeMonth + 1;
-      let nextYear = activeYear;
-      if (nextMonth > 12) {
-        nextMonth = 1;
-        nextYear += 1;
-      }
-
       const [currentVotesRes, nextVotesRes] = await Promise.all([
-        fetch(`/api/day-votes?year=${activeYear}&month=${activeMonth}`),
-        fetch(`/api/day-votes?year=${nextYear}&month=${nextMonth}`)
+        fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
+        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
       ]);
 
       const currentVotes = await currentVotesRes.json();
@@ -487,12 +491,12 @@ export default function GamesPage() {
       }
       error('Error', 'No se pudo registrar el voto');
     }
-  }, [currentUser, activeMonth, activeYear, success, error]);
+  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, success, error]);
 
   const handleUnvote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
-    const isCurrentMonth = year === activeYear && month === activeMonth;
+    const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
 
     // Store previous vote for rollback if needed
     const previousVote = isCurrentMonth
@@ -516,16 +520,9 @@ export default function GamesPage() {
       if (!response.ok) throw new Error('Failed to unvote');
 
       // Silently sync with server data in background
-      let nextMonth = activeMonth + 1;
-      let nextYear = activeYear;
-      if (nextMonth > 12) {
-        nextMonth = 1;
-        nextYear += 1;
-      }
-
       const [currentVotesRes, nextVotesRes] = await Promise.all([
-        fetch(`/api/day-votes?year=${activeYear}&month=${activeMonth}`),
-        fetch(`/api/day-votes?year=${nextYear}&month=${nextMonth}`)
+        fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
+        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
       ]);
 
       const currentVotes = await currentVotesRes.json();
@@ -545,7 +542,7 @@ export default function GamesPage() {
       }
       error('Error', 'No se pudo eliminar el voto');
     }
-  }, [currentUser, activeMonth, activeYear, currentMonthDayVotes, nextMonthDayVotes, success, error]);
+  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, currentMonthDayVotes, nextMonthDayVotes, success, error]);
 
   // Game management handlers
   const handleManageGame = useCallback((game: Game, noVoters: string[]) => {
@@ -744,14 +741,6 @@ export default function GamesPage() {
     );
   }
 
-  // Calculate next month for display
-  let nextMonth = activeMonth + 1;
-  let nextYear = activeYear;
-  if (nextMonth > 12) {
-    nextMonth = 1;
-    nextYear += 1;
-  }
-
   return (
     <div className="min-h-screen bg-background py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -796,7 +785,7 @@ export default function GamesPage() {
             <div className="flex items-center gap-3 mb-4">
               <Calendar className="h-6 w-6 text-muted-foreground" />
               <h2 className="text-2xl font-bold text-foreground">
-                {getCapitalizedMonthYear(activeYear, activeMonth)}
+                {getCapitalizedMonthYear(effectiveYear, effectiveMonth)}
               </h2>
             </div>
             <div className="space-y-4">
@@ -804,9 +793,9 @@ export default function GamesPage() {
                 <SundayCard
                   key={`current-${sunday.dayNumber}`}
                   {...sunday}
-                  onVote={() => handleVote(sunday.dayNumber, activeYear, activeMonth)}
-                  onVoteNo={() => handleVoteNo(sunday.dayNumber, activeYear, activeMonth)}
-                  onUnvote={() => handleUnvote(sunday.dayNumber, activeYear, activeMonth)}
+                  onVote={() => handleVote(sunday.dayNumber, effectiveYear, effectiveMonth)}
+                  onVoteNo={() => handleVoteNo(sunday.dayNumber, effectiveYear, effectiveMonth)}
+                  onUnvote={() => handleUnvote(sunday.dayNumber, effectiveYear, effectiveMonth)}
                   isAdmin={isAdmin}
                   onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
                   onAddResult={sunday.game ? (team1Score, team2Score, notes) => handleAddResult(sunday.game!.id, team1Score, team2Score, notes) : undefined}
@@ -830,7 +819,7 @@ export default function GamesPage() {
             <div className="flex items-center gap-3 mb-4">
               <Calendar className="h-6 w-6 text-muted-foreground" />
               <h2 className="text-2xl font-bold text-foreground">
-                {getCapitalizedMonthYear(nextYear, nextMonth)}
+                {getCapitalizedMonthYear(effectiveNextYear, effectiveNextMonth)}
               </h2>
             </div>
             <div className="space-y-4">
@@ -838,9 +827,9 @@ export default function GamesPage() {
                 <SundayCard
                   key={`next-${sunday.dayNumber}`}
                   {...sunday}
-                  onVote={() => handleVote(sunday.dayNumber, nextYear, nextMonth)}
-                  onVoteNo={() => handleVoteNo(sunday.dayNumber, nextYear, nextMonth)}
-                  onUnvote={() => handleUnvote(sunday.dayNumber, nextYear, nextMonth)}
+                  onVote={() => handleVote(sunday.dayNumber, effectiveNextYear, effectiveNextMonth)}
+                  onVoteNo={() => handleVoteNo(sunday.dayNumber, effectiveNextYear, effectiveNextMonth)}
+                  onUnvote={() => handleUnvote(sunday.dayNumber, effectiveNextYear, effectiveNextMonth)}
                   isAdmin={isAdmin}
                   onManageGame={sunday.game ? () => handleManageGame(sunday.game!, sunday.noVoters.map(v => v.userId)) : undefined}
                   onAddResult={sunday.game ? (team1Score, team2Score, notes) => handleAddResult(sunday.game!.id, team1Score, team2Score, notes) : undefined}
