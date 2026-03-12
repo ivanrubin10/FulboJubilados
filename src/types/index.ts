@@ -6,6 +6,7 @@ export interface User {
   imageUrl?: string;
   isAdmin: boolean;
   isWhitelisted: boolean; // For counting towards matches (excludes test users)
+  isBot: boolean; // Bot players that fill spots but are excluded from stats
   createdAt: Date;
   updatedAt?: Date;
 }

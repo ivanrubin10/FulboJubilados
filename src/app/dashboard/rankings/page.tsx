@@ -160,7 +160,7 @@ export default function RankingsPage() {
 
       [...team1, ...team2].forEach(playerId => {
         const player = users.find(u => u.id === playerId);
-        if (!stats[playerId] && player) {
+        if (!stats[playerId] && player && !player.isBot) {
           // Count MVP votes for this player from games in the selected quarter
           const votesForPlayer = quarterMvpVotes.filter(vote => vote.votedForId === playerId).length;
 
@@ -738,9 +738,9 @@ export default function RankingsPage() {
         // Calcular ausencias para cada jugador activo
         const playerAbsences: Record<string, { player: User; attended: number; totalGames: number; absences: number }> = {};
 
-        // Inicializar todos los jugadores activos (whitelisted, no admin)
+        // Inicializar todos los jugadores activos (whitelisted, no admin, no bot)
         users.forEach(user => {
-          if (user.isWhitelisted && !user.isAdmin) {
+          if (user.isWhitelisted && !user.isAdmin && !user.isBot) {
             playerAbsences[user.id] = {
               player: user,
               attended: 0,

@@ -43,6 +43,13 @@
       "when": 1761509407201,
       "tag": "0005_stiff_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1762000000000,
+      "tag": "0006_add_is_bot",
+      "breakpoints": true
     }
   ]
 }

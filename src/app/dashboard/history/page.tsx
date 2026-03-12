@@ -470,7 +470,8 @@ export default function HistoryPage() {
                     nickname: player?.nickname,
                     imageUrl: player?.imageUrl,
                     votedAt: new Date(),
-                    position: index + 1
+                    position: index + 1,
+                    isBot: player?.isBot ?? false,
                   };
                 });
 

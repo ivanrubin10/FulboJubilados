@@ -12,6 +12,7 @@ interface VoterInfo {
   imageUrl?: string;
   votedAt: Date;
   position: number;
+  isBot?: boolean;
 }
 
 interface UserInfo {
@@ -385,8 +386,12 @@ export function SundayCard({
                     {game.teams.team1.map((playerId, index) => {
                       const player = voters.find(v => v.userId === playerId);
                       return (
-                        <div key={playerId} className={`text-xs px-2 py-1 rounded ${
-                          playerId === currentUserId
+                        <div key={playerId} className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                          player?.isBot
+                            ? theme === 'dark'
+                              ? 'bg-purple-900/40 text-purple-300'
+                              : 'bg-purple-100 text-purple-700'
+                            : playerId === currentUserId
                             ? theme === 'dark'
                               ? 'bg-blue-900/60 text-blue-200 font-semibold'
                               : 'bg-blue-200 text-blue-900 font-semibold'
@@ -395,6 +400,7 @@ export function SundayCard({
                               : 'bg-slate-100 text-slate-700'
                         }`}>
                           {player?.nickname || player?.name || `Jugador ${index + 1}`}
+                          {player?.isBot && <span className="font-bold font-mono text-[10px] opacity-70">BOT</span>}
                         </div>
                       );
                     })}
@@ -411,8 +417,12 @@ export function SundayCard({
                     {game.teams.team2.map((playerId, index) => {
                       const player = voters.find(v => v.userId === playerId);
                       return (
-                        <div key={playerId} className={`text-xs px-2 py-1 rounded ${
-                          playerId === currentUserId
+                        <div key={playerId} className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                          player?.isBot
+                            ? theme === 'dark'
+                              ? 'bg-purple-900/40 text-purple-300'
+                              : 'bg-purple-100 text-purple-700'
+                            : playerId === currentUserId
                             ? theme === 'dark'
                               ? 'bg-red-900/60 text-red-200 font-semibold'
                               : 'bg-red-200 text-red-900 font-semibold'
@@ -421,6 +431,7 @@ export function SundayCard({
                               : 'bg-slate-100 text-slate-700'
                         }`}>
                           {player?.nickname || player?.name || `Jugador ${index + 1}`}
+                          {player?.isBot && <span className="font-bold font-mono text-[10px] opacity-70">BOT</span>}
                         </div>
                       );
                     })}
@@ -647,7 +658,7 @@ export function SundayCard({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {game.participants
                           .map(participantId => voters.find(v => v.userId === participantId))
-                          .filter(Boolean)
+                          .filter((player): player is VoterInfo => Boolean(player) && !player!.isBot)
                           .map(player => (
                             <button
                               key={player!.userId}
