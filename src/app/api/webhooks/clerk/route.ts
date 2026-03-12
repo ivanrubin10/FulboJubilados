@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
           imageUrl: clerkUser.image_url || undefined,
           isAdmin: false,
           isWhitelisted: true,
+          isBot: false,
         };
 
         await DatabaseService.addUser(newUser);

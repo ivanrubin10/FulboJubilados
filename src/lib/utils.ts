@@ -64,14 +64,15 @@ export function getNextAvailableMonth(): { month: number; year: number } {
 }
 
 export function generateTeams(players: string[]): { team1: string[]; team2: string[] } {
-  if (players.length !== 10) {
-    throw new Error('Exactly 10 players are required to form teams');
+  if (players.length < 2 || players.length % 2 !== 0) {
+    throw new Error('An even number of at least 2 players is required to form teams');
   }
-  
+
+  const half = players.length / 2;
   const shuffled = [...players].sort(() => Math.random() - 0.5);
   return {
-    team1: shuffled.slice(0, 5),
-    team2: shuffled.slice(5, 10),
+    team1: shuffled.slice(0, half),
+    team2: shuffled.slice(half),
   };
 }
 

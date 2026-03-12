@@ -92,11 +92,26 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
   // Player management functions
   const availableUsers = users.filter(user =>
     user.isWhitelisted &&
+    !user.isBot &&
     !participants.includes(user.id) &&
     !waitlist.includes(user.id)
   );
 
+  const availableBots = users.filter(user =>
+    user.isBot &&
+    !participants.includes(user.id) &&
+    !waitlist.includes(user.id)
+  );
+
+  const realParticipantCount = participants.filter(id => {
+    const u = users.find(u => u.id === id);
+    return u && !u.isBot;
+  }).length;
+
   const moveToParticipants = (userId: string, fromWaitlist = false) => {
+    const isBot = users.find(u => u.id === userId)?.isBot ?? false;
+    // Real players capped at 10; bots can fill spots beyond real players up to 10 total
+    if (!isBot && realParticipantCount >= 10) return;
     if (participants.length >= 10) return;
 
     setParticipants(prev => [...prev, userId]);
@@ -169,8 +184,8 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
               }`}
             >
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Jugadores ({participants.length}/10)</span>
-              <span className="sm:hidden">Jugad. ({participants.length}/10)</span>
+              <span className="hidden sm:inline">Jugadores ({realParticipantCount}/10)</span>
+              <span className="sm:hidden">Jugad. ({realParticipantCount}/10)</span>
             </button>
             <button
               onClick={() => setActiveTab('teams')}
@@ -326,7 +341,7 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
                   theme === 'dark' ? 'text-green-300' : 'text-green-800'
                 }`}>
                   <Users className="h-5 w-5" />
-                  Participantes ({participants.length}/10)
+                  Participantes ({realParticipantCount}/10{participants.length > realParticipantCount ? ` + ${participants.length - realParticipantCount} bot` : ''})
                 </h3>
 
                 <div className="space-y-2 min-h-[300px]">
@@ -336,7 +351,9 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
 
                     return (
                       <div key={userId} className={`flex items-center justify-between p-2 rounded ${
-                        theme === 'dark' ? 'bg-green-900/20' : 'bg-green-100/50'
+                        user.isBot
+                          ? theme === 'dark' ? 'bg-purple-900/20' : 'bg-purple-100/50'
+                          : theme === 'dark' ? 'bg-green-900/20' : 'bg-green-100/50'
                       }`}>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs px-2 py-1 rounded ${
@@ -347,9 +364,20 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
                           {user.imageUrl && (
                             <img src={user.imageUrl} alt={user.name} className="w-8 h-8 rounded-full" />
                           )}
-                          <span className={`text-sm ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>
+                          <span className={`text-sm ${
+                            user.isBot
+                              ? theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
+                              : theme === 'dark' ? 'text-green-300' : 'text-green-700'
+                          }`}>
                             {user.nickname || user.name}
                           </span>
+                          {user.isBot && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold ${
+                              theme === 'dark' ? 'bg-purple-800/60 text-purple-200' : 'bg-purple-200 text-purple-800'
+                            }`}>
+                              BOT
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-1">
                           <button
@@ -477,7 +505,7 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
                   Disponibles ({availableUsers.length})
                 </h3>
 
-                <div className="space-y-2 min-h-[300px]">
+                <div className="space-y-2 min-h-[200px]">
                   {availableUsers.map(user => (
                     <div key={user.id} className={`flex items-center justify-between p-2 rounded ${
                       theme === 'dark' ? 'bg-slate-900/20' : 'bg-slate-100/50'
@@ -491,7 +519,7 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
                         </span>
                       </div>
                       <div className="flex gap-1">
-                        {participants.length < 10 && (
+                        {realParticipantCount < 10 && participants.length < 10 && (
                           <button
                             onClick={() => moveToParticipants(user.id)}
                             className={`px-2 py-1 rounded text-xs ${
@@ -520,13 +548,57 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
                   ))}
 
                   {availableUsers.length === 0 && (
-                    <div className={`text-center py-8 text-sm ${
+                    <div className={`text-center py-4 text-sm ${
                       theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                     }`}>
                       No hay usuarios disponibles
                     </div>
                   )}
                 </div>
+
+                {/* Bots section */}
+                {availableBots.length > 0 && (
+                  <>
+                    <h4 className={`font-semibold mt-4 mb-2 flex items-center gap-2 text-sm ${
+                      theme === 'dark' ? 'text-purple-300' : 'text-purple-800'
+                    }`}>
+                      🤖 Bots disponibles
+                    </h4>
+                    <div className="space-y-2">
+                      {availableBots.map(bot => (
+                        <div key={bot.id} className={`flex items-center justify-between p-2 rounded ${
+                          theme === 'dark' ? 'bg-purple-900/20' : 'bg-purple-50'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-mono ${
+                              theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
+                            }`}>
+                              {bot.name}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
+                              theme === 'dark' ? 'bg-purple-800/60 text-purple-200' : 'bg-purple-200 text-purple-800'
+                            }`}>
+                              BOT
+                            </span>
+                          </div>
+                          {participants.length < 10 && (
+                            <button
+                              onClick={() => moveToParticipants(bot.id)}
+                              className={`px-2 py-1 rounded text-xs ${
+                                theme === 'dark'
+                                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                  : 'bg-purple-500 text-white hover:bg-purple-600'
+                              }`}
+                              title="Agregar bot como participante"
+                            >
+                              +Bot
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

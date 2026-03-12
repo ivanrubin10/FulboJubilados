@@ -8,6 +8,7 @@ export const users = pgTable('users', {
   imageUrl: text('image_url'),
   isAdmin: boolean('is_admin').default(false).notNull(),
   isWhitelisted: boolean('is_whitelisted').default(true).notNull(),
+  isBot: boolean('is_bot').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

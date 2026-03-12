@@ -25,6 +25,19 @@ export class DatabaseService {
       ...user,
       nickname: user.nickname ?? undefined,
       imageUrl: user.imageUrl ?? undefined,
+      isBot: user.isBot ?? false,
+      updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
+      createdAt: new Date(user.createdAt),
+    }));
+  }
+
+  static async getBotUsers(): Promise<User[]> {
+    const result = await db.select().from(users).where(eq(users.isBot, true));
+    return result.map(user => ({
+      ...user,
+      nickname: user.nickname ?? undefined,
+      imageUrl: user.imageUrl ?? undefined,
+      isBot: true,
       updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
       createdAt: new Date(user.createdAt),
     }));
@@ -33,11 +46,12 @@ export class DatabaseService {
   static async getUserById(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     if (result.length === 0) return undefined;
-    
+
     return {
       ...result[0],
       nickname: result[0].nickname ?? undefined,
       imageUrl: result[0].imageUrl ?? undefined,
+      isBot: result[0].isBot ?? false,
       updatedAt: result[0].updatedAt ? new Date(result[0].updatedAt) : undefined,
       createdAt: new Date(result[0].createdAt),
     };
@@ -52,6 +66,7 @@ export class DatabaseService {
       imageUrl: user.imageUrl || null,
       isAdmin: user.isAdmin,
       isWhitelisted: user.isWhitelisted,
+      isBot: user.isBot ?? false,
       createdAt: user.createdAt || new Date(),
       updatedAt: new Date(),
     });
@@ -59,14 +74,15 @@ export class DatabaseService {
 
   static async updateUser(updatedUser: User): Promise<void> {
     await db.update(users)
-      .set({ 
+      .set({
         email: updatedUser.email,
         name: updatedUser.name,
         nickname: updatedUser.nickname || null,
         imageUrl: updatedUser.imageUrl || null,
         isAdmin: updatedUser.isAdmin,
         isWhitelisted: updatedUser.isWhitelisted,
-        updatedAt: new Date() 
+        isBot: updatedUser.isBot ?? false,
+        updatedAt: new Date()
       })
       .where(eq(users.id, updatedUser.id));
   }
@@ -124,12 +140,13 @@ export class DatabaseService {
   static async getWhitelistedUsers(): Promise<User[]> {
     const result = await db.select()
       .from(users)
-      .where(and(eq(users.isWhitelisted, true), eq(users.isAdmin, false)));
-    
+      .where(and(eq(users.isWhitelisted, true), eq(users.isAdmin, false), eq(users.isBot, false)));
+
     return result.map(user => ({
       ...user,
       nickname: user.nickname ?? undefined,
       imageUrl: user.imageUrl ?? undefined,
+      isBot: false,
       updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
       createdAt: new Date(user.createdAt),
     }));
@@ -824,15 +841,16 @@ export class DatabaseService {
       
       const allGames = await this.getAllGames();
       const allUsers = await this.getUsers();
-      const whitelistedUserIds = new Set(allUsers.filter(u => u.isWhitelisted).map(u => u.id));
-      
+      // Keep bots (isBot) even if not whitelisted
+      const allowedUserIds = new Set(allUsers.filter(u => u.isWhitelisted || u.isBot).map(u => u.id));
+
       let updatedCount = 0;
       const details: string[] = [];
-      
+
       for (const game of allGames) {
         const originalParticipantCount = game.participants.length;
-        const cleanedParticipants = game.participants.filter(participantId => 
-          whitelistedUserIds.has(participantId)
+        const cleanedParticipants = game.participants.filter(participantId =>
+          allowedUserIds.has(participantId)
         );
         
         if (cleanedParticipants.length !== originalParticipantCount) {

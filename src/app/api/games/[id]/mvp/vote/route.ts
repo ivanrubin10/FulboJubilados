@@ -68,7 +68,7 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Verify the voted-for user exists
+    // Verify the voted-for user exists and is not a bot
     const votedForUser = await db
       .select()
       .from(users)
@@ -77,6 +77,10 @@ export async function POST(
 
     if (!votedForUser.length) {
       return NextResponse.json({ error: 'Voted user not found' }, { status: 404 });
+    }
+
+    if (votedForUser[0].isBot) {
+      return NextResponse.json({ error: 'Cannot vote for bot players' }, { status: 400 });
     }
 
     // First, let's try inserting just the MVP vote to isolate the issue

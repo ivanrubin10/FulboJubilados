@@ -76,28 +76,31 @@ export async function GET(
 
     const votedUserIds = votedUsers.map(v => v.voterId);
 
-    // Find participants who haven't voted
+    // Find participants who haven't voted (exclude bots — they never vote)
     const nonVoterIds = participants.filter(participantId => !votedUserIds.includes(participantId));
 
-    // Get user details for non-voters
-    const nonVoters = nonVoterIds.length > 0 
+    // Get user details for non-voters, excluding bots
+    const nonVoters = nonVoterIds.length > 0
       ? await db
           .select({
             id: users.id,
             name: users.name,
             nickname: users.nickname,
-            imageUrl: users.imageUrl
+            imageUrl: users.imageUrl,
+            isBot: users.isBot,
           })
           .from(users)
           .where(inArray(users.id, nonVoterIds))
       : [];
 
+    const realNonVoters = nonVoters.filter(u => !u.isBot);
+
     return NextResponse.json({
       gameId,
       totalParticipants: participants.length,
       votersCount: votedUserIds.length,
-      nonVotersCount: nonVoterIds.length,
-      nonVoters: nonVoters.map(user => ({
+      nonVotersCount: realNonVoters.length,
+      nonVoters: realNonVoters.map(user => ({
         id: user.id,
         name: user.name,
         nickname: user.nickname,
