@@ -107,6 +107,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
+      const requestingUser = await DatabaseService.getUserById(userId);
+      if (!requestingUser?.isAdmin) {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
+
       const gameId = await DatabaseService.createGame({
         date: new Date(body.date),
         participants: body.participants || [],
