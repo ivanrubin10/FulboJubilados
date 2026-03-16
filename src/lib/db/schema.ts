@@ -100,6 +100,18 @@ export const mvpVoteStatus = pgTable('mvp_vote_status', {
   oneStatusPerGameVoter: unique('one_status_per_game_voter').on(table.gameId, table.voterId),
 }));
 
+export const customDates = pgTable('custom_dates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  year: integer('year').notNull(),
+  month: integer('month').notNull(),
+  day: integer('day').notNull(),
+  description: text('description'), // e.g. "Lunes de reemplazo"
+  createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueDate: unique('unique_custom_date').on(table.year, table.month, table.day),
+}));
+
 export const dayVotes = pgTable('day_votes', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -131,3 +143,5 @@ export type MvpVoteStatus = typeof mvpVoteStatus.$inferSelect;
 export type NewMvpVoteStatus = typeof mvpVoteStatus.$inferInsert;
 export type DayVote = typeof dayVotes.$inferSelect;
 export type NewDayVote = typeof dayVotes.$inferInsert;
+export type CustomDate = typeof customDates.$inferSelect;
+export type NewCustomDate = typeof customDates.$inferInsert;

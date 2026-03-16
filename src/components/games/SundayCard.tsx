@@ -24,6 +24,7 @@ interface UserInfo {
 interface SundayCardProps {
   date: Date;
   dayNumber: number;
+  dayLabel?: string;
   isPast: boolean;
 
   // User's vote
@@ -75,6 +76,7 @@ interface SundayCardProps {
 export function SundayCard({
   date,
   dayNumber,
+  dayLabel,
   isPast,
   userVoted,
   userVotedNo,
@@ -116,7 +118,8 @@ export function SundayCard({
     year: 'numeric'
   });
 
-  const fullDate = `Domingo ${dayNumber} de ${monthYear}`;
+  const weekdayName = dayLabel || 'Domingo';
+  const fullDate = `${weekdayName} ${dayNumber} de ${monthYear}`;
 
   // Check if we should show add result button (same day after match hour)
   const shouldShowAddResult = () => {
@@ -942,7 +945,7 @@ export function SundayCard({
         }`}>
           <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">
-            {isPast ? 'No hubo votos para esta fecha' : 'Aún no hay votos para este domingo'}
+            {isPast ? 'No hubo votos para esta fecha' : 'Aún no hay votos para esta fecha'}
           </p>
         </div>
       )}

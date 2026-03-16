@@ -3,7 +3,7 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSundaysInMonth, getCapitalizedMonthYear } from '@/lib/utils';
+import { getSundaysInMonth, getCapitalizedMonthYear, getDayLabel } from '@/lib/utils';
 import { Game, User, MvpResults } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useTheme } from '@/contexts/theme-context';
@@ -18,9 +18,15 @@ interface DayVote {
   voteType: 'yes' | 'no';
 }
 
+interface CustomDateInfo {
+  day: number;
+  description: string | null;
+}
+
 interface SundayData {
   date: Date;
   dayNumber: number;
+  dayLabel: string;
   isPast: boolean;
   userVoted: boolean;
   userVotedNo: boolean;
@@ -75,6 +81,8 @@ export default function GamesPage() {
 
   const [currentMonthSundaysData, setCurrentMonthSundaysData] = useState<SundayData[]>([]);
   const [nextMonthSundaysData, setNextMonthSundaysData] = useState<SundayData[]>([]);
+  const [currentMonthCustomDates, setCurrentMonthCustomDates] = useState<CustomDateInfo[]>([]);
+  const [nextMonthCustomDates, setNextMonthCustomDates] = useState<CustomDateInfo[]>([]);
 
   // MVP voting state
   const [showMVPVoting, setShowMVPVoting] = useState<{[gameId: string]: boolean}>({});
@@ -206,17 +214,23 @@ export default function GamesPage() {
       if (!currentUser) return;
 
       try {
-        // Fetch day votes for both months using effective months
-        const [currentMonthVotesRes, nextMonthVotesRes] = await Promise.all([
+        // Fetch day votes and custom dates for both months using effective months
+        const [currentMonthVotesRes, nextMonthVotesRes, currentCustomDatesRes, nextCustomDatesRes] = await Promise.all([
           fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
-          fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
+          fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`),
+          fetch(`/api/custom-dates?year=${effectiveYear}&month=${effectiveMonth}`),
+          fetch(`/api/custom-dates?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
         ]);
 
         const currentVotes = await currentMonthVotesRes.json();
         const nextVotes = await nextMonthVotesRes.json();
+        const currentCustom = currentCustomDatesRes.ok ? await currentCustomDatesRes.json() : [];
+        const nextCustom = nextCustomDatesRes.ok ? await nextCustomDatesRes.json() : [];
 
         setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
         setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
+        setCurrentMonthCustomDates(currentCustom);
+        setNextMonthCustomDates(nextCustom);
 
       } catch (err) {
         console.error('Error loading months data:', err);
@@ -250,20 +264,25 @@ export default function GamesPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Build data for current month
-    const buildMonthData = (year: number, month: number, monthDayVotes: DayVote[]) => {
+    // Build data for current month (Sundays + custom dates)
+    const buildMonthData = (year: number, month: number, monthDayVotes: DayVote[], monthCustomDates: CustomDateInfo[]) => {
       const sundays = getSundaysInMonth(year, month);
+      const customDayNumbers = monthCustomDates.map(cd => cd.day);
 
-      // Filter out past Sundays (but keep today)
-      const futureSundays = sundays.filter(dayNumber => {
+      // Merge and deduplicate (a custom date could fall on a Sunday)
+      const allDays = [...new Set([...sundays, ...customDayNumbers])].sort((a, b) => a - b);
+
+      // Filter out past days (but keep today)
+      const futureDays = allDays.filter(dayNumber => {
         const date = new Date(year, month - 1, dayNumber);
         date.setHours(0, 0, 0, 0);
         return date >= today; // Include today
       });
 
-      return futureSundays.map(dayNumber => {
+      return futureDays.map(dayNumber => {
         const date = new Date(year, month - 1, dayNumber);
         date.setHours(0, 0, 0, 0);
+        const dayLabel = getDayLabel(date);
         const isPast = false; // Already filtered out past days
 
         // Find game for this day
@@ -349,6 +368,7 @@ export default function GamesPage() {
         return {
           date,
           dayNumber,
+          dayLabel,
           isPast,
           userVoted,
           userVotedNo,
@@ -368,12 +388,12 @@ export default function GamesPage() {
       });
     };
 
-    const currentData = buildMonthData(effectiveYear, effectiveMonth, currentMonthDayVotes);
-    const nextData = buildMonthData(effectiveNextYear, effectiveNextMonth, nextMonthDayVotes);
+    const currentData = buildMonthData(effectiveYear, effectiveMonth, currentMonthDayVotes, currentMonthCustomDates);
+    const nextData = buildMonthData(effectiveNextYear, effectiveNextMonth, nextMonthDayVotes, nextMonthCustomDates);
 
     setCurrentMonthSundaysData(currentData);
     setNextMonthSundaysData(nextData);
-  }, [currentUser, users, games, currentMonthDayVotes, nextMonthDayVotes, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear]);
+  }, [currentUser, users, games, currentMonthDayVotes, nextMonthDayVotes, currentMonthCustomDates, nextMonthCustomDates, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear]);
 
   const handleVote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
@@ -394,7 +414,7 @@ export default function GamesPage() {
       setNextMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
     }
 
-    success('Voto registrado', `Votaste SÍ por el domingo ${dayNumber}`);
+    success('Voto registrado', `Votaste SÍ por el ${dayNumber}`);
 
     try {
       const response = await fetch('/api/day-vote', {
@@ -453,7 +473,7 @@ export default function GamesPage() {
       setNextMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
     }
 
-    success('Voto registrado', `Votaste NO por el domingo ${dayNumber}`);
+    success('Voto registrado', `Votaste NO por el ${dayNumber}`);
 
     try {
       const response = await fetch('/api/day-vote', {
@@ -510,7 +530,7 @@ export default function GamesPage() {
       setNextMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
     }
 
-    success('Voto eliminado', `Removiste tu voto del domingo ${dayNumber}`);
+    success('Voto eliminado', `Removiste tu voto del ${dayNumber}`);
 
     try {
       const response = await fetch(`/api/day-vote?userId=${currentUser.id}&year=${year}&month=${month}&day=${dayNumber}`, {
@@ -750,7 +770,7 @@ export default function GamesPage() {
             Partidos y Disponibilidad
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Marca los domingos que puedes jugar y ve los partidos programados
+            Marca los días que puedes jugar y ve los partidos programados
           </p>
         </div>
 
@@ -850,7 +870,7 @@ export default function GamesPage() {
         {currentMonthSundaysData.length === 0 && nextMonthSundaysData.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
-            <p>No hay domingos disponibles para votar en este momento</p>
+            <p>No hay fechas disponibles para votar en este momento</p>
           </div>
         )}
       </div>

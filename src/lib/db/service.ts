@@ -1,5 +1,5 @@
 import { db } from './connection';
-import { users, monthlyAvailability, reminderStatus, settings, games, adminNotifications, dayVotes } from './schema';
+import { users, monthlyAvailability, reminderStatus, settings, games, adminNotifications, dayVotes, customDates } from './schema';
 import { eq, and, desc } from 'drizzle-orm';
 import type { User } from '@/types';
 import type { Game, AdminNotification, NewGame, NewAdminNotification } from './schema';
@@ -871,5 +871,47 @@ export class DatabaseService {
     } catch (error) {
       console.error('Error checking and notifying admins for full games:', error);
     }
+  }
+
+  // Custom dates management
+  static async getCustomDatesForMonth(year: number, month: number): Promise<Array<{ day: number; description: string | null }>> {
+    const result = await db.select({
+      day: customDates.day,
+      description: customDates.description,
+    })
+      .from(customDates)
+      .where(and(
+        eq(customDates.year, year),
+        eq(customDates.month, month)
+      ));
+    return result;
+  }
+
+  static async addCustomDate(year: number, month: number, day: number, description: string | null, createdBy: string): Promise<void> {
+    await db.insert(customDates)
+      .values({
+        year,
+        month,
+        day,
+        description,
+        createdBy,
+        createdAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [customDates.year, customDates.month, customDates.day],
+        set: {
+          description,
+          createdBy,
+        }
+      });
+  }
+
+  static async removeCustomDate(year: number, month: number, day: number): Promise<void> {
+    await db.delete(customDates)
+      .where(and(
+        eq(customDates.year, year),
+        eq(customDates.month, month),
+        eq(customDates.day, day)
+      ));
   }
 }

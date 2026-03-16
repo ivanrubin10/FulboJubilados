@@ -91,3 +91,8 @@ export function getCapitalizedDateWithMonth(date: Date): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
+export function getDayLabel(date: Date): string {
+  const weekday = date.toLocaleDateString('es-ES', { weekday: 'long' });
+  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+}
+

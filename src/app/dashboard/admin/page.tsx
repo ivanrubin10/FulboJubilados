@@ -29,17 +29,17 @@ import { getNextAvailableMonth, getCapitalizedMonthYear, getCapitalizedMonthName
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useTheme } from '@/contexts/theme-context';
-import { 
-  Settings, 
-  Mail, 
-  Vote, 
-  Trophy, 
-  Calendar, 
-  ChevronRight, 
-  Users, 
+import {
+  Settings,
+  Mail,
+  Vote,
+  Trophy,
+  Calendar,
+  ChevronRight,
+  Users,
   User as UserIcon,
-  Shield, 
-  ShieldOff, 
+  Shield,
+  ShieldOff,
   Clock,
   CheckCircle,
   XCircle,
@@ -47,8 +47,16 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Star
+  Star,
+  Plus,
+  Trash2,
+  CalendarPlus,
+  Menu,
+  X,
+  Wrench
 } from 'lucide-react';
+
+type AdminSection = 'notifications' | 'month' | 'custom-dates' | 'users' | 'emails' | 'tools';
 
 
 
@@ -180,6 +188,8 @@ export default function AdminPage() {
   const { success, error, info } = useToast();
   const { confirm } = useConfirm();
   const { theme } = useTheme();
+  const [activeSection, setActiveSection] = useState<AdminSection>('notifications');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -200,6 +210,11 @@ export default function AdminPage() {
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
   const [latestCompletedGame, setLatestCompletedGame] = useState<GameWithParticipants | null>(null);
   const [selectedMvpParticipants, setSelectedMvpParticipants] = useState<Set<string>>(new Set());
+
+  // Custom dates state
+  const [customDates, setCustomDates] = useState<Array<{ day: number; description: string | null }>>([]);
+  const [newCustomDate, setNewCustomDate] = useState('');
+  const [newCustomDateDescription, setNewCustomDateDescription] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -251,6 +266,72 @@ export default function AdminPage() {
 
     loadData();
   }, [isLoaded, user, manualAdminMode]);
+
+  // Load custom dates when active month changes
+  useEffect(() => {
+    const loadCustomDates = async () => {
+      try {
+        const res = await fetch(`/api/custom-dates?year=${currentActiveMonth.year}&month=${currentActiveMonth.month}`);
+        if (res.ok) {
+          const dates = await res.json();
+          setCustomDates(dates);
+        }
+      } catch (err) {
+        console.error('Error loading custom dates:', err);
+      }
+    };
+    if (isAdmin) loadCustomDates();
+  }, [currentActiveMonth, isAdmin]);
+
+  const handleAddCustomDate = async () => {
+    if (!newCustomDate || !user) return;
+    const dateObj = new Date(newCustomDate + 'T12:00:00');
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth() + 1;
+    const day = dateObj.getDate();
+
+    try {
+      const res = await fetch('/api/custom-dates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year,
+          month,
+          day,
+          description: newCustomDateDescription || null,
+          userId: user.id
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        error('Error', data.error || 'No se pudo agregar la fecha');
+        return;
+      }
+      success('Fecha agregada', `Se agregó el ${day}/${month}/${year} como fecha de votación`);
+      setNewCustomDate('');
+      setNewCustomDateDescription('');
+      // Reload custom dates
+      const datesRes = await fetch(`/api/custom-dates?year=${currentActiveMonth.year}&month=${currentActiveMonth.month}`);
+      if (datesRes.ok) setCustomDates(await datesRes.json());
+    } catch (err) {
+      console.error('Error adding custom date:', err);
+      error('Error', 'No se pudo agregar la fecha');
+    }
+  };
+
+  const handleRemoveCustomDate = async (day: number) => {
+    try {
+      const res = await fetch(`/api/custom-dates?year=${currentActiveMonth.year}&month=${currentActiveMonth.month}&day=${day}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed');
+      success('Fecha eliminada', `Se eliminó la fecha personalizada`);
+      setCustomDates(prev => prev.filter(d => d.day !== day));
+    } catch (err) {
+      console.error('Error removing custom date:', err);
+      error('Error', 'No se pudo eliminar la fecha');
+    }
+  };
 
   const refreshUsers = async () => {
     try {
@@ -821,25 +902,96 @@ export default function AdminPage() {
     );
   }
 
+  const sidebarItems: { id: AdminSection; label: string; icon: React.ReactNode; color: string }[] = [
+    { id: 'notifications', label: 'Notificaciones', icon: <Mail className="h-5 w-5" />, color: 'purple' },
+    { id: 'month', label: 'Mes Activo', icon: <Calendar className="h-5 w-5" />, color: 'emerald' },
+    { id: 'custom-dates', label: 'Fechas Custom', icon: <CalendarPlus className="h-5 w-5" />, color: 'purple' },
+    { id: 'users', label: 'Usuarios', icon: <Users className="h-5 w-5" />, color: 'blue' },
+    { id: 'emails', label: 'Emails Preview', icon: <Eye className="h-5 w-5" />, color: 'indigo' },
+    { id: 'tools', label: 'Herramientas', icon: <Wrench className="h-5 w-5" />, color: 'indigo' },
+  ];
+
+  const handleSectionChange = (section: AdminSection) => {
+    setActiveSection(section);
+    setSidebarOpen(false);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-background">
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-              theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
-            }`}>
-              <Settings className={`h-6 w-6 ${
-                theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-              }`} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Panel de Administración</h1>
-              <p className="text-muted-foreground">Gestiona usuarios, permisos y configuración del sistema</p>
+    <div className="min-h-screen bg-background">
+      {/* Mobile header */}
+      <div className="lg:hidden sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-lg hover:bg-accent transition-colors"
+        >
+          {sidebarOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
+        </button>
+        <h1 className="text-lg font-bold text-foreground">Admin</h1>
+        <div className="w-9" /> {/* spacer */}
+      </div>
+
+      <div className="flex">
+        {/* Sidebar overlay on mobile */}
+        {sidebarOpen && (
+          <div
+            className="lg:hidden fixed inset-0 z-20 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <aside className={`
+          fixed lg:sticky top-0 lg:top-0 z-20 lg:z-0
+          h-screen w-64 shrink-0
+          bg-card border-r border-border
+          transform transition-transform duration-200 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          overflow-y-auto
+        `}>
+          {/* Sidebar header */}
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                theme === 'dark' ? 'bg-blue-900/40' : 'bg-blue-100'
+              }`}>
+                <Settings className={`h-5 w-5 ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                }`} />
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-foreground">Panel Admin</h1>
+                <p className="text-xs text-muted-foreground">Configuración</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Admin Notifications */}
+          {/* Nav items */}
+          <nav className="p-2 space-y-1">
+            {sidebarItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => handleSectionChange(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeSection === item.id
+                    ? theme === 'dark'
+                      ? 'bg-blue-900/40 text-blue-300'
+                      : 'bg-blue-50 text-blue-700'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                }`}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main content */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto lg:-translate-x-32">
+
+        {/* Notifications Section */}
+        {activeSection === 'notifications' && (
         <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
@@ -926,9 +1078,10 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+        )}
 
-
-
+        {/* Month Section */}
+        {activeSection === 'month' && (
         <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
@@ -1017,8 +1170,103 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        )}
 
+        {/* Custom Dates Section */}
+        {activeSection === 'custom-dates' && (
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+            }`}>
+              <CalendarPlus className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+              }`} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Fechas Personalizadas</h2>
+              <p className="text-muted-foreground text-sm">Agrega días extra para votar (ej: lunes, miércoles)</p>
+            </div>
+          </div>
 
+          {/* Add custom date form */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <input
+              type="date"
+              value={newCustomDate}
+              onChange={(e) => setNewCustomDate(e.target.value)}
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              value={newCustomDateDescription}
+              onChange={(e) => setNewCustomDateDescription(e.target.value)}
+              placeholder="Descripción (opcional)"
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent flex-1"
+            />
+            <button
+              onClick={handleAddCustomDate}
+              disabled={!newCustomDate}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors duration-200 disabled:bg-accent disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar
+            </button>
+          </div>
+
+          {/* List of custom dates */}
+          {customDates.length > 0 ? (
+            <div className="space-y-2">
+              {customDates
+                .sort((a, b) => a.day - b.day)
+                .map(cd => {
+                  const dateObj = new Date(currentActiveMonth.year, currentActiveMonth.month - 1, cd.day);
+                  const weekday = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
+                  const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+                  return (
+                    <div key={cd.day} className={`flex items-center justify-between p-3 rounded-lg ${
+                      theme === 'dark'
+                        ? 'bg-purple-950/40 border border-purple-600/30'
+                        : 'bg-purple-50 border border-purple-200'
+                    }`}>
+                      <div>
+                        <span className={`font-medium ${
+                          theme === 'dark' ? 'text-purple-200' : 'text-purple-800'
+                        }`}>
+                          {capitalizedWeekday} {cd.day} de {getCapitalizedMonthName(currentActiveMonth.year, currentActiveMonth.month)}
+                        </span>
+                        {cd.description && (
+                          <span className={`ml-2 text-sm ${
+                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                          }`}>
+                            — {cd.description}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleRemoveCustomDate(cd.day)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          theme === 'dark'
+                            ? 'text-red-400 hover:bg-red-900/40'
+                            : 'text-red-600 hover:bg-red-100'
+                        }`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay fechas personalizadas para {getCapitalizedMonthName(currentActiveMonth.year, currentActiveMonth.month)}. Solo se muestran los domingos.
+            </p>
+          )}
+        </div>
+        )}
+
+        {/* Users Section */}
+        {activeSection === 'users' && (
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-4 flex-1">
@@ -1360,37 +1608,25 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Email Previews Section */}
+        {activeSection === 'emails' && (
         <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                theme === 'dark' ? 'bg-indigo-900/40' : 'bg-indigo-100'
-              }`}>
-                <Eye className={`h-6 w-6 ${
-                  theme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
-                }`} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Vista Previa de Emails</h2>
-                <p className="text-muted-foreground">Mira cómo se ven los 3 tipos de emails del sistema</p>
-              </div>
+          <div className="flex items-center gap-4 mb-6">
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-indigo-900/40' : 'bg-indigo-100'
+            }`}>
+              <Eye className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
+              }`} />
             </div>
-            <button
-              onClick={() => setShowEmailPreviews(!showEmailPreviews)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                theme === 'dark' 
-                  ? 'bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/60 border border-indigo-600/30' 
-                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-              }`}
-            >
-              {showEmailPreviews ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              {showEmailPreviews ? 'Ocultar' : 'Ver Previews'}
-            </button>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Vista Previa de Emails</h2>
+              <p className="text-muted-foreground text-sm">Mira cómo se ven los 4 tipos de emails del sistema</p>
+            </div>
           </div>
 
-          {showEmailPreviews && (
             <div className="space-y-4">
               {/* Voting Reminder Email */}
               <div className="border border-border rounded-lg">
@@ -1545,10 +1781,12 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-          )}
         </div>
+        )}
 
         {/* Admin Tools */}
+        {activeSection === 'tools' && (
+        <>
         <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
@@ -1619,6 +1857,12 @@ export default function AdminPage() {
             Ten cuidado al otorgar estos permisos ya que dan acceso completo al sistema.
           </p>
         </div>
+        </>
+        )}
+
+        </div>
+        </main>
+      </div>
 
         {/* Voting Reminder Confirmation Modal */}
         {showVotingConfirmModal && (
