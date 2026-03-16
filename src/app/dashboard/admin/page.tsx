@@ -29,17 +29,17 @@ import { getNextAvailableMonth, getCapitalizedMonthYear, getCapitalizedMonthName
 import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useTheme } from '@/contexts/theme-context';
-import { 
-  Settings, 
-  Mail, 
-  Vote, 
-  Trophy, 
-  Calendar, 
-  ChevronRight, 
-  Users, 
+import {
+  Settings,
+  Mail,
+  Vote,
+  Trophy,
+  Calendar,
+  ChevronRight,
+  Users,
   User as UserIcon,
-  Shield, 
-  ShieldOff, 
+  Shield,
+  ShieldOff,
   Clock,
   CheckCircle,
   XCircle,
@@ -47,7 +47,8 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Star
+  Star,
+  PlusCircle
 } from 'lucide-react';
 
 
@@ -200,6 +201,12 @@ export default function AdminPage() {
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
   const [latestCompletedGame, setLatestCompletedGame] = useState<GameWithParticipants | null>(null);
   const [selectedMvpParticipants, setSelectedMvpParticipants] = useState<Set<string>>(new Set());
+
+  // Create manual game state
+  const [showCreateGameForm, setShowCreateGameForm] = useState(false);
+  const [createGameDate, setCreateGameDate] = useState('');
+  const [createGameParticipants, setCreateGameParticipants] = useState<Set<string>>(new Set());
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -628,6 +635,48 @@ export default function AdminPage() {
   };
 
 
+  // Create manual game handlers
+  const toggleCreateGameParticipant = (userId: string) => {
+    const next = new Set(createGameParticipants);
+    if (next.has(userId)) {
+      next.delete(userId);
+    } else {
+      next.add(userId);
+    }
+    setCreateGameParticipants(next);
+  };
+
+  const handleCreateGame = async () => {
+    if (!createGameDate) {
+      error('Fecha requerida', 'Seleccioná una fecha para el partido');
+      return;
+    }
+
+    setIsCreatingGame(true);
+    try {
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: new Date(createGameDate).toISOString(),
+          participants: Array.from(createGameParticipants),
+        }),
+      });
+
+      if (!res.ok) throw new Error('Error al crear el partido');
+
+      success('Partido creado', 'El partido fue creado correctamente. Podés editarlo desde la página de juegos.');
+      setShowCreateGameForm(false);
+      setCreateGameDate('');
+      setCreateGameParticipants(new Set());
+    } catch (err) {
+      console.error('Error creating game:', err);
+      error('Error al crear partido', 'No se pudo crear el partido');
+    } finally {
+      setIsCreatingGame(false);
+    }
+  };
+
   // Email preview generators
   const generateVotingReminderPreview = () => {
     const monthName = getCapitalizedMonthName(currentActiveMonth.year, currentActiveMonth.month);
@@ -1018,6 +1067,136 @@ export default function AdminPage() {
           </div>
         </div>
 
+
+        {/* Create Manual Game Section */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              theme === 'dark' ? 'bg-orange-900/40' : 'bg-orange-100'
+            }`}>
+              <PlusCircle className={`h-6 w-6 ${
+                theme === 'dark' ? 'text-orange-300' : 'text-orange-600'
+              }`} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-foreground">Crear Partido Manual</h2>
+              <p className="text-muted-foreground text-sm">Para partidos que no se armaron por la app</p>
+            </div>
+            <button
+              onClick={() => setShowCreateGameForm(v => !v)}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                showCreateGameForm
+                  ? 'bg-accent text-muted-foreground hover:bg-accent/80'
+                  : theme === 'dark'
+                    ? 'bg-orange-700 text-white hover:bg-orange-600'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+              }`}
+            >
+              {showCreateGameForm ? 'Cancelar' : '+ Nuevo Partido'}
+            </button>
+          </div>
+
+          {showCreateGameForm && (
+            <div className="space-y-5">
+              {/* Date picker */}
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  <Calendar className="h-4 w-4 inline mr-1" />
+                  Fecha del partido
+                </label>
+                <input
+                  type="date"
+                  value={createGameDate}
+                  onChange={e => setCreateGameDate(e.target.value)}
+                  className="w-full sm:w-64 p-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Participant selector */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-semibold text-foreground">
+                    <Users className="h-4 w-4 inline mr-1" />
+                    Jugadores ({createGameParticipants.size} seleccionados)
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCreateGameParticipants(new Set(users.filter(u => u.isWhitelisted && !u.isBot && !u.isAdmin).map(u => u.id)))}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setCreateGameParticipants(new Set())}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Ninguno
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto`}>
+                  {users.filter(u => u.isWhitelisted && !u.isBot && !u.isAdmin).map(user => (
+                    <label
+                      key={user.id}
+                      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
+                        createGameParticipants.has(user.id)
+                          ? theme === 'dark' ? 'bg-orange-900/30' : 'bg-orange-50'
+                          : 'hover:bg-accent/20'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={createGameParticipants.has(user.id)}
+                        onChange={() => toggleCreateGameParticipant(user.id)}
+                        className="accent-orange-500"
+                      />
+                      {user.imageUrl && (
+                        <img src={user.imageUrl} alt={user.name} className="w-6 h-6 rounded-full" />
+                      )}
+                      <span className="text-sm text-foreground">
+                        {user.nickname || user.name}
+                      </span>
+                    </label>
+                  ))}
+                  {users.filter(u => u.isWhitelisted && !u.isBot && !u.isAdmin).length === 0 && (
+                    <p className="text-sm text-muted-foreground p-4 text-center">No hay jugadores disponibles</p>
+                  )}
+                </div>
+              </div>
+
+              {createGameParticipants.size > 0 && createGameParticipants.size !== 10 && (
+                <p className={`text-xs ${
+                  theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
+                }`}>
+                  ⚠️ Seleccionaste {createGameParticipants.size} jugadores. Se recomienda 10 para armar equipos 5v5.
+                </p>
+              )}
+
+              <button
+                onClick={handleCreateGame}
+                disabled={isCreatingGame || !createGameDate}
+                className={`px-6 py-2 rounded-lg font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+                  theme === 'dark'
+                    ? 'bg-orange-700 hover:bg-orange-600'
+                    : 'bg-orange-500 hover:bg-orange-600'
+                }`}
+              >
+                {isCreatingGame ? (
+                  <>
+                    <Clock className="h-4 w-4 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="h-4 w-4" />
+                    Crear Partido
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
