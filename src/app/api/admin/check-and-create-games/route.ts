@@ -115,29 +115,35 @@ export async function POST(request: NextRequest) {
               waitlist: waitlist.length
             });
           } else {
-            console.log(`   Game already exists: ${gameExists.id}`);
+            console.log(`   Game already exists: ${gameExists.id} (status: ${gameExists.status})`);
 
-            // Check if we need to update participants/waitlist based on current votes
-            yesVotes.sort((a, b) => a.votedAt.getTime() - b.votedAt.getTime());
-            const expectedParticipants = yesVotes.slice(0, 10).map(v => v.userId);
-            const expectedWaitlist = yesVotes.slice(10).map(v => v.userId);
+            // Skip participant updates for confirmed or completed games
+            // Admin may have manually edited the participant list
+            if (gameExists.status === 'confirmed' || gameExists.status === 'completed') {
+              console.log(`   Skipping participant update - game is ${gameExists.status}`);
+            } else {
+              // Check if we need to update participants/waitlist based on current votes
+              yesVotes.sort((a, b) => a.votedAt.getTime() - b.votedAt.getTime());
+              const expectedParticipants = yesVotes.slice(0, 10).map(v => v.userId);
+              const expectedWaitlist = yesVotes.slice(10).map(v => v.userId);
 
-            const participantsMatch = JSON.stringify(gameExists.participants.sort()) === JSON.stringify(expectedParticipants.sort());
-            const waitlistMatch = JSON.stringify((gameExists.waitlist || []).sort()) === JSON.stringify(expectedWaitlist.sort());
+              const participantsMatch = JSON.stringify(gameExists.participants.sort()) === JSON.stringify(expectedParticipants.sort());
+              const waitlistMatch = JSON.stringify((gameExists.waitlist || []).sort()) === JSON.stringify(expectedWaitlist.sort());
 
-            if (!participantsMatch || !waitlistMatch) {
-              console.log(`   Updating participants/waitlist for game ${gameExists.id}`);
-              await DatabaseService.updateGame(gameExists.id, {
-                participants: expectedParticipants,
-                waitlist: expectedWaitlist
-              });
+              if (!participantsMatch || !waitlistMatch) {
+                console.log(`   Updating participants/waitlist for game ${gameExists.id}`);
+                await DatabaseService.updateGame(gameExists.id, {
+                  participants: expectedParticipants,
+                  waitlist: expectedWaitlist
+                });
 
-              gamesUpdated.push({
-                date: `${day}/${month}/${year}`,
-                gameId: gameExists.id,
-                participants: expectedParticipants.length,
-                waitlist: expectedWaitlist.length
-              });
+                gamesUpdated.push({
+                  date: `${day}/${month}/${year}`,
+                  gameId: gameExists.id,
+                  participants: expectedParticipants.length,
+                  waitlist: expectedWaitlist.length
+                });
+              }
             }
           }
         }

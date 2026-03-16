@@ -222,7 +222,11 @@ async function checkAndCreateGameForDay(month: number, year: number, day: number
                  existingGameDate.getDate() === gameDate.getDate();
         });
 
-        if (existingGame && playersAvailableOnSunday.length > 10) {
+        // Skip participant updates for confirmed or completed games
+        // Admin may have manually edited the participant list
+        if (existingGame && (existingGame.status === 'confirmed' || existingGame.status === 'completed')) {
+          console.log(`⏭️ Skipping participant update - game ${existingGame.id} is ${existingGame.status}`);
+        } else if (existingGame && playersAvailableOnSunday.length > 10) {
           const allPotentialParticipants = playersAvailableOnSunday.map(p => p.userId);
           const whitelistedUserIds = new Set(whitelistedUsers.map(u => u.id));
           const allValidParticipants = allPotentialParticipants.filter(userId => whitelistedUserIds.has(userId));
