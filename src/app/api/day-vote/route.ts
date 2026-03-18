@@ -179,9 +179,14 @@ export async function DELETE(request: NextRequest) {
                gd.getDate() === gameDate.getDate();
       });
 
+      console.log(`🔍 Looking for game on ${dayNum}/${monthNum}/${yearNum}, found: ${existingGame?.id || 'none'}, status: ${existingGame?.status || 'N/A'}`);
+
       if (existingGame && existingGame.status === 'scheduled') {
         const currentParticipants = existingGame.participants || [];
         const currentWaitlist = existingGame.waitlist || [];
+
+        console.log(`👥 Participants: ${JSON.stringify(currentParticipants)}`);
+        console.log(`👤 Looking for userId: "${userId}", includes: ${currentParticipants.includes(userId)}`);
 
         if (currentParticipants.includes(userId)) {
           // Remove from participants and promote first waitlist player
