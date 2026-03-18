@@ -68,6 +68,57 @@ export async function POST(request: NextRequest) {
         updatedSundays,
         false
       );
+
+      // Remove user from game participants/waitlist if a scheduled game exists for this day
+      try {
+        const allGames = await DatabaseService.getAllGames();
+        const gameDate = new Date(year, month - 1, day, 10, 0, 0, 0);
+        const existingGame = allGames.find(game => {
+          const gd = new Date(game.date);
+          return gd.getFullYear() === gameDate.getFullYear() &&
+                 gd.getMonth() === gameDate.getMonth() &&
+                 gd.getDate() === gameDate.getDate();
+        });
+
+        if (existingGame && existingGame.status === 'scheduled') {
+          const currentParticipants = existingGame.participants || [];
+          const currentWaitlist = existingGame.waitlist || [];
+
+          if (currentParticipants.includes(userId)) {
+            const updatedParticipants = currentParticipants.filter((id: string) => id !== userId);
+            let updatedWaitlistArr = currentWaitlist;
+            if (currentWaitlist.length > 0) {
+              const promotedUserId = currentWaitlist[0];
+              updatedWaitlistArr = currentWaitlist.slice(1);
+              updatedParticipants.push(promotedUserId);
+              console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} voted no`);
+            }
+
+            let updatedTeams = existingGame.teams;
+            if (updatedTeams) {
+              updatedTeams = {
+                team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
+                team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
+              };
+            }
+
+            await DatabaseService.updateGame(existingGame.id, {
+              participants: updatedParticipants,
+              waitlist: updatedWaitlistArr,
+              teams: updatedTeams
+            });
+            console.log(`📝 Removed ${userId} from game ${existingGame.id} after voting no`);
+          } else if (currentWaitlist.includes(userId)) {
+            const updatedWaitlistArr = currentWaitlist.filter((id: string) => id !== userId);
+            await DatabaseService.updateGame(existingGame.id, {
+              waitlist: updatedWaitlistArr
+            });
+            console.log(`📝 Removed ${userId} from game ${existingGame.id} waitlist after voting no`);
+          }
+        }
+      } catch (gameError) {
+        console.error('Error updating game after no vote:', gameError);
+      }
     }
 
     return NextResponse.json({ success: true, voteType });
@@ -107,6 +158,64 @@ export async function DELETE(request: NextRequest) {
       updatedSundays,
       false
     );
+
+    // Remove user from game participants/waitlist if a scheduled game exists for this day
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    try {
+      const allGames = await DatabaseService.getAllGames();
+      const gameDate = new Date(yearNum, monthNum - 1, dayNum, 10, 0, 0, 0);
+      const existingGame = allGames.find(game => {
+        const gd = new Date(game.date);
+        return gd.getFullYear() === gameDate.getFullYear() &&
+               gd.getMonth() === gameDate.getMonth() &&
+               gd.getDate() === gameDate.getDate();
+      });
+
+      if (existingGame && existingGame.status === 'scheduled') {
+        const currentParticipants = existingGame.participants || [];
+        const currentWaitlist = existingGame.waitlist || [];
+
+        if (currentParticipants.includes(userId)) {
+          // Remove from participants and promote first waitlist player
+          const updatedParticipants = currentParticipants.filter((id: string) => id !== userId);
+          let updatedWaitlist = currentWaitlist;
+          if (currentWaitlist.length > 0) {
+            const promotedUserId = currentWaitlist[0];
+            updatedWaitlist = currentWaitlist.slice(1);
+            updatedParticipants.push(promotedUserId);
+            console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} unvoted`);
+          }
+
+          // Clean up team assignments if they exist
+          let updatedTeams = existingGame.teams;
+          if (updatedTeams) {
+            updatedTeams = {
+              team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
+              team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
+            };
+          }
+
+          await DatabaseService.updateGame(existingGame.id, {
+            participants: updatedParticipants,
+            waitlist: updatedWaitlist,
+            teams: updatedTeams
+          });
+          console.log(`📝 Removed ${userId} from game ${existingGame.id} participants after unvote`);
+        } else if (currentWaitlist.includes(userId)) {
+          // Remove from waitlist
+          const updatedWaitlist = currentWaitlist.filter((id: string) => id !== userId);
+          await DatabaseService.updateGame(existingGame.id, {
+            waitlist: updatedWaitlist
+          });
+          console.log(`📝 Removed ${userId} from game ${existingGame.id} waitlist after unvote`);
+        }
+      }
+    } catch (gameError) {
+      console.error('Error updating game after unvote:', gameError);
+      // Don't fail the main request
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

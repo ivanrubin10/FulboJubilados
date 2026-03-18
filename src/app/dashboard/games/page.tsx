@@ -491,9 +491,10 @@ export default function GamesPage() {
       if (!response.ok) throw new Error('Failed to vote');
 
       // Silently sync with server data in background
-      const [currentVotesRes, nextVotesRes] = await Promise.all([
+      const [currentVotesRes, nextVotesRes, gamesRes] = await Promise.all([
         fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
-        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
+        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`),
+        fetch('/api/games')
       ]);
 
       const currentVotes = await currentVotesRes.json();
@@ -501,6 +502,17 @@ export default function GamesPage() {
 
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
+
+      // Refetch games to reflect participant changes
+      if (gamesRes.ok) {
+        const allGames = await gamesRes.json();
+        setGames(allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt)
+        })));
+      }
     } catch (err) {
       console.error('Error voting:', err);
       // Revert optimistic update on error
@@ -540,9 +552,10 @@ export default function GamesPage() {
       if (!response.ok) throw new Error('Failed to unvote');
 
       // Silently sync with server data in background
-      const [currentVotesRes, nextVotesRes] = await Promise.all([
+      const [currentVotesRes, nextVotesRes, gamesRes] = await Promise.all([
         fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
-        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`)
+        fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`),
+        fetch('/api/games')
       ]);
 
       const currentVotes = await currentVotesRes.json();
@@ -550,6 +563,17 @@ export default function GamesPage() {
 
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
+
+      // Refetch games to reflect participant changes
+      if (gamesRes.ok) {
+        const allGames = await gamesRes.json();
+        setGames(allGames.map((game: Game) => ({
+          ...game,
+          date: new Date(game.date),
+          createdAt: new Date(game.createdAt),
+          updatedAt: new Date(game.updatedAt)
+        })));
+      }
     } catch (err) {
       console.error('Error unvoting:', err);
       // Revert optimistic update on error
