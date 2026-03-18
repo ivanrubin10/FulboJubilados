@@ -301,7 +301,8 @@ export default function GamesPage() {
         const noVotes = dayVotes.filter(v => v.voteType === 'no');
 
         // Reconcile stale game data: remove participants who no longer have a YES vote
-        if (game && game.status === 'scheduled') {
+        // Only reconcile when votes are loaded (monthDayVotes has data) to avoid clearing on initial render
+        if (game && game.status === 'scheduled' && monthDayVotes.length > 0) {
           const yesVoterIds = new Set(yesVotes.map(v => v.userId));
           const staleParticipants = game.participants.filter(id => !yesVoterIds.has(id));
           if (staleParticipants.length > 0) {
