@@ -70,61 +70,7 @@ export async function POST(request: NextRequest) {
       );
 
       // Remove user from game participants/waitlist if a scheduled game exists for this day
-      try {
-        const allGames = await DatabaseService.getAllGames();
-        const gameDate = new Date(year, month - 1, day, 10, 0, 0, 0);
-        const existingGame = allGames.find(game => {
-          const gd = new Date(game.date);
-          return gd.getFullYear() === gameDate.getFullYear() &&
-                 gd.getMonth() === gameDate.getMonth() &&
-                 gd.getDate() === gameDate.getDate();
-        });
-
-        if (existingGame && existingGame.status === 'scheduled') {
-          const currentParticipants = existingGame.participants || [];
-          const currentWaitlist = existingGame.waitlist || [];
-
-          if (currentParticipants.includes(userId)) {
-            const updatedParticipants = currentParticipants.filter((id: string) => id !== userId);
-            let updatedWaitlistArr = currentWaitlist;
-            if (currentWaitlist.length > 0) {
-              const promotedUserId = currentWaitlist[0];
-              updatedWaitlistArr = currentWaitlist.slice(1);
-              updatedParticipants.push(promotedUserId);
-              console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} voted no`);
-            }
-
-            if (updatedParticipants.length < 10) {
-              // Not enough players - delete the game
-              await DatabaseService.deleteGame(existingGame.id);
-              console.log(`🗑️ Deleted game ${existingGame.id} - dropped below 10 players after ${userId} voted no`);
-            } else {
-              let updatedTeams = existingGame.teams;
-              if (updatedTeams) {
-                updatedTeams = {
-                  team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
-                  team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
-                };
-              }
-
-              await DatabaseService.updateGame(existingGame.id, {
-                participants: updatedParticipants,
-                waitlist: updatedWaitlistArr,
-                teams: updatedTeams
-              });
-              console.log(`📝 Removed ${userId} from game ${existingGame.id} after voting no`);
-            }
-          } else if (currentWaitlist.includes(userId)) {
-            const updatedWaitlistArr = currentWaitlist.filter((id: string) => id !== userId);
-            await DatabaseService.updateGame(existingGame.id, {
-              waitlist: updatedWaitlistArr
-            });
-            console.log(`📝 Removed ${userId} from game ${existingGame.id} waitlist after voting no`);
-          }
-        }
-      } catch (gameError) {
-        console.error('Error updating game after no vote:', gameError);
-      }
+      await removeUserFromGameForDay(userId, year, month, day, 'voted no');
     }
 
     return NextResponse.json({ success: true, voteType });
@@ -166,73 +112,7 @@ export async function DELETE(request: NextRequest) {
     );
 
     // Remove user from game participants/waitlist if a scheduled game exists for this day
-    const dayNum = parseInt(day);
-    const monthNum = parseInt(month);
-    const yearNum = parseInt(year);
-    try {
-      const allGames = await DatabaseService.getAllGames();
-      const gameDate = new Date(yearNum, monthNum - 1, dayNum, 10, 0, 0, 0);
-      const existingGame = allGames.find(game => {
-        const gd = new Date(game.date);
-        return gd.getFullYear() === gameDate.getFullYear() &&
-               gd.getMonth() === gameDate.getMonth() &&
-               gd.getDate() === gameDate.getDate();
-      });
-
-      console.log(`🔍 Looking for game on ${dayNum}/${monthNum}/${yearNum}, found: ${existingGame?.id || 'none'}, status: ${existingGame?.status || 'N/A'}`);
-
-      if (existingGame && existingGame.status === 'scheduled') {
-        const currentParticipants = existingGame.participants || [];
-        const currentWaitlist = existingGame.waitlist || [];
-
-        console.log(`👥 Participants: ${JSON.stringify(currentParticipants)}`);
-        console.log(`👤 Looking for userId: "${userId}", includes: ${currentParticipants.includes(userId)}`);
-
-        if (currentParticipants.includes(userId)) {
-          // Remove from participants and promote first waitlist player
-          const updatedParticipants = currentParticipants.filter((id: string) => id !== userId);
-          let updatedWaitlist = currentWaitlist;
-          if (currentWaitlist.length > 0) {
-            const promotedUserId = currentWaitlist[0];
-            updatedWaitlist = currentWaitlist.slice(1);
-            updatedParticipants.push(promotedUserId);
-            console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} unvoted`);
-          }
-
-          if (updatedParticipants.length < 10) {
-            // Not enough players - delete the game
-            await DatabaseService.deleteGame(existingGame.id);
-            console.log(`🗑️ Deleted game ${existingGame.id} - dropped below 10 players after ${userId} unvoted`);
-          } else {
-            // Clean up team assignments if they exist
-            let updatedTeams = existingGame.teams;
-            if (updatedTeams) {
-              updatedTeams = {
-                team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
-                team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
-              };
-            }
-
-            await DatabaseService.updateGame(existingGame.id, {
-              participants: updatedParticipants,
-              waitlist: updatedWaitlist,
-              teams: updatedTeams
-            });
-            console.log(`📝 Removed ${userId} from game ${existingGame.id} participants after unvote`);
-          }
-        } else if (currentWaitlist.includes(userId)) {
-          // Remove from waitlist
-          const updatedWaitlist = currentWaitlist.filter((id: string) => id !== userId);
-          await DatabaseService.updateGame(existingGame.id, {
-            waitlist: updatedWaitlist
-          });
-          console.log(`📝 Removed ${userId} from game ${existingGame.id} waitlist after unvote`);
-        }
-      }
-    } catch (gameError) {
-      console.error('Error updating game after unvote:', gameError);
-      // Don't fail the main request
-    }
+    await removeUserFromGameForDay(userId, parseInt(year), parseInt(month), parseInt(day), 'unvoted');
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -389,5 +269,74 @@ async function checkAndCreateGameForDay(month: number, year: number, day: number
   } catch (error) {
     console.error('Error in checkAndCreateGameForDay:', error);
     throw error;
+  }
+}
+
+// Helper function to remove a user from a game when they unvote or vote no
+async function removeUserFromGameForDay(userId: string, year: number, month: number, day: number, reason: string) {
+  try {
+    const allGames = await DatabaseService.getAllGames();
+    const existingGame = allGames.find(game => {
+      const gd = new Date(game.date);
+      return gd.getFullYear() === year &&
+             gd.getMonth() === month - 1 &&
+             gd.getDate() === day;
+    });
+
+    console.log(`🔍 removeUserFromGameForDay: userId="${userId}", date=${day}/${month}/${year}, reason=${reason}`);
+    console.log(`🔍 Found game: ${existingGame?.id || 'none'}, status: ${existingGame?.status || 'N/A'}`);
+
+    if (!existingGame || existingGame.status !== 'scheduled') {
+      console.log(`⏭️ No scheduled game found for ${day}/${month}/${year}, skipping`);
+      return;
+    }
+
+    const currentParticipants = existingGame.participants || [];
+    const currentWaitlist = existingGame.waitlist || [];
+
+    console.log(`👥 Participants (${currentParticipants.length}): ${JSON.stringify(currentParticipants)}`);
+    console.log(`👤 User "${userId}" in participants: ${currentParticipants.includes(userId)}, in waitlist: ${currentWaitlist.includes(userId)}`);
+
+    if (currentParticipants.includes(userId)) {
+      const updatedParticipants = currentParticipants.filter((id: string) => id !== userId);
+      let updatedWaitlist = currentWaitlist;
+
+      if (currentWaitlist.length > 0) {
+        const promotedUserId = currentWaitlist[0];
+        updatedWaitlist = currentWaitlist.slice(1);
+        updatedParticipants.push(promotedUserId);
+        console.log(`✅ Promoted user ${promotedUserId} from waitlist`);
+      }
+
+      if (updatedParticipants.length < 10) {
+        await DatabaseService.deleteGame(existingGame.id);
+        console.log(`🗑️ Deleted game ${existingGame.id} - only ${updatedParticipants.length} players remain`);
+      } else {
+        let updatedTeams = existingGame.teams;
+        if (updatedTeams) {
+          updatedTeams = {
+            team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
+            team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
+          };
+        }
+
+        await DatabaseService.updateGame(existingGame.id, {
+          participants: updatedParticipants,
+          waitlist: updatedWaitlist,
+          teams: updatedTeams
+        });
+        console.log(`📝 Removed ${userId} from game ${existingGame.id} (${reason}). ${updatedParticipants.length} participants remain.`);
+      }
+    } else if (currentWaitlist.includes(userId)) {
+      const updatedWaitlist = currentWaitlist.filter((id: string) => id !== userId);
+      await DatabaseService.updateGame(existingGame.id, {
+        waitlist: updatedWaitlist
+      });
+      console.log(`📝 Removed ${userId} from waitlist of game ${existingGame.id} (${reason})`);
+    } else {
+      console.log(`⚠️ User ${userId} not found in participants or waitlist of game ${existingGame.id}`);
+    }
+  } catch (error) {
+    console.error(`Error removing user from game (${reason}):`, error);
   }
 }
