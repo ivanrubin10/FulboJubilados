@@ -286,12 +286,12 @@ export default function GamesPage() {
         const isPast = false; // Already filtered out past days
 
         // Find game for this day
-        const game = games.find(g => {
+        let game = games.find(g => {
           const gameDate = new Date(g.date);
           return gameDate.getFullYear() === year &&
                  gameDate.getMonth() === month - 1 &&
                  gameDate.getDate() === dayNumber;
-        });
+        }) || null;
 
         // Get all votes for this day
         const dayVotes = monthDayVotes.filter(v => v.day === dayNumber);
@@ -299,6 +299,30 @@ export default function GamesPage() {
         // Separate yes votes and no votes
         const yesVotes = dayVotes.filter(v => v.voteType === 'yes');
         const noVotes = dayVotes.filter(v => v.voteType === 'no');
+
+        // Reconcile stale game data: remove participants who no longer have a YES vote
+        if (game && game.status === 'scheduled') {
+          const yesVoterIds = new Set(yesVotes.map(v => v.userId));
+          const staleParticipants = game.participants.filter(id => !yesVoterIds.has(id));
+          if (staleParticipants.length > 0) {
+            const cleanedParticipants = game.participants.filter(id => yesVoterIds.has(id));
+            const cleanedWaitlist = (game.waitlist || []).filter(id => yesVoterIds.has(id));
+
+            // Promote from waitlist to fill participant slots
+            while (cleanedParticipants.length < 10 && cleanedWaitlist.length > 0) {
+              cleanedParticipants.push(cleanedWaitlist.shift()!);
+            }
+
+            game = { ...game, participants: cleanedParticipants, waitlist: cleanedWaitlist };
+
+            // Fire background request to fix the DB
+            fetch(`/api/games/${game.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ participants: cleanedParticipants, waitlist: cleanedWaitlist })
+            }).catch(err => console.error('Error reconciling game participants:', err));
+          }
+        }
 
         const yesVotersWithInfo = yesVotes.map((vote, index) => {
           const voterUser = users.find(u => u.id === vote.userId);

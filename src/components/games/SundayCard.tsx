@@ -335,9 +335,7 @@ export function SundayCard({
                 Jugadores confirmados:
               </p>
               <div className="flex flex-wrap gap-2">
-                {game.participants
-                  .filter((playerId) => game.status !== 'scheduled' || voters.some(v => v.userId === playerId))
-                  .map((playerId) => {
+                {game.participants.map((playerId) => {
                   const player = voters.find(v => v.userId === playerId)
                     || noVoters.find(v => v.userId === playerId)
                     || nonVoters.find(v => v.userId === playerId);
