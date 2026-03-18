@@ -61,6 +61,22 @@ export function EditGameModal({ game, users, onSave, onClose, currentUserId, noV
         });
 
         if (!res.ok) throw new Error('Failed to update participants');
+
+        // Remove YES votes for players removed from both participants and waitlist
+        const originalAll = new Set([...game.participants, ...(game.waitlist || [])]);
+        const newAll = new Set([...participants, ...waitlist]);
+        const removedPlayers = [...originalAll].filter(id => !newAll.has(id));
+
+        const gameDate = new Date(game.date);
+        for (const removedUserId of removedPlayers) {
+          try {
+            await fetch(`/api/day-vote?userId=${removedUserId}&year=${gameDate.getFullYear()}&month=${gameDate.getMonth() + 1}&day=${gameDate.getDate()}`, {
+              method: 'DELETE'
+            });
+          } catch (err) {
+            console.error(`Error removing vote for user ${removedUserId}:`, err);
+          }
+        }
       } catch (error) {
         console.error('Error updating participants:', error);
       }

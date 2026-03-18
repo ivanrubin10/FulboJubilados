@@ -82,6 +82,7 @@ export function SundayCard({
   userVotedNo,
   totalVotes,
   voters,
+  noVoters,
   nonVoters,
   game,
   userInGame,
@@ -334,8 +335,12 @@ export function SundayCard({
                 Jugadores confirmados:
               </p>
               <div className="flex flex-wrap gap-2">
-                {game.participants.map((playerId) => {
-                  const player = voters.find(v => v.userId === playerId);
+                {game.participants
+                  .filter((playerId) => game.status !== 'scheduled' || voters.some(v => v.userId === playerId))
+                  .map((playerId) => {
+                  const player = voters.find(v => v.userId === playerId)
+                    || noVoters.find(v => v.userId === playerId)
+                    || nonVoters.find(v => v.userId === playerId);
                   // Use yellow for scheduled, blue for confirmed, green for completed
                   const getPillColor = () => {
                     if (game.status === 'scheduled') {

@@ -338,8 +338,8 @@ export default function GamesPage() {
         const userVotedNo = userVote?.voteType === 'no';
         const userPositionInQueue = userVoted ? yesVotersWithInfo.findIndex(v => v.userId === currentUser.id) + 1 : null;
 
-        const userInGame = game?.participants.includes(currentUser.id) || false;
-        const userInWaitlist = game?.waitlist?.includes(currentUser.id) || false;
+        const userInGame = (game?.participants.includes(currentUser.id) && userVoted) || false;
+        const userInWaitlist = (game?.waitlist?.includes(currentUser.id) && userVoted) || false;
 
         // Determine if user can vote/unvote
         // Users can vote/unvote on scheduled games, but not on confirmed games
