@@ -92,10 +92,10 @@ async function promoteFromWaitlistForUnvotedDays(month: number, year: number, un
         
         if (currentParticipants.includes(unvotingUserId)) {
           console.log(`👤 User ${unvotingUserId} was a participant, promoting from waitlist`);
-          
+
           // Remove user from participants
           const updatedParticipants = currentParticipants.filter(id => id !== unvotingUserId);
-          
+
           // Promote first person from waitlist if available
           let updatedWaitlist = currentWaitlist;
           if (currentWaitlist.length > 0) {
@@ -104,22 +104,28 @@ async function promoteFromWaitlistForUnvotedDays(month: number, year: number, un
             updatedParticipants.push(promotedUserId);
             console.log(`✅ Promoted user ${promotedUserId} from waitlist to participant for game ${existingGame.id}`);
           }
-          
-          // Clean up team assignments using the helper function
-          const allValidPlayers = [...updatedParticipants, ...updatedWaitlist];
-          const updatedTeams = cleanupTeamAssignments(existingGame.teams, allValidPlayers, unvotingUserId);
-          
-          if (updatedTeams && (updatedTeams.team1.length > 0 || updatedTeams.team2.length > 0)) {
-            console.log(`🏟️ Cleaned team assignments. Team 1: ${updatedTeams.team1.length} players, Team 2: ${updatedTeams.team2.length} players`);
+
+          if (updatedParticipants.length < 10) {
+            // Not enough players - delete the game
+            await DatabaseService.deleteGame(existingGame.id);
+            console.log(`🗑️ Deleted game ${existingGame.id} - dropped below 10 players after ${unvotingUserId} unvoted`);
+          } else {
+            // Clean up team assignments using the helper function
+            const allValidPlayers = [...updatedParticipants, ...updatedWaitlist];
+            const updatedTeams = cleanupTeamAssignments(existingGame.teams, allValidPlayers, unvotingUserId);
+
+            if (updatedTeams && (updatedTeams.team1.length > 0 || updatedTeams.team2.length > 0)) {
+              console.log(`🏟️ Cleaned team assignments. Team 1: ${updatedTeams.team1.length} players, Team 2: ${updatedTeams.team2.length} players`);
+            }
+
+            await DatabaseService.updateGame(existingGame.id, {
+              participants: updatedParticipants,
+              waitlist: updatedWaitlist,
+              teams: updatedTeams
+            });
+
+            console.log(`📝 Updated game ${existingGame.id} after user ${unvotingUserId} unvoted`);
           }
-          
-          await DatabaseService.updateGame(existingGame.id, {
-            participants: updatedParticipants,
-            waitlist: updatedWaitlist,
-            teams: updatedTeams
-          });
-          
-          console.log(`📝 Updated game ${existingGame.id} after user ${unvotingUserId} unvoted`);
         } else if (currentWaitlist.includes(unvotingUserId)) {
           console.log(`👤 User ${unvotingUserId} was in waitlist, removing from waitlist`);
           

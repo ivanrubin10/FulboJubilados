@@ -73,6 +73,29 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: gameId } = await params;
+
+    const game = await DatabaseService.getGame(gameId);
+    if (!game) {
+      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
+
+    await DatabaseService.deleteGame(gameId);
+    console.log(`🗑️ Game ${gameId} deleted (participants dropped below 10)`);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const { id } = await params;
+    console.error(`❌ Error deleting game ${id}:`, error);
+    return NextResponse.json({ error: 'Failed to delete game' }, { status: 500 });
+  }
+}
+
 // Helper function to send MVP voting and payment reminder emails
 async function sendMvpVotingEmails(gameId: string, game: Game, result: { team1Score: number; team2Score: number; notes?: string }) {
   try {

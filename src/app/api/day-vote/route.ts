@@ -94,20 +94,26 @@ export async function POST(request: NextRequest) {
               console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} voted no`);
             }
 
-            let updatedTeams = existingGame.teams;
-            if (updatedTeams) {
-              updatedTeams = {
-                team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
-                team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
-              };
-            }
+            if (updatedParticipants.length < 10) {
+              // Not enough players - delete the game
+              await DatabaseService.deleteGame(existingGame.id);
+              console.log(`🗑️ Deleted game ${existingGame.id} - dropped below 10 players after ${userId} voted no`);
+            } else {
+              let updatedTeams = existingGame.teams;
+              if (updatedTeams) {
+                updatedTeams = {
+                  team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
+                  team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
+                };
+              }
 
-            await DatabaseService.updateGame(existingGame.id, {
-              participants: updatedParticipants,
-              waitlist: updatedWaitlistArr,
-              teams: updatedTeams
-            });
-            console.log(`📝 Removed ${userId} from game ${existingGame.id} after voting no`);
+              await DatabaseService.updateGame(existingGame.id, {
+                participants: updatedParticipants,
+                waitlist: updatedWaitlistArr,
+                teams: updatedTeams
+              });
+              console.log(`📝 Removed ${userId} from game ${existingGame.id} after voting no`);
+            }
           } else if (currentWaitlist.includes(userId)) {
             const updatedWaitlistArr = currentWaitlist.filter((id: string) => id !== userId);
             await DatabaseService.updateGame(existingGame.id, {
@@ -188,21 +194,27 @@ export async function DELETE(request: NextRequest) {
             console.log(`✅ Promoted user ${promotedUserId} from waitlist after ${userId} unvoted`);
           }
 
-          // Clean up team assignments if they exist
-          let updatedTeams = existingGame.teams;
-          if (updatedTeams) {
-            updatedTeams = {
-              team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
-              team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
-            };
-          }
+          if (updatedParticipants.length < 10) {
+            // Not enough players - delete the game
+            await DatabaseService.deleteGame(existingGame.id);
+            console.log(`🗑️ Deleted game ${existingGame.id} - dropped below 10 players after ${userId} unvoted`);
+          } else {
+            // Clean up team assignments if they exist
+            let updatedTeams = existingGame.teams;
+            if (updatedTeams) {
+              updatedTeams = {
+                team1: (updatedTeams.team1 || []).filter((id: string) => id !== userId),
+                team2: (updatedTeams.team2 || []).filter((id: string) => id !== userId)
+              };
+            }
 
-          await DatabaseService.updateGame(existingGame.id, {
-            participants: updatedParticipants,
-            waitlist: updatedWaitlist,
-            teams: updatedTeams
-          });
-          console.log(`📝 Removed ${userId} from game ${existingGame.id} participants after unvote`);
+            await DatabaseService.updateGame(existingGame.id, {
+              participants: updatedParticipants,
+              waitlist: updatedWaitlist,
+              teams: updatedTeams
+            });
+            console.log(`📝 Removed ${userId} from game ${existingGame.id} participants after unvote`);
+          }
         } else if (currentWaitlist.includes(userId)) {
           // Remove from waitlist
           const updatedWaitlist = currentWaitlist.filter((id: string) => id !== userId);

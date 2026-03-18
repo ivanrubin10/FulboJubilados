@@ -306,6 +306,7 @@ export default function GamesPage() {
           const yesVoterIds = new Set(yesVotes.map(v => v.userId));
           const staleParticipants = game.participants.filter(id => !yesVoterIds.has(id));
           if (staleParticipants.length > 0) {
+            const gameId = game.id;
             const cleanedParticipants = game.participants.filter(id => yesVoterIds.has(id));
             const cleanedWaitlist = (game.waitlist || []).filter(id => yesVoterIds.has(id));
 
@@ -314,14 +315,21 @@ export default function GamesPage() {
               cleanedParticipants.push(cleanedWaitlist.shift()!);
             }
 
-            game = { ...game, participants: cleanedParticipants, waitlist: cleanedWaitlist };
+            if (cleanedParticipants.length < 10) {
+              // Not enough players - delete the game, revert to voting state
+              game = null;
+              fetch(`/api/games/${gameId}`, { method: 'DELETE' })
+                .catch(err => console.error('Error deleting game with insufficient players:', err));
+            } else {
+              game = { ...game, participants: cleanedParticipants, waitlist: cleanedWaitlist };
 
-            // Fire background request to fix the DB
-            fetch(`/api/games/${game.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ participants: cleanedParticipants, waitlist: cleanedWaitlist })
-            }).catch(err => console.error('Error reconciling game participants:', err));
+              // Fire background request to fix the DB
+              fetch(`/api/games/${game.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ participants: cleanedParticipants, waitlist: cleanedWaitlist })
+              }).catch(err => console.error('Error reconciling game participants:', err));
+            }
           }
         }
 
