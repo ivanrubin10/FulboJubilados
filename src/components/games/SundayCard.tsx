@@ -327,15 +327,20 @@ export function SundayCard({
           </div>
 
           {/* Display Players List if teams not arranged yet */}
-          {!game.teams && game.participants.length > 0 && (
+          {!game.teams && game.participants.length > 0 && (() => {
+            // For scheduled games, only show participants who have a YES vote
+            const confirmedPlayerIds = game.status === 'scheduled'
+              ? game.participants.filter(id => voters.some(v => v.userId === id))
+              : game.participants;
+            return confirmedPlayerIds.length > 0 && (
             <div className={`mt-4 rounded-lg p-3 ${
               theme === 'dark' ? 'bg-background/70' : 'bg-white/70'
             }`}>
               <p className="text-xs font-semibold text-muted-foreground mb-2">
-                Jugadores confirmados:
+                Jugadores confirmados ({confirmedPlayerIds.length}):
               </p>
               <div className="flex flex-wrap gap-2">
-                {game.participants.map((playerId) => {
+                {confirmedPlayerIds.map((playerId) => {
                   const player = voters.find(v => v.userId === playerId)
                     || noVoters.find(v => v.userId === playerId)
                     || nonVoters.find(v => v.userId === playerId);
@@ -368,7 +373,8 @@ export function SundayCard({
                 })}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Display Teams if arranged */}
           {game.teams && (
@@ -780,7 +786,7 @@ export function SundayCard({
             </div>
           )}
 
-          {!game.teams && userInGame && (
+          {!game.teams && userInGame && voters.some(v => v.userId === currentUserId) && (
             <div className={`mt-3 p-2 rounded-lg text-sm font-semibold text-center ${
               theme === 'dark'
                 ? 'bg-blue-900/40 text-blue-300'

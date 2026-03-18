@@ -131,6 +131,9 @@ export default function GamesPage() {
 
       setIsLoading(true);
       try {
+        // Sync game participants with actual YES votes before fetching
+        await fetch('/api/games/sync', { method: 'POST' }).catch(() => {});
+
         // Fetch settings, users, games in parallel
         const [settingsRes, usersRes, gamesRes] = await Promise.all([
           fetch('/api/settings'),
@@ -285,14 +288,6 @@ export default function GamesPage() {
         const dayLabel = getDayLabel(date);
         const isPast = false; // Already filtered out past days
 
-        // Find game for this day
-        let game = games.find(g => {
-          const gameDate = new Date(g.date);
-          return gameDate.getFullYear() === year &&
-                 gameDate.getMonth() === month - 1 &&
-                 gameDate.getDate() === dayNumber;
-        }) || null;
-
         // Get all votes for this day
         const dayVotes = monthDayVotes.filter(v => v.day === dayNumber);
 
@@ -300,37 +295,25 @@ export default function GamesPage() {
         const yesVotes = dayVotes.filter(v => v.voteType === 'yes');
         const noVotes = dayVotes.filter(v => v.voteType === 'no');
 
-        // Reconcile stale game data: remove participants who no longer have a YES vote
-        // Only reconcile when votes are loaded (monthDayVotes has data) to avoid clearing on initial render
-        if (game && game.status === 'scheduled' && monthDayVotes.length > 0) {
-          const yesVoterIds = new Set(yesVotes.map(v => v.userId));
-          const staleParticipants = game.participants.filter(id => !yesVoterIds.has(id));
-          if (staleParticipants.length > 0) {
-            const gameId = game.id;
-            const cleanedParticipants = game.participants.filter(id => yesVoterIds.has(id));
-            const cleanedWaitlist = (game.waitlist || []).filter(id => yesVoterIds.has(id));
+        // Find game for this day
+        const dbGame = games.find(g => {
+          const gameDate = new Date(g.date);
+          return gameDate.getFullYear() === year &&
+                 gameDate.getMonth() === month - 1 &&
+                 gameDate.getDate() === dayNumber;
+        }) || null;
 
-            // Promote from waitlist to fill participant slots
-            while (cleanedParticipants.length < 10 && cleanedWaitlist.length > 0) {
-              cleanedParticipants.push(cleanedWaitlist.shift()!);
-            }
-
-            if (cleanedParticipants.length < 10) {
-              // Not enough players - delete the game, revert to voting state
-              game = null;
-              fetch(`/api/games/${gameId}`, { method: 'DELETE' })
-                .catch(err => console.error('Error deleting game with insufficient players:', err));
-            } else {
-              game = { ...game, participants: cleanedParticipants, waitlist: cleanedWaitlist };
-
-              // Fire background request to fix the DB
-              fetch(`/api/games/${game.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ participants: cleanedParticipants, waitlist: cleanedWaitlist })
-              }).catch(err => console.error('Error reconciling game participants:', err));
-            }
-          }
+        // The votes are the source of truth. A game only renders as a match card if:
+        // - It's scheduled/confirmed/completed AND has 10+ YES voters
+        // - Cancelled games always revert to the base voting card
+        let game = dbGame;
+        if (dbGame && (
+          dbGame.status === 'cancelled' ||
+          (dbGame.status === 'scheduled' && yesVotes.length < 10)
+        )) {
+          game = null;
+          // Fire background cleanup to delete the stale game from DB
+          fetch(`/api/games/${dbGame.id}`, { method: 'DELETE' }).catch(() => {});
         }
 
         const yesVotersWithInfo = yesVotes.map((vote, index) => {
@@ -371,8 +354,9 @@ export default function GamesPage() {
         const userVotedNo = userVote?.voteType === 'no';
         const userPositionInQueue = userVoted ? yesVotersWithInfo.findIndex(v => v.userId === currentUser.id) + 1 : null;
 
-        const userInGame = (game?.participants.includes(currentUser.id) && userVoted) || false;
-        const userInWaitlist = (game?.waitlist?.includes(currentUser.id) && userVoted) || false;
+        // userInGame is ONLY true if the user has a YES vote — never from stale game data
+        const userInGame = userVoted && (game?.participants.includes(currentUser.id) || false);
+        const userInWaitlist = userVoted && (game?.waitlist?.includes(currentUser.id) || false);
 
         // Determine if user can vote/unvote
         // Users can vote/unvote on scheduled games, but not on confirmed games
@@ -487,10 +471,43 @@ export default function GamesPage() {
     }
   }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, success, error]);
 
+  // Helper: optimistically remove a user from games state for a given day
+  const removeUserFromGamesState = useCallback((userId: string, year: number, month: number, dayNumber: number) => {
+    setGames(prev => prev.map(g => {
+      const gd = new Date(g.date);
+      if (gd.getFullYear() !== year || gd.getMonth() !== month - 1 || gd.getDate() !== dayNumber) return g;
+      if (g.status !== 'scheduled') return g;
+
+      const inParticipants = g.participants.includes(userId);
+      const inWaitlist = g.waitlist?.includes(userId);
+      if (!inParticipants && !inWaitlist) return g;
+
+      const newParticipants = g.participants.filter(id => id !== userId);
+      let newWaitlist = (g.waitlist || []).filter(id => id !== userId);
+
+      // Promote from waitlist
+      if (inParticipants && newWaitlist.length > 0) {
+        newParticipants.push(newWaitlist[0]);
+        newWaitlist = newWaitlist.slice(1);
+      }
+
+      return { ...g, participants: newParticipants, waitlist: newWaitlist };
+    }).filter(g => {
+      // Remove game entirely if below 10 participants
+      const gd = new Date(g.date);
+      if (gd.getFullYear() === year && gd.getMonth() === month - 1 && gd.getDate() === dayNumber) {
+        if (g.status === 'scheduled' && g.participants.length < 10) return false;
+      }
+      return true;
+    }));
+  }, []);
+
   const handleVoteNo = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
-    // Optimistic update - immediately add the vote to local state
+    const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
+
+    // Optimistic updates: change vote AND remove from game immediately
     const newVote: DayVote = {
       userId: currentUser.id,
       day: dayNumber,
@@ -498,13 +515,12 @@ export default function GamesPage() {
       voteType: 'no'
     };
 
-    const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
-
     if (isCurrentMonth) {
       setCurrentMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
     } else {
       setNextMonthDayVotes(prev => [...prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)), newVote]);
     }
+    removeUserFromGamesState(currentUser.id, year, month, dayNumber);
 
     success('Voto registrado', `Votaste NO por el ${dayNumber}`);
 
@@ -523,7 +539,9 @@ export default function GamesPage() {
 
       if (!response.ok) throw new Error('Failed to vote');
 
-      // Silently sync with server data in background
+      // Sync DB and refetch
+      await fetch('/api/games/sync', { method: 'POST' }).catch(() => {});
+
       const [currentVotesRes, nextVotesRes, gamesRes] = await Promise.all([
         fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
         fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`),
@@ -536,7 +554,6 @@ export default function GamesPage() {
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
 
-      // Refetch games to reflect participant changes
       if (gamesRes.ok) {
         const allGames = await gamesRes.json();
         setGames(allGames.map((game: Game) => ({
@@ -548,7 +565,6 @@ export default function GamesPage() {
       }
     } catch (err) {
       console.error('Error voting:', err);
-      // Revert optimistic update on error
       if (isCurrentMonth) {
         setCurrentMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
       } else {
@@ -556,24 +572,24 @@ export default function GamesPage() {
       }
       error('Error', 'No se pudo registrar el voto');
     }
-  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, success, error]);
+  }, [currentUser, effectiveMonth, effectiveYear, effectiveNextMonth, effectiveNextYear, removeUserFromGamesState, success, error]);
 
   const handleUnvote = useCallback(async (dayNumber: number, year: number, month: number) => {
     if (!currentUser) return;
 
     const isCurrentMonth = year === effectiveYear && month === effectiveMonth;
 
-    // Store previous vote for rollback if needed
     const previousVote = isCurrentMonth
       ? currentMonthDayVotes.find(v => v.userId === currentUser.id && v.day === dayNumber)
       : nextMonthDayVotes.find(v => v.userId === currentUser.id && v.day === dayNumber);
 
-    // Optimistic update - immediately remove the vote from local state
+    // Optimistic updates: remove vote AND remove from game immediately
     if (isCurrentMonth) {
       setCurrentMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
     } else {
       setNextMonthDayVotes(prev => prev.filter(v => !(v.userId === currentUser.id && v.day === dayNumber)));
     }
+    removeUserFromGamesState(currentUser.id, year, month, dayNumber);
 
     success('Voto eliminado', `Removiste tu voto del ${dayNumber}`);
 
@@ -584,7 +600,9 @@ export default function GamesPage() {
 
       if (!response.ok) throw new Error('Failed to unvote');
 
-      // Silently sync with server data in background
+      // Sync DB and refetch
+      await fetch('/api/games/sync', { method: 'POST' }).catch(() => {});
+
       const [currentVotesRes, nextVotesRes, gamesRes] = await Promise.all([
         fetch(`/api/day-votes?year=${effectiveYear}&month=${effectiveMonth}`),
         fetch(`/api/day-votes?year=${effectiveNextYear}&month=${effectiveNextMonth}`),
@@ -597,7 +615,6 @@ export default function GamesPage() {
       setCurrentMonthDayVotes(currentVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
       setNextMonthDayVotes(nextVotes.map((v: { userId: string; year: number; month: number; day: number; voteType: string; votedAt: string }) => ({ ...v, votedAt: new Date(v.votedAt) })));
 
-      // Refetch games to reflect participant changes
       if (gamesRes.ok) {
         const allGames = await gamesRes.json();
         setGames(allGames.map((game: Game) => ({
