@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect, useCallback } from 'react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getDayLabel } from '@/lib/utils';
 import { Game, User, MvpResults } from '@/types';
 import { useToast } from '@/components/ui/toast';
 import { useTheme } from '@/contexts/theme-context';
@@ -479,6 +479,7 @@ export default function HistoryPage() {
                     key={game.id}
                     date={gameDate}
                     dayNumber={gameDate.getDate()}
+                    dayLabel={getDayLabel(gameDate)}
                     isPast={false}
                     userVoted={game.participants.includes(currentUser?.id || '')}
                     userVotedNo={false}
