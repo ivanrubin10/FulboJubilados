@@ -1,26 +1,15 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Define which routes require authentication
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard/games(.*)',
-  '/dashboard/profile(.*)',
-  '/dashboard/component-test(.*)',
-  '/dashboard$',
-  '/setup-nickname',
-]);
+// DEPRECATED: Fulbo Jubilados se mudó a Cancha (https://play.cancha.app).
+// Esta app ya no se usa: todas las rutas redirigen al aviso de deprecación.
+export default function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-export default clerkMiddleware(async (auth, req) => {
-  // Protect dashboard and setup-nickname routes
-  if (isProtectedRoute(req)) {
-    const { userId } = await auth();
-    
-    // If user is not authenticated, redirect to home page
-    if (!userId) {
-      return NextResponse.redirect(new URL('/', req.url));
-    }
+  if (pathname !== '/deprecated') {
+    return NextResponse.redirect(new URL('/deprecated', req.url));
   }
-});
+}
 
 export const config = {
   matcher: [

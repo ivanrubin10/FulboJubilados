@@ -1,17 +1,16 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard/games(.*)',
-  '/dashboard/profile(.*)',
-  '/dashboard/component-test(.*)',
-  '/dashboard$',
-  '/admin(.*)',
-  '/setup-nickname',
-])
+// DEPRECATED: Fulbo Jubilados se mudó a Cancha (https://play.cancha.app).
+// Nota: con el directorio `src/`, Next.js usa `src/middleware.ts`; este archivo
+// se mantiene en sincronía solo por consistencia.
+export default function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect()
-})
+  if (pathname !== '/deprecated') {
+    return NextResponse.redirect(new URL('/deprecated', req.url))
+  }
+}
 
 export const config = {
   matcher: [
